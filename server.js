@@ -132,16 +132,16 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-to
 async function seedAdmin() {
     try {
         // เช็คก่อนว่ามี Admin หรือยัง ถ้ามีแล้วจะไม่ Reset (ป้องกันรหัสเปลี่ยนเอง)
-        const adminExists = await User.findOne({ username: 'admin' });
+        const adminExists = await User.findOne({ username: 'NoomfuuAdmin' });
         if (!adminExists) {
-            const hashedPassword = bcrypt.hashSync('admin123', 10);
+            const hashedPassword = bcrypt.hashSync('Noomfuu4869', 10);
             const newAdmin = new User({
-                username: 'admin',
+                username: 'noomfuuadmin',
                 password: hashedPassword,
                 role: 'admin'
             });
             await newAdmin.save();
-            console.log('🔐 Admin Account Created: admin / admin123');
+            console.log('🔐 Admin Account Created: NoomfuuAdmin / Noomfuu4869');
         } else {
             console.log('🔐 Admin Account Exists (Skipping Reset)');
         }
@@ -240,30 +240,53 @@ const auth = (roles = []) => async (req, res, next) => {
 // --- AUTH & TEAMS ROUTES ---
 app.post('/api/login', async (req,res) => {
     try {
-        const {username,password,role} = req.body;
-        if(role==='admin') {
-            const u = await User.findOne({username});
+        const { username, password, role } = req.body;
+        
+        // แปลง input ให้เป็นตัวพิมพ์เล็กเพื่อความแม่นยำ
+        const cleanUsername = username.toLowerCase().trim();
+
+        if(role === 'admin') {
+            const u = await User.findOne({ username: cleanUsername });
             if(!u || !bcrypt.compareSync(password, u.password)) return res.status(400).json({msg:'Invalid Credentials'});
-            return res.json({token:jwt.sign({id:u._id,role:'admin'}, process.env.JWT_SECRET), role:'admin'});
+            return res.json({token:jwt.sign({id:u._id, role:'admin'}, process.env.JWT_SECRET), role:'admin'});
         }
-        const t = await Team.findOne({name:username});
+
+        // ค้นหา Team ด้วย username
+        const t = await Team.findOne({ username: cleanUsername });
+        
         if(!t || !bcrypt.compareSync(password, t.password)) return res.status(400).json({msg:'Invalid Credentials'});
-        if(t.status!=='approved') return res.status(403).json({msg:'Team account not approved yet'});
-        res.json({token:jwt.sign({id:t._id,role:'team',name:t.name}, process.env.JWT_SECRET), role:'team', id:t._id});
+        if(t.status !== 'approved') return res.status(403).json({msg:'Team account not approved yet'});
+        
+        // Payload ส่ง name (Display Name) ไปแสดงผล แต่ id ยังคงเดิม
+        res.json({token:jwt.sign({id:t._id, role:'team', name:t.name}, process.env.JWT_SECRET), role:'team', id:t._id});
     } catch (e) { res.status(500).json({msg: 'Server Error'}); }
 });
-
 // [UPDATED] Register using Cloudinary-aware upload
 app.post('/api/register', upload.single('logo'), async(req,res)=>{
     try {
-        const {name,shortName,password} = req.body;
-        // ปรับ Logic การเก็บ Path รูป (Cloudinary = req.file.path, Local = req.file.filename)
+        // รับ username เพิ่มเข้ามา
+        const { username, name, shortName, password } = req.body;
+        const cleanUsername = username.toLowerCase().trim();
+
         const logo = req.file ? (req.file.path || `/uploads/${req.file.filename}`) : DEFAULT_LOGO;
         
-        const existing = await Team.findOne({ name });
-        if(existing) return res.status(400).json({msg: 'Team name already exists'});
+        // Check 1: Username ซ้ำไหม?
+        const existingUser = await Team.findOne({ username: cleanUsername });
+        if(existingUser) return res.status(400).json({msg: 'Username is already taken'});
+
+        // Check 2: Team Name (Display Name) ซ้ำไหม? (ยังควรเช็คเพื่อไม่ให้สับสนในการแข่ง)
+        const existingName = await Team.findOne({ name: name });
+        if(existingName) return res.status(400).json({msg: 'Team Name is already registered'});
         
-        await new Team({name,shortName,password:bcrypt.hashSync(password,10),logo,status:'pending'}).save();
+        await new Team({
+            username: cleanUsername,
+            name,
+            shortName,
+            password: bcrypt.hashSync(password, 10),
+            logo,
+            status: 'pending'
+        }).save();
+        
         res.json({success:true});
     } catch (e) { res.status(500).json({msg: e.message}); }
 });

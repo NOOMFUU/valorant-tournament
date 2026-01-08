@@ -1,3 +1,4 @@
+// models/Team.js
 const mongoose = require('mongoose');
 
 const MemberSchema = new mongoose.Schema({
@@ -5,8 +6,6 @@ const MemberSchema = new mongoose.Schema({
     tag: String,
     role: { type: String, enum: ['Main', 'Sub', 'Coach'], default: 'Main' },
     status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'pending' },
-    
-    // *** NEW: เก็บข้อมูลใหม่ที่รออนุมัติ (Old vs New) ***
     pendingUpdate: {
         name: String,
         tag: String
@@ -14,19 +13,25 @@ const MemberSchema = new mongoose.Schema({
 });
 
 const TeamSchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true },
+    // [NEW] username สำหรับ Login (ห้ามซ้ำ, แก้ไขยาก)
+    username: { 
+        type: String, 
+        required: true, 
+        unique: true, 
+        lowercase: true, // บังคับตัวเล็กหมดเพื่อลดปัญหา Case sensitive
+        trim: true 
+    },
+    // [MODIFIED] name คือ Display Name (แสดงผลในตารางแข่ง)
+    name: { type: String, required: true }, 
     shortName: { type: String, required: true, maxlength: 4, uppercase: true },
     password: { type: String, required: true },
     logo: { type: String, default: '' },
     status: { type: String, enum: ['pending', 'approved'], default: 'pending' },
     
     members: [MemberSchema],
-    
-    // ตัวล็อค: ถ้าเป็น false (ครั้งแรก) จะ Auto Approve, ถ้า true (เคยส่งแล้ว) จะต้องรออนุมัติ
     rosterLocked: { type: Boolean, default: false },
-    
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 }
-});
+}, { timestamps: true }); // เพิ่ม Timestamps เพื่อดูเวลาสมัคร/แก้ไขล่าสุด
 
 module.exports = mongoose.model('Team', TeamSchema);
