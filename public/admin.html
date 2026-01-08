@@ -670,7 +670,32 @@
             const badge = document.getElementById('navBadgeTeams'); if (totalAction > 0) { badge.innerText = totalAction; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
             document.getElementById('teamGrid').innerHTML = t.map(x => {
                 const isPending = x.status === 'pending'; const hasNameChange = x.members.some(m => m.pendingUpdate);
-                return `<div class="bg-[#15171a] p-5 border border-[#2d3139] flex justify-between items-center hover:border-gray-500 transition rounded-lg relative overflow-hidden">${isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 animate-pulse"></div>' : ''}${hasNameChange && !isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>' : ''}<div class="flex items-center gap-5"><img src="${x.logo||DEFAULT_LOGO}" class="w-12 h-12 rounded bg-black object-cover border border-[#333]"><div onclick="openRosterModal('${x._id}')" class="cursor-pointer group"><div class="flex items-center gap-3"><div class="font-bold text-lg text-white group-hover:text-[#ff4655] transition">${x.name}</div>${isPending ? '<span class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-500/30 font-bold uppercase tracking-widest">PENDING</span>' : ''}${hasNameChange ? '<span class="text-[10px] bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30 font-bold uppercase tracking-widest">NAME CHANGE</span>' : ''}</div><div class="text-sm text-gray-400 font-mono mt-1">TAG: ${x.shortName} <span class="mx-2 text-gray-600">|</span> <span class="text-gray-500">${x.members.length} Members</span></div></div></div><div class="flex items-center gap-3">${isPending ? `<button onclick="approveTeam('${x._id}')" class="w-10 h-10 rounded bg-green-500/10 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white transition flex items-center justify-center shadow-lg"><i class="fa-solid fa-check"></i></button>` : ''}<button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="w-10 h-10 rounded bg-[#222] border border-[#333] text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center"><i class="fa-solid fa-pen text-sm"></i></button><button onclick="deleteTeam('${x._id}')" class="w-10 h-10 rounded bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center"><i class="fa-solid fa-trash text-sm"></i></button></div></div>`;
+                return `<div class="bg-[#15171a] p-5 border border-[#2d3139] flex justify-between items-center hover:border-gray-500 transition rounded-lg relative overflow-hidden">
+                    ${isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 animate-pulse"></div>' : ''}
+                    ${hasNameChange && !isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>' : ''}
+                    
+                    <div class="flex items-center gap-5">
+                        <img src="${x.logo||DEFAULT_LOGO}" class="w-12 h-12 rounded bg-black object-cover border border-[#333]">
+                        <div onclick="openRosterModal('${x._id}')" class="cursor-pointer group">
+                            <div class="flex items-center gap-3">
+                                <div class="font-bold text-lg text-white group-hover:text-[#ff4655] transition">${x.name}</div>
+                                ${isPending ? '<span class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-500/30 font-bold uppercase tracking-widest">PENDING</span>' : ''}
+                                ${hasNameChange ? '<span class="text-[10px] bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30 font-bold uppercase tracking-widest">NAME CHANGE</span>' : ''}
+                            </div>
+                            <div class="text-sm text-gray-400 font-mono mt-1">TAG: ${x.shortName} <span class="mx-2 text-gray-600">|</span> <span class="text-gray-500">${x.members.length} Members</span></div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        ${isPending ? `<button onclick="approveTeam('${x._id}')" class="w-10 h-10 rounded bg-green-500/10 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white transition flex items-center justify-center shadow-lg"><i class="fa-solid fa-check"></i></button>` : ''}
+                        
+                        <button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="w-10 h-10 rounded bg-[#222] border border-[#333] text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center"><i class="fa-solid fa-pen text-sm"></i></button>
+                        
+                        <button onclick="resetTeamPassword('${x._id}', '${x.name}')" class="w-10 h-10 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500 hover:text-black transition flex items-center justify-center" title="Reset Password"><i class="fa-solid fa-key text-sm"></i></button>
+                        
+                        <button onclick="deleteTeam('${x._id}')" class="w-10 h-10 rounded bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center"><i class="fa-solid fa-trash text-sm"></i></button>
+                    </div>
+                </div>`;
             }).join('');
         }
         function renderRequests(matches) {
@@ -955,6 +980,23 @@
         }
         async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
         async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
+        async function resetTeamPassword(id, name) {
+            const newPass = prompt(`Enter NEW Password for team: ${name}`);
+            if (!newPass) return; // ถ้ากด Cancel หรือไม่ใส่ ก็จบ
+
+            const res = await fetch(`/api/teams/${id}/reset-password`, {
+                method: 'PUT',
+                headers: { 'Authorization': token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newPassword: newPass })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                showToast(`Password for ${name} changed!`);
+            } else {
+                showToast(data.msg || 'Error', 'error');
+            }
+        }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
         function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
         async function generateStage() { 

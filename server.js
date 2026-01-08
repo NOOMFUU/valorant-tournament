@@ -370,6 +370,21 @@ app.put('/api/teams/:id', auth(['admin']), async (req, res) => {
     }
 });
 
+// [ADDED] Admin Reset Team Password
+app.put('/api/teams/:id/reset-password', auth(['admin']), async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+        if (!newPassword) return res.status(400).json({ msg: 'New password is required' });
+
+        const hash = bcrypt.hashSync(newPassword, 10);
+        await Team.findByIdAndUpdate(req.params.id, { password: hash });
+
+        res.json({ success: true, msg: 'Password updated successfully' });
+    } catch (e) {
+        res.status(500).json({ msg: e.message });
+    }
+});
+
 app.put('/api/teams/:id/members/:mid/status', auth(['admin']), async(req,res)=>{
     try {
         const { status } = req.body;
