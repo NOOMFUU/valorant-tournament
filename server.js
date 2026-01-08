@@ -219,6 +219,16 @@ setInterval(async () => {
     } catch (e) { console.error("Auto Check-in Error", e); }
 }, 60 * 1000);
 
+const getFileUrl = (file) => {
+    if (!file) return null;
+    // ถ้าเป็น Cloudinary หรือ URL เต็มอยู่แล้ว ให้ใช้เลย
+    if (file.path && (file.path.startsWith('http') || file.path.startsWith('https'))) {
+        return file.path;
+    }
+    // ถ้าเป็น Local ให้เติม /uploads/ ข้างหน้า เพื่อให้ Browser เข้าถึงได้
+    return `/uploads/${file.filename}`;
+};
+
 // --- AUTH MIDDLEWARE ---
 const auth = (roles = []) => async (req, res, next) => {
     let t = req.headers['authorization'];
@@ -268,8 +278,8 @@ app.post('/api/register', upload.single('logo'), async(req,res)=>{
         const { username, name, shortName, password } = req.body;
         const cleanUsername = username.toLowerCase().trim();
 
-        const logo = req.file ? (req.file.path || `/uploads/${req.file.filename}`) : DEFAULT_LOGO;
-        
+        const logo = req.file ? getFileUrl(req.file) : DEFAULT_LOGO;        
+
         // Check 1: Username ซ้ำไหม?
         const existingUser = await Team.findOne({ username: cleanUsername });
         if(existingUser) return res.status(400).json({msg: 'Username is already taken'});
@@ -379,7 +389,7 @@ app.delete('/api/teams/:id/members/:mid', auth(['admin']), async (req, res) => {
 app.put('/api/teams/logo', auth(['team']), upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
-        const logoPath = req.file.path || `/uploads/${req.file.filename}`;
+        const logoPath = getFileUrl(req.file);        
         await Team.findByIdAndUpdate(req.user.id, { logo: logoPath });
         res.json({ success: true, logo: logoPath });
     } catch (e) { res.status(500).json({ msg: 'Error' }); }
@@ -469,7 +479,8 @@ app.post('/api/matches/:id/submit-score', auth(['team']), upload.any(), async (r
             if(parts.length === 2 && parts[0] === 'proof') {
                 const index = parseInt(parts[1]);
                 if(scores[index]) {
-                    scores[index].proofImage = file.path || `/uploads/${file.filename}`;
+                    // [แก้ตรงนี้]
+                    scores[index].proofImage = getFileUrl(file);
                 }
             }
         });
@@ -504,7 +515,7 @@ app.post('/api/matches/:id/claim-forfeit', auth(['team']), upload.single('proof'
                 mapName: `Forfeit Map ${i+1}`,
                 teamAScore: isTeamA ? 13 : 0,
                 teamBScore: isTeamA ? 0 : 13,
-                proofImage: req.file.path || `/uploads/${req.file.filename}`
+                proofImage: getFileUrl(req.file)
             });
         }
 
