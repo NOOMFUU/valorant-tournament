@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Command Center | VCT Style</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --val-red: #ff4655;
+            --val-dark: #0f1923;
+            --val-gray: #ece8e1;
+            --bg-overlay: rgba(15, 25, 35, 0.92);
+        }
+        
+        body {
+            background-color: var(--val-dark);
+            color: var(--val-gray);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Typography Override */
+        .font-header { font-family: 'Tungsten', 'Impact', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+        .font-tech { font-family: 'Rajdhani', sans-serif; text-transform: uppercase; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
+
+        /* Navigation Style */
+        .nav-item {
+            position: relative;
+            opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+        .nav-item:hover, .nav-item.active {
+            opacity: 1;
+            color: white;
+        }
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            top: -28px; /* Adjust based on header height */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 4px;
+            background: var(--val-red);
+            box-shadow: 0 0 15px var(--val-red);
+        }
+
+        /* Glass Panel Enhanced */
+        .tech-panel {
+            background: rgba(20, 24, 28, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        /* Corner Decorations */
+        .tech-panel::after {
+            content: ''; position: absolute; top: 0; right: 0; width: 20px; height: 20px;
+            border-top: 2px solid rgba(255,255,255,0.3); border-right: 2px solid rgba(255,255,255,0.3);
+        }
+        .tech-panel::before {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 20px; height: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.3); border-left: 2px solid rgba(255,255,255,0.3);
+        }
+
+        /* Buttons */
+        .btn-val {
+            background: var(--val-red);
+            color: white;
+            font-family: 'Tungsten', sans-serif;
+            letter-spacing: 1.5px;
+            font-size: 1.2rem;
+            position: relative;
+            transition: all 0.2s;
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+        }
+        .btn-val:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 70, 85, 0.4);
+            filter: brightness(1.1);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #ece8e1;
+            font-family: 'Tungsten', sans-serif;
+            transition: 0.2s;
+        }
+        .btn-outline:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: var(--val-red);
+            color: white;
+        }
+
+        /* Roster Card */
+        .agent-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(20,20,20,0.8) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+        }
+        .agent-card:hover {
+            border-color: var(--val-red);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.8);
+        }
+        .agent-card:hover .role-bg { opacity: 0.1; transform: scale(1.2); }
+        
+        .role-bg {
+            position: absolute; top: 10px; right: 10px; font-size: 80px;
+            color: white; opacity: 0.03; transition: 0.5s; pointer-events: none;
+        }
+
+        .roster-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #333;
+            color: white;
+            width: 100%;
+            padding: 5px 0;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            transition: 0.3s;
+        }
+        .roster-input:focus {
+            outline: none;
+            border-color: var(--val-red);
+        }
+        .roster-input:disabled {
+            border-color: transparent;
+            color: #ccc;
+        }
+
+        /* Animations */
+        .animate-enter { animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(20px); }
+        @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
+
+        /* Loader */
+        #loader { transition: opacity 0.5s; }
+        
+        /* Grid Background Pattern */
+        .bg-grid {
+            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen bg-[url('https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png')] bg-fixed bg-cover">
+    
+    <div class="fixed inset-0 bg-[#0f1923]/95 pointer-events-none z-0"></div>
+    <div class="fixed inset-0 bg-grid pointer-events-none z-0"></div>
+
+    <div id="loader" class="fixed inset-0 bg-[#0f1923] z-[9999] flex items-center justify-center">
+        <div class="text-center relative">
+            <div class="w-16 h-16 border-4 border-[#333] border-t-[#ff4655] rounded-full animate-spin mx-auto mb-4"></div>
+            <h2 class="font-header text-4xl text-white tracking-widest">ESTABLISHING UPLINK</h2>
+        </div>
+    </div>
+
+    <header class="relative z-50 h-24 border-b border-white/5 bg-[#0f1923]/80 backdrop-blur-md">
+        <div class="max-w-[1600px] w-full mx-auto px-6 h-full flex justify-between items-center">
+            
+            <div class="flex items-center gap-6">
+                <div class="relative group cursor-pointer" onclick="document.getElementById('logoInput').click()">
+                    <div class="w-14 h-14 bg-black border border-white/20 flex items-center justify-center overflow-hidden transition-all group-hover:border-[#ff4655]">
+                        <img id="teamLogo" src="https://via.placeholder.com/100" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/50">
+                            <i class="fa-solid fa-pen text-white text-xs"></i>
+                        </div>
+                    </div>
+                    <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="uploadLogo(this)">
+                </div>
+                
+                <div class="flex flex-col">
+                    <h1 id="teamHeader" class="text-3xl font-header font-bold text-white leading-none tracking-wide">LOADING...</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-mono text-gray-400 tracking-widest uppercase">Captain Access</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="hidden lg:flex gap-10 h-full items-center">
+                <button onclick="nav('dashboard')" id="nav-dashboard" class="nav-item h-full flex items-center font-header text-xl tracking-wider active">
+                    DASHBOARD
+                </button>
+                <button onclick="nav('roster')" id="nav-roster" class="nav-item h-full flex items-center font-header text-xl tracking-wider">
+                    ROSTER
+                </button>
+                <a href="/scoreboard.html" target="_blank" class="nav-item h-full flex items-center font-header text-xl tracking-wider opacity-60 hover:opacity-100">
+                    PUBLIC VIEW <i class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs"></i>
+                </a>
+            </nav>
+
+            <button onclick="logout()" class="group relative px-6 py-2 border border-white/20 overflow-hidden">
+                <div class="absolute inset-0 w-0 bg-white transition-all duration-[250ms] ease-out group-hover:w-full opacity-10"></div>
+                <span class="relative text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 group-hover:text-white transition-colors">
+                    Disconnect
+                </span>
+            </button>
+        </div>
+    </header>
+
+    <main class="relative z-10 flex-1 py-10 px-4">
+        
+        <div id="toast" class="fixed top-28 right-5 z-[100] translate-x-[150%] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+            <div class="bg-white text-[#0f1923] pl-4 pr-8 py-4 border-l-8 border-[#ff4655] shadow-2xl flex items-center gap-4 min-w-[300px]">
+                <i class="fa-solid fa-bell text-[#ff4655] text-xl"></i>
+                <div>
+                    <h4 class="font-header text-2xl leading-none">SYSTEM</h4>
+                    <p class="text-xs font-bold text-gray-600 font-mono mt-1 uppercase" id="toastMsg">Operation Successful</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto min-h-[600px]">
+            
+            <section id="view-dashboard" class="animate-enter space-y-8">
+                
+                <div id="heroSection" class="relative overflow-hidden hidden group border-t border-b border-[#ff4655]/30 bg-gradient-to-r from-[#ff4655]/10 to-transparent p-10">
+                    <div class="absolute right-0 top-1/2 -translate-y-1/2 opacity-10 group-hover:opacity-20 transition duration-700 transform group-hover:scale-110">
+                        <i class="fa-brands fa-valorant text-[20rem] text-white"></i>
+                    </div>
+                    
+                    <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-[#ff4655] text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-widest">Next Operation</span>
+                                <div class="h-[1px] w-20 bg-[#ff4655]"></div>
+                            </div>
+                            <h2 class="text-6xl md:text-7xl font-header text-white tracking-tight leading-none italic" id="heroMatchTitle">VS ENEMY</h2>
+                            <p class="text-[#ff4655] text-lg font-mono font-bold mt-2" id="heroMatchTime">SCHEDULED: ...</p>
+                        </div>
+                        <div id="heroActionBtn"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                            <h3 class="text-2xl font-header text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-[#ff4655]"></i> DEPLOYMENTS
+                            </h3>
+                            <span class="text-[10px] text-gray-500 font-mono">ACTIVE SECTOR</span>
+                        </div>
+                        <div id="matchList" class="space-y-4"></div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="tech-panel p-6">
+                            <h3 class="text-gray-500 text-sm font-tech tracking-widest mb-4 border-b border-white/5 pb-2">TEAM STATUS</h3>
+                            
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-sm text-gray-400 font-bold uppercase">Ready State</span>
+                                <span class="text-xs font-bold px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/30" id="rosterStatusBadge">OPERATIONAL</span>
+                            </div>
+
+                            <div class="mt-6 pt-4 border-t border-white/5">
+                                <h4 class="text-[10px] text-gray-600 uppercase font-bold tracking-widest mb-3">Quick Actions</h4>
+                                <button onclick="copyRosterToClipboard()" class="w-full btn-outline py-3 flex items-center justify-center gap-2 hover:bg-[#5865F2]/20 hover:border-[#5865F2] hover:text-[#5865F2]">
+                                    <i class="fa-brands fa-discord"></i> Copy Roster (Discord)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-roster" class="hidden animate-enter pb-24">
+                <div class="flex flex-col md:flex-row justify-between items-end border-b border-white/10 pb-6 gap-4 mb-8">
+                    <div>
+                        <h2 class="text-5xl font-header text-white mb-1">AGENT ROSTER</h2>
+                        <p class="text-gray-500 text-sm font-mono tracking-widest border-l-2 border-[#ff4655] pl-3">
+                            MANAGE ACTIVE LINEUP & RESERVES
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div id="lockStatus" class="px-4 py-2 bg-black/40 border border-gray-700 text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                            <i class="fa-solid fa-lock"></i> Locked
+                        </div>
+                        <button onclick="toggleRosterEdit()" id="btn-edit-roster" class="btn-outline px-6 py-2 text-sm">
+                            <i class="fa-solid fa-pen-to-square mr-2"></i> UNLOCK PROTOCOL
+                        </button>
+                    </div>
+                </div>
+            
+                <form id="rosterForm" onsubmit="saveRoster(event)"> 
+                    
+                    <div class="mb-12">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="bg-[#ff4655] text-white font-bold text-xl w-10 h-10 flex items-center justify-center clipped-box">01</div>
+                            <h3 class="text-2xl font-header text-white tracking-wide">STARTING FIVE</h3>
+                            <div class="h-[1px] bg-white/10 flex-1"></div>
+                        </div>
+                        <div id="mainRoster" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2">
+                             <div class="flex items-center gap-4 mb-6">
+                                <div class="bg-gray-700 text-white font-bold text-xl w-10 h-10 flex items-center justify-center clipped-box">02</div>
+                                <h3 class="text-2xl font-header text-gray-300 tracking-wide">RESERVES</h3>
+                                <div class="h-[1px] bg-white/10 flex-1"></div>
+                            </div>
+                            <div id="subRoster" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                        </div>
+                        
+                        <div>
+                             <div class="flex items-center gap-4 mb-6">
+                                <div class="bg-gray-700 text-white font-bold text-xl w-10 h-10 flex items-center justify-center clipped-box">03</div>
+                                <h3 class="text-2xl font-header text-gray-300 tracking-wide">TACTICAL</h3>
+                                <div class="h-[1px] bg-white/10 flex-1"></div>
+                            </div>
+                            <div id="coachRoster" class="grid grid-cols-1 gap-6"></div>
+                        </div>
+                    </div>
+            
+                    <div id="rosterActions" class="hidden fixed bottom-0 left-0 right-0 bg-[#0f1923]/90 backdrop-blur-xl border-t border-[#ff4655] p-6 z-50 flex justify-end gap-6 items-center shadow-[0_-10px_50px_rgba(0,0,0,0.8)] slide-up">
+                        <div class="mr-auto hidden md:flex items-center gap-3 text-yellow-500 px-4 py-2 border-l-2 border-yellow-500 bg-yellow-500/5">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span class="text-xs font-mono uppercase font-bold">Unsaved modifications active</span>
+                        </div>
+                        <button type="button" onclick="location.reload()" class="text-gray-500 hover:text-white font-header text-xl uppercase tracking-wider transition">DISCARD</button>
+                        <button type="submit" class="btn-val px-10 py-3 shadow-[0_0_30px_rgba(255,70,85,0.3)] flex items-center gap-3">
+                            <i class="fa-solid fa-floppy-disk"></i> CONFIRM CHANGES
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <div id="scoreModal" class="fixed inset-0 bg-black/95 hidden items-center justify-center z-[200] backdrop-blur-md p-4">
+        <div class="bg-[#1a1d21] w-full max-w-2xl border border-gray-700 relative animate-enter shadow-2xl">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-[#0f1923]">
+                <div>
+                    <h3 class="text-3xl font-header text-white">MISSION REPORT</h3>
+                    <p class="text-xs text-[#ff4655] font-mono uppercase tracking-widest">Post-Match Data Entry</p>
+                </div>
+                <button onclick="closeModal('scoreModal')" class="text-gray-500 hover:text-white transition text-2xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="scoreForm" onsubmit="submitScore(event)" class="p-8 space-y-6">
+                <div id="rejectAlert" class="hidden bg-red-900/20 border-l-4 border-red-500 p-4 mb-4">
+                    <h4 class="text-red-500 font-bold uppercase text-xs mb-1">Submission Rejected</h4>
+                    <p id="rejectReasonText" class="text-gray-300 text-sm">...</p>
+                </div>
+                
+                <div id="mapInputs" class="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scroll"></div>
+                
+                <button type="submit" class="btn-val w-full py-4 mt-4 shadow-lg">TRANSMIT DATA</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="forfeitModal" class="fixed inset-0 bg-black/95 hidden items-center justify-center z-[200] backdrop-blur-md p-4">
+        <div class="bg-[#1a1d21] w-full max-w-md border border-yellow-600/50 relative animate-enter shadow-[0_0_50px_rgba(234,179,8,0.1)]">
+            <div class="p-6 border-b border-yellow-600/20 flex justify-between items-center bg-yellow-900/10">
+                <div>
+                    <h3 class="text-3xl font-header text-yellow-500">CLAIM VICTORY</h3>
+                    <p class="text-xs text-yellow-700 font-mono uppercase tracking-widest">Opponent No-Show Protocol</p>
+                </div>
+                <button onclick="closeModal('forfeitModal')" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="forfeitForm" onsubmit="submitForfeit(event)" class="p-8 space-y-6">
+                <div class="p-4 bg-yellow-500/5 border border-yellow-500/20 text-xs text-yellow-200 font-mono">
+                    WARNING: Submitting false claims will result in immediate disqualification.
+                </div>
+                <div class="relative group">
+                    <input type="file" id="forfeitProofImg" class="hidden" onchange="document.getElementById('ffFileName').innerText = this.files[0].name; document.getElementById('ffFileName').classList.add('text-yellow-500')">
+                    <label for="forfeitProofImg" class="block w-full border-2 border-dashed border-gray-700 rounded p-10 text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-500/5 transition">
+                        <i class="fa-solid fa-camera text-4xl text-gray-600 mb-3 group-hover:text-yellow-500 transition"></i>
+                        <div id="ffFileName" class="text-sm font-bold text-gray-400">UPLOAD LOBBY SCREENSHOT</div>
+                    </label>
+                </div>
+                <button type="submit" class="btn-outline w-full py-4 text-yellow-500 border-yellow-500/50 hover:bg-yellow-500 hover:text-black font-bold">SUBMIT CLAIM</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if(!token) location.href = '/login.html';
+
+        let myTeamId = null;
+        let isRosterLocked = true;
+        let teamMembers = []; 
+        let matchData = null;
+        let currentMatchId = null;
+
+        // --- INITIALIZATION ---
+        (async () => {
+            try {
+                // Restore Tab
+                const savedTab = localStorage.getItem('activeTab') || 'dashboard';
+                nav(savedTab);
+
+                const team = await fetch('/api/teams/me', { headers: {'Authorization': token} }).then(r=>r.json());
+                myTeamId = team._id;
+                document.getElementById('teamHeader').innerText = team.name;
+                if(team.logo) document.getElementById('teamLogo').src = team.logo;
+                // REMOVED: Win/Loss Stat Record text set
+                
+                isRosterLocked = team.rosterLocked;
+                teamMembers = team.members || [];
+                renderRoster(teamMembers);
+                loadDashboardData();
+                
+                // Hide Loader
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').classList.add('hidden'), 500);
+
+            } catch(e) { console.error(e); showToast('Connection Failed', 'error'); }
+        })();
+
+        // --- DASHBOARD FUNCTIONS ---
+        async function loadDashboardData() {
+            const matches = await fetch('/api/matches').then(r=>r.json());
+            const myMatches = matches.filter(m => (m.teamA?._id === myTeamId || m.teamB?._id === myTeamId) && m.status !== 'finished');
+            
+            const liveMatch = myMatches.find(m => m.status === 'live');
+            const nextMatch = myMatches.find(m => m.status === 'scheduled') || myMatches[0];
+            const heroMatch = liveMatch || nextMatch;
+
+            if (heroMatch) {
+                const isLive = heroMatch.status === 'live';
+                const opp = heroMatch.teamA._id === myTeamId ? heroMatch.teamB : heroMatch.teamA;
+                document.getElementById('heroSection').classList.remove('hidden');
+                document.getElementById('heroMatchTitle').innerText = `VS ${opp?.name || 'TBD'}`;
+                if (isLive) {
+                    document.getElementById('heroMatchTime').innerHTML = `<span class="text-[#ff4655] font-bold animate-pulse"><i class="fa-solid fa-circle text-[8px] mr-2"></i>LIVE COMBAT IN PROGRESS</span>`;
+                    document.getElementById('heroActionBtn').innerHTML = `<a href="/veto.html?match=${heroMatch._id}" class="btn-val px-8 py-3 shadow-lg shadow-red-500/40 inline-block">ENTER VETO PROTOCOL</a>`;
+                } else {
+                    const time = heroMatch.scheduledTime ? new Date(heroMatch.scheduledTime) : null;
+                    const timeStr = time ? `${time.toLocaleDateString()} @ ${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'TIME TBD';
+                    document.getElementById('heroMatchTime').innerText = `SCHEDULED: ${timeStr}`;
+                    document.getElementById('heroActionBtn').innerHTML = `<a href="/veto.html?match=${heroMatch._id}" class="btn-outline px-8 py-3 text-xl inline-block">VIEW LOBBY</a>`;
+                }
+            }
+
+            const listContainer = document.getElementById('matchList');
+            if(myMatches.length === 0) listContainer.innerHTML = `<div class="p-10 border border-dashed border-white/10 rounded bg-white/5 text-center text-gray-500 font-mono uppercase tracking-widest">No active operations found</div>`;
+            else listContainer.innerHTML = myMatches.map(m => createMatchCard(m)).join('');
+        }
+
+        function createMatchCard(m) {
+            const isMeA = m.teamA?._id === myTeamId;
+            const oppName = isMeA ? m.teamB?.name : m.teamA?.name;
+            const oppLogo = isMeA ? m.teamB?.logo : m.teamA?.logo;
+            let statusBadge = '', actionBtn = '', rejectMsg = '';
+
+            if (m.status === 'live') {
+                statusBadge = `<span class="text-[#ff4655] bg-[#ff4655]/10 px-2 py-1 rounded text-[10px] font-bold border border-[#ff4655]/20 animate-pulse">LIVE</span>`;
+                actionBtn = `<a href="/veto.html?match=${m._id}" class="btn-outline px-4 py-2 text-xs text-center flex-1">JOIN VETO</a><button onclick="openScoreModal('${m._id}')" class="bg-[#ff4655] text-white px-4 py-2 text-xs font-bold font-header tracking-wider flex-1 hover:brightness-110">REPORT SCORE</button>`;
+            } else if (m.status === 'pending_approval') {
+                statusBadge = `<span class="text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded text-[10px] font-bold border border-yellow-500/20">VERIFYING</span>`;
+                if(m.scoreSubmission.status === 'rejected') {
+                    rejectMsg = `<div class="mt-3 p-3 bg-red-500/10 border-l-2 border-red-500 text-xs text-gray-300 font-mono"><strong>REJECTED:</strong> ${m.scoreSubmission.rejectReason || 'Check details'}</div>`;
+                    actionBtn = `<button onclick="openScoreModal('${m._id}')" class="w-full mt-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs font-bold transition">FIX & RESUBMIT</button>`;
+                } else actionBtn = `<div class="w-full mt-2 text-center text-xs text-gray-500 font-mono py-2 border border-dashed border-gray-700">Waiting for Admin Approval...</div>`;
+            } else {
+                statusBadge = `<span class="text-gray-400 bg-gray-800 px-2 py-1 rounded text-[10px] font-bold">SCHEDULED</span>`;
+                let forfeitBtn = '';
+                if (m.scheduledTime) {
+                    const diff = (new Date() - new Date(m.scheduledTime)) / 1000 / 60;
+                    if (diff >= 15) forfeitBtn = `<button onclick="openForfeitModal('${m._id}')" class="w-full bg-yellow-900/20 hover:bg-yellow-600 text-yellow-500 hover:text-white border border-yellow-600/40 px-4 py-2 text-xs font-bold font-header tracking-wider transition mt-2">CLAIM WIN (NO SHOW)</button>`;
+                }
+                actionBtn = `<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/40 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a>${forfeitBtn}`;
+            }
+            const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('th-TH', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'TBD';
+            
+            return `
+            <div class="tech-panel p-5 transition hover:bg-[#1a1e24] relative group border-l-2 ${m.status==='live'?'border-[#ff4655]':'border-gray-700'}">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center gap-5">
+                        <div class="relative w-12 h-12">
+                            <img src="${oppLogo||'https://via.placeholder.com/40'}" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition duration-500">
+                            <div class="absolute inset-0 border border-white/20"></div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-widest mb-1">VS OPPONENT</div>
+                            <div class="text-white font-header text-2xl leading-none tracking-wide">${oppName||'TBD'}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        ${statusBadge}
+                        <div class="text-xs text-gray-500 font-mono mt-1">${timeDisplay}</div>
+                    </div>
+                </div>
+                ${rejectMsg}
+                <div class="flex gap-2 mt-4">${actionBtn}</div>
+            </div>`;
+        }
+
+        // --- ROSTER FUNCTIONS ---
+        function renderRoster(members) {
+            const createPlayerCard = (role, index, label) => {
+                const member = (members && members.length > 0) ? members.filter(m => m.role === role)[index] || {} : {};
+                const hasPendingUpdate = member.status === 'pending' && member.pendingUpdate;
+                
+                const displayName = hasPendingUpdate ? (member.pendingUpdate.name || '') : (member.name || '');
+                const displayTag = hasPendingUpdate ? (member.pendingUpdate.tag || '') : (member.tag || '');
+                const oldName = member.name || '';
+                const oldTag = member.tag || '';
+                const isLocked = isRosterLocked;
+                
+                let statusDot = 'bg-gray-600';
+                let cardBorder = 'border-white/10';
+                
+                if(member.status === 'approved') { statusDot = 'bg-[#1fa474] shadow-[0_0_10px_#1fa474]'; }
+                else if (member.status === 'pending') { statusDot = 'bg-yellow-500 animate-pulse'; cardBorder = 'border-yellow-500/50'; }
+                else if (member.status === 'rejected') { statusDot = 'bg-[#ff4655]'; cardBorder = 'border-[#ff4655]'; }
+
+                const nameInputName = `${role.toLowerCase()}_name_${role === 'Coach' ? 0 : index}`;
+                const tagInputName = `${role.toLowerCase()}_tag_${role === 'Coach' ? 0 : index}`;
+                const roleBgIcon = role === 'Coach' ? 'fa-headset' : 'fa-crosshairs';
+
+                return `
+                <div class="agent-card p-5 ${cardBorder}">
+                    <i class="fa-solid ${roleBgIcon} role-bg"></i>
+                    
+                    <div class="flex justify-between items-center mb-6 relative z-10">
+                        <span class="text-[10px] font-bold tracking-[0.2em] text-gray-500 uppercase">${label}</span>
+                        <div class="w-2 h-2 rounded-full ${statusDot}"></div>
+                    </div>
+
+                    <div class="space-y-4 relative z-10">
+                        <div>
+                            <label class="text-[9px] text-gray-600 uppercase font-bold">Riot ID</label>
+                            <input name="${nameInputName}" value="${displayName}" placeholder="EMPTY" autocomplete="off" 
+                                class="roster-input" ${isLocked ? 'disabled' : ''}>
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-gray-600 uppercase font-bold">Tag</label>
+                            <div class="flex items-center">
+                                <span class="text-gray-500 text-lg mr-1">#</span>
+                                <input name="${tagInputName}" value="${displayTag}" placeholder="0000" maxlength="5" 
+                                    class="roster-input" style="width: 60px;" ${isLocked ? 'disabled' : ''}>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            let mainHtml = '', subHtml = '', coachHtml = '';
+            for(let i=0; i<5; i++) mainHtml += createPlayerCard('Main', i, `AGENT 0${i+1}`);
+            for(let i=0; i<2; i++) subHtml += createPlayerCard('Sub', i, `RESERVE 0${i+1}`);
+            coachHtml = createPlayerCard('Coach', 0, 'STRATEGIST');
+
+            document.getElementById('mainRoster').innerHTML = mainHtml; 
+            document.getElementById('subRoster').innerHTML = subHtml; 
+            document.getElementById('coachRoster').innerHTML = coachHtml;
+            
+            const lockLabel = document.getElementById('lockStatus');
+            const editBtn = document.getElementById('btn-edit-roster');
+            
+            if(isRosterLocked) {
+                lockLabel.innerHTML = '<i class="fa-solid fa-lock text-gray-500"></i> <span class="text-gray-500">DATABASE LOCKED</span>';
+                lockLabel.className = "px-4 py-2 bg-black/40 border border-gray-700 text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2";
+                editBtn.classList.remove('hidden');
+                document.getElementById('rosterActions').classList.add('hidden');
+            } else {
+                lockLabel.innerHTML = '<i class="fa-solid fa-unlock text-[#ff4655]"></i> <span class="text-[#ff4655]">EDITING ENABLED</span>';
+                lockLabel.className = "px-4 py-2 bg-[#ff4655]/10 border border-[#ff4655]/50 text-xs font-bold text-[#ff4655] uppercase tracking-widest flex items-center gap-2 animate-pulse";
+                editBtn.classList.add('hidden');
+                document.getElementById('rosterActions').classList.remove('hidden');
+            }
+        }
+
+        function toggleRosterEdit() {
+            if(isRosterLocked) {
+                isRosterLocked = false;
+                renderRoster(teamMembers);
+            }
+        }
+
+        async function saveRoster(e) {
+            if (e) e.preventDefault();
+            
+            const updatedMembers = [];
+            const roles = ['Main', 'Sub', 'Coach'];
+            let hasData = false;
+
+            roles.forEach(role => {
+                const count = role === 'Coach' ? 1 : (role === 'Main' ? 5 : 2);
+                for (let i = 0; i < count; i++) {
+                    const nameIdx = role === 'Coach' ? 0 : i;
+                    const nameInput = document.querySelector(`input[name="${role.toLowerCase()}_name_${nameIdx}"]`);
+                    const tagInput = document.querySelector(`input[name="${role.toLowerCase()}_tag_${nameIdx}"]`);
+
+                    const nameVal = nameInput ? nameInput.value.trim() : "";
+                    const tagVal = tagInput ? tagInput.value.trim() : "";
+
+                    if (nameVal !== "") {
+                        hasData = true;
+                        updatedMembers.push({ role: role, name: nameVal, tag: tagVal || "0000" });
+                    }
+                }
+            });
+
+            if (!hasData) { showToast('Database cannot be empty', 'error'); return; }
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> PROCESSING...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/teams/roster', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                    body: JSON.stringify({ members: updatedMembers })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('Roster Database Updated');
+                    const team = await fetch('/api/teams/me', { headers: {'Authorization': token} }).then(r=>r.json());
+                    teamMembers = team.members;
+                    isRosterLocked = true;
+                    renderRoster(teamMembers);
+                } else {
+                    alert(data.msg || 'Error saving roster');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Uplink Error', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        // --- UTILS ---
+        function copyRosterToClipboard() {
+            let text = `**${document.getElementById('teamHeader').innerText} Roster:**\n`;
+            const getMembersByRole = (role) => teamMembers.filter(m => m.role === role && m.status !== 'rejected').map(m => `- ${m.name} #${m.tag}`).join('\n');
+            text += `\n**Main:**\n${getMembersByRole('Main') || '- Empty'}`;
+            text += `\n\n**Subs:**\n${getMembersByRole('Sub') || '- None'}`;
+            navigator.clipboard.writeText(text).then(() => showToast('Data Copied to Clipboard'));
+        }
+
+        function openScoreModal(mid) {
+            currentMatchId = mid;
+            fetch(`/api/matches/${mid}`).then(r=>r.json()).then(m => {
+                matchData = m;
+                const alertBox = document.getElementById('rejectAlert');
+                if(m.scoreSubmission.status === 'rejected') {
+                    document.getElementById('rejectReasonText').innerText = m.scoreSubmission.rejectReason || 'No reason details provided.';
+                    alertBox.classList.remove('hidden');
+                } else {
+                    alertBox.classList.add('hidden');
+                }
+
+                document.getElementById('mapInputs').innerHTML = m.vetoData.pickedMaps.map((map, i) => `
+                    <div class="bg-black/20 p-4 border border-white/5 relative">
+                        <div class="flex justify-between mb-3"><span class="text-[#ff4655] font-header text-xl tracking-wide">${map.map}</span></div>
+                        <div class="flex items-center gap-6 mb-4">
+                            <div class="flex-1 bg-[#0f1113] p-3 border border-gray-700 flex items-center justify-between"><span class="text-xs text-gray-500 font-bold uppercase mr-2">${m.teamA?.shortName}</span><input type="number" id="scoreA_${i}" class="bg-transparent text-white font-header text-2xl text-center w-12 outline-none" placeholder="0"></div>
+                            <span class="text-gray-600 font-bold text-xl">:</span>
+                            <div class="flex-1 bg-[#0f1113] p-3 border border-gray-700 flex items-center justify-between"><input type="number" id="scoreB_${i}" class="bg-transparent text-white font-header text-2xl text-center w-12 outline-none" placeholder="0"><span class="text-xs text-gray-500 font-bold uppercase ml-2">${m.teamB?.shortName}</span></div>
+                        </div>
+                        <div class="relative group">
+                            <input type="file" id="proofImg_${i}" class="hidden" onchange="document.getElementById('fileName_${i}').innerText = this.files[0].name; document.getElementById('fileName_${i}').classList.add('text-[#ff4655]')">
+                            <label for="proofImg_${i}" class="block w-full border border-dashed border-gray-600 p-2 text-center text-[10px] text-gray-400 cursor-pointer hover:border-white hover:text-white transition uppercase tracking-widest"><i class="fa-solid fa-paperclip mr-2"></i> <span id="fileName_${i}">Attach Scoreboard</span></label>
+                        </div>
+                    </div>`).join('');
+                document.getElementById('scoreModal').classList.remove('hidden'); document.getElementById('scoreModal').classList.add('flex');
+            });
+        }
+
+        async function submitScore(e) {
+            e.preventDefault();
+            const fd = new FormData();
+            const scores = [];
+            matchData.vetoData.pickedMaps.forEach((m, i) => {
+                scores.push({ mapName: m.map, teamAScore: document.getElementById(`scoreA_${i}`).value, teamBScore: document.getElementById(`scoreB_${i}`).value });
+                const f = document.getElementById(`proofImg_${i}`).files[0];
+                if(f) fd.append(`proof_${i}`, f);
+            });
+            fd.append('scores', JSON.stringify(scores));
+            const res = await fetch(`/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
+            if(res.ok) { closeModal('scoreModal'); showToast('Score Data Transmitted'); loadDashboardData(); }
+        }
+
+        function openForfeitModal(mid) { currentMatchId = mid; document.getElementById('forfeitModal').classList.remove('hidden'); document.getElementById('forfeitModal').classList.add('flex'); }
+        async function submitForfeit(e) {
+            e.preventDefault();
+            const file = document.getElementById('forfeitProofImg').files[0];
+            if(!file) return alert('Proof required.');
+            const fd = new FormData(); fd.append('proof', file);
+            const res = await fetch(`/api/matches/${currentMatchId}/claim-forfeit`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
+            const d = await res.json();
+            if(res.ok) { closeModal('forfeitModal'); showToast('Claim Submitted'); loadDashboardData(); } else { alert(d.msg); }
+        }
+
+        async function uploadLogo(input) {
+            if (!input.files[0]) return;
+            const fd = new FormData(); fd.append('logo', input.files[0]);
+            const res = await fetch('/api/teams/logo', { method: 'PUT', headers: { 'Authorization': token }, body: fd });
+            const d = await res.json();
+            if(res.ok) { document.getElementById('teamLogo').src = d.logo; showToast('Identity Updated'); }
+        }
+
+        function nav(id) {
+            localStorage.setItem('activeTab', id);
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`view-${id}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+            document.getElementById(`nav-${id}`).classList.add('active');
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.remove('flex'); document.getElementById(id).classList.add('hidden'); }
+        function showToast(msg, type='success') { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.style.transform = "translateX(0)"; setTimeout(() => t.style.transform = "translateX(150%)", 3000); }
+        function logout() { localStorage.removeItem('token'); location.href='/login.html'; }
+    </script>
+</body>
+</html>

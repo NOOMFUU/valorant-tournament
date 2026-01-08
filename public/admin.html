@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VALORANT // ADMIN PROTOCOL V7.2 (MAP PREVIEW)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- CORE VARIABLES --- */
+        :root { 
+            --primary: #ff4655; 
+            --bg-dark: #0f1923; 
+            --card-bg: #1a1d21; 
+            --border: #2d3139; 
+            --text-gray: #8b978f;
+        }
+        
+        /* --- BASE STYLES --- */
+        body { background: var(--bg-dark); color: #ece8e1; font-family: 'Inter', sans-serif; overflow: hidden; font-size: 16px; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1113; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #555; }
+
+        /* --- COMPONENTS --- */
+        .nav-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-right: 4px solid transparent; opacity: 0.8; }
+        .nav-btn:hover { background: rgba(255, 255, 255, 0.05); opacity: 1; color: white; }
+        .nav-btn.active { background: linear-gradient(90deg, rgba(255, 70, 85, 0.15) 0%, transparent 100%); color: var(--primary); border-right-color: var(--primary); opacity: 1; font-weight: 700; }
+        
+        .glass-panel { background: #15171a; border: 1px solid var(--border); border-radius: 6px; }
+        .btn-val { background: var(--primary); color: white; font-family: 'Oswald', sans-serif; letter-spacing: 1px; transition: 0.2s; position: relative; overflow: hidden; border-radius: 4px; font-weight: 600; }
+        .btn-val:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        
+        .input-dark { background: transparent; border: 1px solid transparent; border-bottom: 2px solid var(--border); color: white; transition: 0.3s; padding: 10px 0; font-size: 1rem; }
+        .input-dark:focus { border-bottom-color: var(--primary); outline: none; background: transparent; }
+        
+        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .tab-btn { border-bottom: 3px solid transparent; transition: all 0.2s; opacity: 0.6; font-size: 0.9rem; }
+        .tab-btn:hover { opacity: 1; }
+        .tab-btn.active { border-color: var(--primary); color: var(--primary); opacity: 1; }
+        
+        .nav-badge { background: #ff4655; color: white; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: auto; font-weight: bold; min-width: 24px; text-align: center; }
+        
+        /* --- TABLE STYLES --- */
+        .table-val { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.95rem; }
+        .table-val th { text-align: left; padding: 12px 16px; font-family: 'Oswald', sans-serif; color: #8b978f; font-weight: 500; text-transform: uppercase; border-bottom: 2px solid #333; font-size: 0.85rem; }
+        .table-val td { padding: 12px 16px; border-bottom: 1px solid #222; color: #ece8e1; }
+        .table-val tr:hover td { background: rgba(255,255,255,0.03); }
+        
+        /* --- BRACKET LAYOUT --- */
+        .bracket-container { display: flex; overflow-x: auto; padding-bottom: 24px; gap: 2.5rem; }
+        .bracket-round { min-width: 320px; display: flex; flex-direction: column; gap: 1.25rem; }
+        .bracket-header { font-family: 'Oswald', sans-serif; font-size: 0.9rem; color: #8b978f; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 0.75rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+
+        /* --- [UPDATED] MAP SELECTOR STYLES (WITH PREVIEW) --- */
+        .map-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 0.75rem;
+            max-height: 350px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .map-option {
+            position: relative;
+            background-color: #15171a;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 90px;
+            user-select: none;
+            overflow: hidden;
+        }
+        /* Dark Overlay for text readability */
+        .map-option::before {
+            content: ''; position: absolute; inset: 0;
+            background: rgba(0,0,0,0.6);
+            transition: 0.3s;
+            z-index: 1;
+        }
+        .map-option:hover { border-color: #888; transform: translateY(-2px); }
+        .map-option:hover::before { background: rgba(0,0,0,0.3); }
+        
+        /* Selected State */
+        .map-option.selected {
+            border-color: #ff4655;
+            box-shadow: 0 4px 12px rgba(255, 70, 85, 0.3);
+        }
+        .map-option.selected::before {
+            background: rgba(255, 70, 85, 0.2);
+            backdrop-filter: grayscale(100%);
+        }
+        .map-option.selected .map-name { color: #fff; text-shadow: 0 0 10px #ff4655; }
+        .map-option.selected .check-icon { opacity: 1; transform: scale(1); }
+        
+        /* Elements inside map card */
+        .map-option i.fa-map { display: none; }
+        .map-name { 
+            position: relative; z-index: 2; 
+            font-size: 0.85rem; font-weight: 700; 
+            color: #ece8e1; text-transform: uppercase; 
+            letter-spacing: 0.1em; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        .check-icon {
+            position: absolute; top: 6px; right: 6px; z-index: 2;
+            color: #ff4655; font-size: 1rem;
+            background: white; border-radius: 50%; padding: 1px;
+            opacity: 0; transform: scale(0.5);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        /* Disabled State */
+        .map-option.disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
+    </style>
+</head>
+<body class="flex h-screen w-full">
+
+    <aside class="w-72 bg-[#111] border-r border-[#222] flex flex-col z-30 shadow-xl shrink-0">
+        <div class="p-8 border-b border-[#222]">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-white flex items-center justify-center rounded-md">
+                    <i class="fa-solid fa-shield-halved text-[#111] text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-header font-bold text-white leading-none tracking-wide">ADMIN<br><span class="text-[#ff4655]">PROTOCOL</span></h1>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="flex-1 py-8 space-y-2 px-4">
+            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-4 mb-3">Main Menu</p>
+            <button onclick="nav('dashboard')" id="nav-dashboard" class="nav-btn active w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+                <i class="fa-solid fa-chart-line w-5 text-center"></i> DASHBOARD
+            </button>
+            <button onclick="nav('requests')" id="nav-requests" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+                <i class="fa-solid fa-inbox w-5 text-center"></i> REQUESTS
+                <span id="navBadgeReq" class="nav-badge hidden">0</span>
+            </button>
+            <button onclick="nav('structure')" id="nav-structure" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+                <i class="fa-solid fa-sitemap w-5 text-center"></i> TOURNAMENTS
+            </button>
+            <button onclick="nav('teams')" id="nav-teams" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+                <i class="fa-solid fa-users-gear w-5 text-center"></i> TEAMS
+                <span id="navBadgeTeams" class="nav-badge hidden">0</span>
+            </button>
+        </nav>
+
+        <div class="p-6 border-t border-[#222]">
+            <a href="/scoreboard.html" target="_blank" class="flex items-center gap-3 text-sm text-gray-500 hover:text-white transition p-3 rounded hover:bg-[#222] mb-3">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Public View
+            </a>
+            <button onclick="logout()" class="w-full py-3 border border-[#333] hover:border-[#ff4655] hover:text-[#ff4655] text-gray-400 text-xs font-bold uppercase tracking-widest transition rounded-md">
+                System Logout
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto relative isolate bg-[#0f1923]">
+        
+        <div id="toast" class="fixed top-8 right-8 z-[100] transform translate-x-[150%] transition-all duration-300">
+            <div class="bg-white text-[#0f1923] px-8 py-5 rounded-lg shadow-2xl border-l-8 border-[#ff4655] flex items-center gap-5">
+                <i class="fa-solid fa-circle-check text-[#ff4655] text-2xl"></i>
+                <div>
+                    <h4 class="font-header font-bold text-xl leading-none">NOTIFICATION</h4>
+                    <p class="text-sm font-bold text-gray-500 mt-1" id="toastMsg">Operation Successful</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="bulkActionBar" class="fixed bottom-0 left-72 right-0 bg-[#1a1d21] border-t-2 border-[#ff4655] p-4 z-50 transform translate-y-full transition-transform duration-300 shadow-2xl flex items-center justify-between">
+            <div class="flex items-center gap-8">
+                <div class="bg-[#ff4655] text-white font-header text-base px-4 py-2 rounded">
+                    <span id="bulkCount">0</span> SELECTED
+                </div>
+                <div class="flex items-center gap-4">
+                    <label class="text-xs text-gray-400 font-bold uppercase">Set Time:</label>
+                    <input type="datetime-local" id="bulkTime" class="bg-[#0f1113] border border-[#333] text-white text-sm p-2 rounded [color-scheme:dark]">
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="clearSelection()" class="px-6 py-2 border border-gray-600 text-gray-400 hover:text-white rounded font-bold text-xs uppercase transition">Cancel</button>
+                <button onclick="applyBulkTime()" class="btn-val px-8 py-2 rounded font-bold text-xs uppercase">APPLY SCHEDULE</button>
+            </div>
+        </div>
+
+        <div class="relative z-10 p-10 max-w-[1920px] mx-auto min-h-screen flex flex-col">
+            <header class="flex justify-between items-end mb-10 border-b border-white/5 pb-8">
+                <div>
+                    <h2 class="text-4xl font-header font-bold text-white tracking-tight" id="pageTitle">DASHBOARD</h2>
+                    <p class="text-sm text-gray-400 mt-2 font-mono">SYSTEM STATUS: <span class="text-[#22c55e] font-bold">ONLINE</span></p>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right hidden md:block">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-1">Server Time</div>
+                        <div class="text-2xl font-mono text-white tracking-wider" id="clock">00:00:00</div>
+                    </div>
+                </div>
+            </header>
+
+            <section id="view-dashboard" class="animate-slide-up space-y-10">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="glass-panel p-6 border-l-4 border-l-[#ff4655]">
+                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Live Matches</div>
+                        <div class="text-5xl font-header text-white" id="stat-live">0</div>
+                    </div>
+                    <div onclick="nav('requests')" class="glass-panel p-6 border-l-4 border-l-yellow-500 cursor-pointer hover:bg-[#1a1d21] transition">
+                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Pending Scores</div>
+                        <div class="text-5xl font-header text-white" id="stat-pending">0</div>
+                    </div>
+                    <div onclick="nav('teams')" class="glass-panel p-6 border-l-4 border-l-blue-500 cursor-pointer hover:bg-[#1a1d21] transition">
+                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Teams</div>
+                        <div class="text-5xl font-header text-white" id="stat-teams">0</div>
+                    </div>
+                    <div class="glass-panel p-6 border-l-4 border-l-purple-500">
+                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Finished</div>
+                        <div class="text-5xl font-header text-white" id="stat-finished">0</div>
+                    </div>
+                </div>
+                <div class="space-y-6">
+                     <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-header text-white">LIVE COMBAT OVERVIEW</h3>
+                        <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search match..." class="bg-[#1a1d21] border border-[#333] text-sm p-3 rounded text-white focus:border-[#ff4655] outline-none w-80 placeholder-gray-600">
+                    </div>
+                    <div id="liveMatches" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4"></div>
+                </div>
+            </section>
+
+            <section id="view-requests" class="hidden animate-slide-up space-y-8">
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-10 h-10 rounded bg-yellow-500/10 text-yellow-500 flex items-center justify-center border border-yellow-500/30 text-xl"><i class="fa-solid fa-inbox"></i></div>
+                    <div><h3 class="text-2xl font-header text-white">SCORE APPROVALS</h3><p class="text-xs text-gray-500 font-bold uppercase">Matches waiting for verification</p></div>
+                </div>
+                <div id="pendingScores" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
+            </section>
+
+            <section id="view-structure" class="hidden animate-slide-up space-y-8">
+                <div id="mainTourneyHeader" class="glass-panel p-8 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div class="text-center w-full py-6 text-gray-500">Loading...</div>
+                </div>
+                <div class="flex justify-end pb-4 border-b border-white/5">
+                    <button onclick="toggleBulkMode()" id="btnBulkMode" class="px-5 py-2.5 border border-[#333] hover:border-[#ff4655] text-gray-400 hover:text-[#ff4655] rounded text-xs font-bold uppercase transition flex items-center gap-3"><i class="fa-solid fa-list-check"></i> Manual Batch Mode</button>
+                </div>
+                <div id="stageList" class="space-y-10"></div>
+            </section>
+
+            <section id="view-teams" class="hidden animate-slide-up space-y-8">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-6 bg-[#15171a] p-6 rounded-lg border border-[#2d3139]">
+                    <h2 class="text-2xl font-header text-white">REGISTERED TEAMS</h2>
+                    <div class="relative w-full md:w-80">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                        <input type="text" id="teamSearch" oninput="renderTeams(allTeams)" placeholder="Search team..." class="w-full bg-[#0f1113] border border-[#2d3139] pl-10 pr-4 py-3 rounded text-sm focus:border-[#ff4655] outline-none transition text-white placeholder-gray-500">
+                    </div>
+                </div>
+                <div id="teamGrid" class="flex flex-col gap-3"></div>
+            </section>
+        </div>
+    </main>
+
+    <div id="modalBackdrop" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm transition-opacity duration-300">
+        <div id="roundSchedulerModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <h3 class="text-base font-header text-white">ROUND SCHEDULER</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-8 space-y-6">
+                <p class="text-sm text-gray-400">Set start time for <span id="rsCount" class="text-[#ff4655] font-bold text-lg">0</span> matches.</p>
+                <input type="datetime-local" id="rsTime" class="w-full input-dark [color-scheme:dark]">
+                <button onclick="submitRoundSchedule()" class="btn-val w-full py-4 rounded font-bold text-sm tracking-wider">APPLY SCHEDULE</button>
+            </div>
+        </div>
+
+        <div id="editMatchModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-2xl border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#21252b]">
+                <h3 class="text-base font-header text-white">MATCH CONTROL</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex border-b border-[#333] bg-[#15171a]">
+                <button onclick="switchMatchTab('overview')" id="tab-overview" class="tab-btn active flex-1 py-3 text-xs font-bold uppercase">Overview</button>
+                <button onclick="switchMatchTab('scoreboard')" id="tab-scoreboard" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Scoreboard</button>
+                <button onclick="switchMatchTab('admin')" id="tab-admin" class="tab-btn flex-1 py-3 text-xs font-bold uppercase text-red-500">Danger Zone</button>
+            </div>
+            <div class="p-8 overflow-y-auto flex-1 custom-scroll">
+                <div id="view-tab-overview" class="space-y-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Match Name</label><input id="emName" class="w-full input-dark font-bold text-lg"></div>
+                        <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Status</label><select id="emStatus" class="w-full bg-[#1a1d21] border-b-2 border-[#2d3139] text-white text-base py-2.5 outline-none"><option value="scheduled">SCHEDULED</option><option value="live">LIVE</option><option value="finished">FINISHED</option></select></div>
+                    </div>
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Time</label><div class="flex gap-4"><input type="datetime-local" id="emTime" class="flex-1 input-dark [color-scheme:dark]"><button onclick="adjustTime(15)" class="px-4 bg-[#222] border border-[#333] text-gray-400 text-xs rounded hover:text-white font-bold">+15m</button></div></div>
+                    <button onclick="openVetoPage()" class="btn-val w-full py-3.5 rounded text-xs font-bold uppercase mt-4">Open Veto Interface</button>
+                </div>
+                <div id="view-tab-scoreboard" class="hidden space-y-6">
+                    <div class="flex justify-between items-center"><label class="text-xs text-[#ff4655] font-bold uppercase">Manual Scores</label><select id="emFormat" onchange="updateScoreInputs()" class="bg-[#0f1113] text-white text-xs p-2 border border-[#333] rounded"><option value="BO1">BO1</option><option value="BO3">BO3</option><option value="BO5">BO5</option></select></div>
+                    <div id="manualScoreInputs" class="space-y-3 bg-black/20 p-4 rounded border border-[#333]"></div>
+                </div>
+                <div id="view-tab-admin" class="hidden space-y-6">
+                    <button onclick="rematchMatch()" class="w-full py-3 mb-2 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500 hover:text-[#111] rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-rotate-left mr-2"></i> RESET & REMATCH</button>
+                    <div class="bg-red-900/5 border border-red-500/20 p-4 rounded">
+                        <label class="text-xs text-red-400 font-bold uppercase mb-3 block">Force Result</label>
+                        <div class="flex gap-3"><button onclick="forceWinner('teamA')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameA">A</span></button><button onclick="forceWinner('teamB')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameB">B</span></button></div>
+                    </div>
+                    <button onclick="deleteMatch()" class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase">DELETE MATCH</button>
+                </div>
+            </div>
+            <div class="p-6 border-t border-[#333] bg-[#21252b]"><button onclick="saveMatchEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm tracking-widest">SAVE CHANGES</button></div>
+        </div>
+
+        <div id="stageModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">NEW STAGE CONFIGURATION</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+            <div class="p-8 space-y-6">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Stage Name</label><input id="stName" class="w-full input-dark" placeholder="e.g. Playoffs Phase 1"></div>
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Match Format</label><select id="stDefBO" class="w-full bg-[#1a1d21] text-white border-b-2 border-[#333] text-sm py-2"><option value="BO1">BO1</option><option value="BO3" selected>BO3</option><option value="BO5">BO5</option></select></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Structure Type</label>
+                        <select id="stType" onchange="toggleStageOptions()" class="w-full bg-[#1a1d21] text-white border-b-2 border-[#333] text-sm py-2">
+                            <option value="single_elim">Single Elimination</option>
+                            <option value="double_elim">Double Elimination</option>
+                            <option value="triple_elim">Triple Elimination</option>
+                            <option value="gsl">GSL Groups (Dual)</option>
+                            <option value="swiss">Swiss System</option>
+                            <option value="round_robin">Round Robin (League)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-3 pt-2">
+                        <div id="stRoundCountContainer" class="hidden"><label class="text-xs text-gray-500 font-bold uppercase mr-2">Legs:</label><input type="number" id="stRoundCount" value="1" min="1" max="5" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded"></div>
+                        
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="stRandom" class="accent-[#ff4655] w-4 h-4">
+                            <label for="stRandom" class="text-xs text-gray-300 select-none">Randomize Seeding</label>
+                        </div>
+
+                        <div id="stThirdPlaceContainer" class="flex items-center gap-2">
+                            <input type="checkbox" id="stThirdPlace" class="accent-[#ff4655] w-4 h-4">
+                            <label for="stThirdPlace" class="text-xs text-gray-300 select-none">Create 3rd Place Match</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-[#0f1113] border border-[#2d3139] rounded relative">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-xs text-[#ff4655] font-bold uppercase">Participants Source</label>
+                        <select id="stSourceSelect" onchange="toggleSourceMode()" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-1 rounded">
+                            <option value="-1">Manual Selection (Drag & Drop)</option>
+                            </select>
+                    </div>
+
+                    <div id="manualSelectUI" class="grid grid-cols-2 gap-6 h-[200px]">
+                        <div class="flex flex-col bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
+                            <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between"><span>Pool</span><span id="availCount">0</span></div>
+                            <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll"></div>
+                        </div>
+                        <div class="flex flex-col bg-[#1a1d21] border border-[#ff4655]/30 rounded overflow-hidden">
+                            <div class="p-2 bg-[#222] text-xs font-bold text-[#ff4655] uppercase flex justify-between"><span>Selected</span><span id="selCount">0</span></div>
+                            <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll"></div>
+                            <button onclick="clearStageSelection()" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
+                        </div>
+                    </div>
+                    
+                    <div id="autoSourceUI" class="hidden h-[200px] flex flex-col items-center justify-center text-gray-500 text-sm">
+                        <div class="text-center space-y-4">
+                            <p class="italic text-gray-400">Teams will be imported automatically from the previous stage.</p>
+                            
+                            <div class="flex items-center gap-4 bg-[#1a1d21] p-3 rounded border border-[#333]">
+                                <div>
+                                    <label class="text-[10px] font-bold uppercase block mb-1">Seeding Logic</label>
+                                    <select id="stAdvanceMethod" class="bg-[#0f1113] text-white border border-[#333] text-xs p-1 rounded">
+                                        <option value="top_standing">Top Standings (Simple)</option>
+                                        <option value="cross_group">Cross Group (A1 vs B2)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold uppercase block mb-1">Total Teams</label>
+                                    <input type="number" id="stAdvanceCount" value="4" class="w-16 bg-[#0f1113] border border-[#333] text-white text-center p-1 rounded">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="generateStage()" class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
+            </div>
+        </div>
+
+        <div id="createTourneyModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-lg border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">NEW SYSTEM</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="p-8 space-y-6">
+                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Name</label><input id="tnName" class="w-full input-dark text-lg" placeholder="Tournament Name"></div>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Map Pool Selection</label>
+                        <span id="count-create" class="text-xs font-mono font-bold text-[#ff4655]">0/7</span>
+                    </div>
+                    <div id="createMapPoolList" class="map-select-grid custom-scroll"></div>
+                    <p class="text-[10px] text-gray-600 italic text-right">* Required exactly 7 maps</p>
+                </div>
+                
+                <button onclick="createTournament()" class="btn-val w-full py-3.5 rounded font-bold text-sm">INITIALIZE SYSTEM</button>
+            </div>
+        </div>
+
+        <div id="tourneySettingsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-lg border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">SETTINGS</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="p-8 space-y-6">
+                <input type="hidden" id="tsId"><input id="tsName" class="w-full input-dark text-lg font-bold">
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Active Map Pool</label>
+                        <span id="count-edit" class="text-xs font-mono font-bold text-[#ff4655]">0/7</span>
+                    </div>
+                    <div id="editMapPoolList" class="map-select-grid custom-scroll"></div>
+                    <p class="text-[10px] text-gray-600 italic text-right">* Changing this affects all pending matches</p>
+                </div>
+                
+                <div class="pt-4 flex flex-col gap-3"><button onclick="updateTourneyName()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SYSTEM</button><button onclick="deleteTourney()" class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase transition">DELETE SYSTEM</button></div>
+            </div>
+        </div>
+        <div id="rosterModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between bg-[#222]"><h3 class="text-base font-header text-white">ROSTER MANAGEMENT</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div id="rosterModalContent" class="p-8"></div>
+        </div>
+        <div id="teamEditModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="p-8 space-y-6">
+                <input type="hidden" id="teId"><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Team Name</label><input id="teName" class="w-full input-dark text-base"></div><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tag (Short Name)</label><input id="teShort" class="w-full input-dark text-base uppercase"></div>
+                <button onclick="saveTeamEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm mt-2">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="imageViewerModal" class="fixed inset-0 z-[300] bg-black/95 hidden items-center justify-center backdrop-blur-xl" onclick="this.classList.add('hidden'); this.classList.remove('flex')">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <img id="imageViewerSrc" src="" class="max-w-full max-h-[90vh] rounded shadow-2xl border border-white/10">
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s"; 
+        const ALL_MAPS = ['Abyss', 'Ascent', 'Bind', 'Corrode', 'Haven', 'Icebox', 'Lotus', 'Sunset', 'Pearl', 'Split', 'Fracture', 'Breeze'];
+        const COMPETITIVE_POOL = ['Abyss', 'Ascent', 'Bind', 'Corrode', 'Haven', 'Lotus', 'Sunset'];
+        
+        // --- MAP PREVIEW IMAGES ---
+        const MAP_IMAGES = {
+            'Abyss': 'https://media.valorant-api.com/maps/224b0a95-48b9-f703-1bd8-67aca101a61f/splash.png',
+            'Ascent': 'https://media.valorant-api.com/maps/7eaecc1b-4337-bbf6-6ab9-04b8f06b3319/splash.png',
+            'Bind': 'https://media.valorant-api.com/maps/2c9d57ec-4431-9c5e-2939-8f9ef6dd5cba/splash.png',
+            'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg',
+            'Haven': 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png',
+            'Icebox': 'https://media.valorant-api.com/maps/e2ad5c54-4114-a870-9641-8ea21279579a/splash.png',
+            'Lotus': 'https://media.valorant-api.com/maps/2fe4ed3a-450a-948b-6d6b-e89a78e680a9/splash.png',
+            'Sunset': 'https://media.valorant-api.com/maps/92584fbe-486a-b1b2-9faa-39b0f486b498/splash.png',
+            'Pearl': 'https://media.valorant-api.com/maps/fd267378-4d1d-484f-ff52-77821ed10dc2/splash.png',
+            'Split': 'https://media.valorant-api.com/maps/d960549e-485c-e861-8d71-aa9d1aed12a2/splash.png',
+            'Fracture': 'https://media.valorant-api.com/maps/b529448b-4d60-346e-e89e-00a4c527a405/splash.png',
+            'Breeze': 'https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png'
+        };
+
+        const token = localStorage.getItem('token');
+        if(!token) location.href='/login.html';
+        
+        let allTeams=[], allMatches=[], activeMatchId, activeTourneyData, pendingRoundScheduleMatches=[];
+        let selectedMatches = new Set();
+        let stagePool = [], stageSelected = [];
+        let bulkMode = false;
+
+        setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
+
+        socket.on('match_update', ()=>init(true));
+        socket.on('bracket_update', ()=>init(true));
+        socket.on('teams_update', ()=>init(true)); 
+        
+        socket.on('notification', (data) => {
+            const msg = data.message || data.msg || 'Update Received';
+            const type = (msg.includes('Conflict') || msg.includes('Error')) ? 'error' : 'success';
+            showToast(msg, type);
+        });
+
+        async function init(silent=false) {
+            try {
+                const ts = Date.now();
+                const [rT, rM, rTr] = await Promise.all([
+                    fetch(`/api/teams?t=${ts}`), fetch(`/api/matches?t=${ts}`), fetch(`/api/tournaments?t=${ts}`)
+                ]);
+                
+                if(rT.status === 401) { logout(); return; }
+                allTeams = await rT.json();
+                allMatches = await rM.json();
+                const tourneys = await rTr.json();
+                
+                updateStats(allTeams, allMatches);
+                renderDashboard(allMatches); 
+                renderRequests(allMatches);
+                renderTeams(allTeams); 
+                renderStructure(tourneys, allMatches);
+                
+                if(!silent) {
+                    const lastView = localStorage.getItem('currentView') || 'dashboard';
+                    nav(lastView);
+                    // Ensure checkbox rendering happens after DOM update
+                    setTimeout(() => renderMapCheckboxes('create'), 100);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // ... Existing Functions ...
+        
+        function nav(id) {
+            document.querySelectorAll('section').forEach(s=>s.classList.add('hidden'));
+            document.getElementById('view-'+id).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+            document.getElementById('nav-'+id).classList.add('active');
+            document.getElementById('pageTitle').innerText = id.toUpperCase();
+            localStorage.setItem('currentView', id);
+        }
+
+        function getSmartTBD(matchId, slot) {
+            const winnerSource = allMatches.find(m => m.nextMatchId === matchId && m.nextMatchSlot === slot);
+            if (winnerSource) return `<span class="text-gray-500 text-[10px] uppercase font-bold">WINNER OF</span> <span class="text-[#ff4655]">${winnerSource.name}</span>`;
+            const loserSource = allMatches.find(m => m.loserMatchId === matchId && m.loserMatchSlot === slot);
+            if (loserSource) return `<span class="text-gray-500 text-[10px] uppercase font-bold">LOSER OF</span> <span class="text-orange-500">${loserSource.name}</span>`;
+            return 'TBD';
+        }
+
+        function renderMatchCard(m) {
+            const [sA, sB] = calculateMatchScore(m.scores);
+            const isSel = selectedMatches.has(m._id);
+            const check = bulkMode ? `<div class="absolute top-3 left-3 z-20"><input type="checkbox" class="chk-match w-4 h-4 accent-[#ff4655] cursor-pointer" onchange="toggleMatchSelect('${m._id}')" ${isSel?'checked':''}></div>` : '';
+            const dateObj = m.scheduledTime ? new Date(m.scheduledTime) : null;
+            const timeStr = dateObj ? dateObj.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : 'TBA';
+            const dateStr = dateObj ? dateObj.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'}) : '';
+            const isLive = m.status === 'live';
+            const nameA = m.teamA ? `<span class="${sA>sB?'text-[#ff4655]':'text-gray-200'}">${m.teamA.shortName}</span>` : getSmartTBD(m._id, 'teamA');
+            const nameB = m.teamB ? `<span class="${sB>sA?'text-[#ff4655]':'text-gray-200'}">${m.teamB.shortName}</span>` : getSmartTBD(m._id, 'teamB');
+
+            // [NEW] Match Number Formatting (e.g., #001)
+            const matchNumStr = m.matchNumber ? `#${String(m.matchNumber).padStart(3, '0')}` : '';
+
+            return `
+            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#0f1113] p-4 rounded-md border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655] shadow-lg shadow-red-900/20':'border-[#333] hover:border-gray-400')} relative transition group cursor-pointer w-full">
+                ${check}
+                <div class="flex justify-between text-[10px] text-gray-500 font-bold uppercase mb-3 pl-1">
+                    <div class="truncate pr-2 tracking-wider flex items-center gap-2">
+                        <span class="text-[#ff4655] font-mono">${matchNumStr}</span>
+                        <span>${m.name}</span>
+                    </div>
+                    <span class="${isLive?'text-[#ff4655] animate-pulse':''}">${m.status}</span>
+                </div>
+                <div class="flex justify-between items-center font-bold text-sm mb-1.5 px-2 py-1.5 rounded ${sA>sB?'bg-white/5':''}">
+                    <div class="truncate flex-1 flex items-center gap-2">${nameA}</div>
+                    <span class="font-mono text-white text-base pl-3">${sA}</span>
+                </div>
+                <div class="flex justify-between items-center font-bold text-sm px-2 py-1.5 rounded ${sB>sA?'bg-white/5':''}">
+                    <div class="truncate flex-1 flex items-center gap-2">${nameB}</div>
+                    <span class="font-mono text-white text-base pl-3">${sB}</span>
+                </div>
+                <div class="mt-3 pt-2 border-t border-[#222] flex justify-between items-center">
+                    <div class="text-[10px] font-mono text-gray-500 font-bold">${dateStr}</div>
+                    <div class="text-[11px] font-mono font-bold ${m.scheduledTime ? 'text-gray-300' : 'text-gray-600'} bg-[#1a1d21] px-2 py-1 rounded border border-[#2d3139] flex items-center gap-1">
+                        <i class="fa-regular fa-clock text-[9px]"></i> ${timeStr}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderStructure(tourneys, matches) {
+            const list = document.getElementById('stageList');
+            if(!tourneys.length) { document.getElementById('mainTourneyHeader').innerHTML = `<div class="text-center w-full"><h3 class="text-base text-gray-500 font-bold">NO SYSTEM INITIALIZED</h3><button onclick="openModal('createTourneyModal'); renderMapCheckboxes('create');" class="btn-val px-6 py-2 rounded mt-3 text-xs font-bold">CREATE NEW SYSTEM</button></div>`; list.innerHTML = ''; return; }
+            const t = tourneys[0]; activeTourneyData = t; 
+            
+            document.getElementById('mainTourneyHeader').innerHTML = `<div><div class="text-xs text-[#ff4655] font-bold uppercase mb-1 tracking-widest">Active System</div><div class="flex items-center gap-4"><h2 class="text-3xl font-header text-white">${t.name}</h2><button onclick="openTourneySettings('${t._id}', '${t.name}')" class="text-gray-500 hover:text-white transition text-lg"><i class="fa-solid fa-gear"></i></button></div></div><button onclick="openStageModal()" class="btn-val px-6 py-3 rounded text-xs font-bold shadow-lg shadow-red-900/10 tracking-widest"><i class="fa-solid fa-plus mr-2"></i> ADD STAGE</button>`;
+
+            list.innerHTML = t.stages.map((s, idx) => {
+                const ms = s.matches.map(mid => matches.find(x=>x._id===mid)).filter(x=>x);
+                let swissBtn = '';
+                if (s.type === 'swiss') swissBtn = `<button onclick="generateSwissNext('${t._id}', ${idx})" class="text-[10px] bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-600/40 px-3 py-1.5 rounded font-bold uppercase tracking-widest transition flex items-center gap-2"><i class="fa-solid fa-shuffle"></i> Generate Next</button>`;
+                
+                if (s.type === 'round_robin' || s.type === 'swiss') {
+                    const standings = calculateStandings(ms, s.stageParticipants);
+                    const standingsHtml = standings.map((st, i) => `<tr><td class="font-mono text-center text-gray-600 border-r border-[#222]">${i+1}</td><td class="font-bold text-white">${st.name}</td><td class="text-center">${st.played}</td><td class="text-center font-bold text-green-400">${st.wins}</td><td class="text-center text-red-400">${st.losses}</td><td class="text-center font-mono text-gray-300 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td><td class="text-center font-mono ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td><td class="text-center font-mono text-gray-500 border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td></tr>`).join('');
+                    const rounds = {}; ms.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
+                    const sortedRoundKeys = Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b));
+                    const matchesListHtml = sortedRoundKeys.map(r => {
+                        const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = s.type === 'round_robin' ? `Round ${r}` : `Round ${r}`;
+                        return `<div class="mb-6"><div class="flex justify-between items-center bg-[#1a1d21] p-2 rounded mb-3 border border-[#2d3139]"><span class="text-xs font-bold text-[#ff4655] uppercase tracking-widest pl-2">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-xs bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                    }).join('');
+                    
+                    return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden mb-10 shadow-xl"><div class="p-4 bg-[#1a1d21] flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-4"><h4 class="font-header text-xl text-white uppercase">${s.name} <span class="ml-2 text-[10px] bg-[#333] px-2 py-0.5 rounded text-gray-400 align-middle">${s.type.replace('_',' ')}</span></h4>${swissBtn}</div><button onclick="deleteStage('${t._id}', ${idx})" class="text-gray-600 hover:text-red-500 px-2 transition"><i class="fa-solid fa-trash text-sm"></i></button></div><div class="grid grid-cols-1 lg:grid-cols-12"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto"><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${standingsHtml}</tbody></table></div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
+                }
+                else {
+                    const upper = [], lower = [], final = [];
+                    ms.forEach(m => { if(m.matchOrder === 999 || m.round === 999) final.push(m); else if(m.round >= 100) lower.push(m); else upper.push(m); });
+                    const renderSection = (matches, label) => {
+                        if(matches.length === 0) return '';
+                        const rounds = {}; matches.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
+                        const sortedRounds = Object.keys(rounds).sort((a,b) => parseInt(a)-parseInt(b));
+                        const columnsHtml = sortedRounds.map(r => {
+                            const roundMatches = rounds[r].sort((a,b) => a.matchOrder - b.matchOrder); const matchIds = roundMatches.map(m => m._id).join(',');
+                            return `<div class="bracket-round"><div class="bracket-header"><span>Round ${r >= 100 ? (r-100) + ' (LB)' : r}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col gap-4">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                        }).join('');
+                        return `<div class="mb-8"><div class="text-xs font-bold text-[#ff4655] uppercase tracking-widest mb-4 pl-1 border-l-4 border-[#ff4655] py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container custom-scroll">${columnsHtml}</div></div>`;
+                    };
+                    let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333]"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => renderMatchCard(m)).join('')}</div></div>`; }
+                    return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden mb-10 shadow-xl"><div class="p-4 bg-[#1a1d21] flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-3"><h4 class="font-header text-xl text-white uppercase">${s.name} <span class="ml-2 text-[10px] bg-[#333] px-2 py-0.5 rounded text-gray-400 align-middle">${s.type.replace('_',' ')}</span></h4></div><button onclick="deleteStage('${t._id}', ${idx})" class="text-gray-600 hover:text-red-500 px-2 transition"><i class="fa-solid fa-trash text-sm"></i></button></div><div class="p-8 overflow-x-auto">${renderSection(upper, "Upper Bracket")}${renderSection(lower, "Lower Bracket")}${finalHtml}</div></div>`;
+                }
+            }).join('');
+        }
+
+        function openRoundScheduler(ids) { pendingRoundScheduleMatches = ids.split(','); document.getElementById('rsCount').innerText = pendingRoundScheduleMatches.length; openModal('roundSchedulerModal'); }
+        async function submitRoundSchedule() {
+            const time = document.getElementById('rsTime').value;
+            if(!time || pendingRoundScheduleMatches.length === 0) return;
+            const promises = pendingRoundScheduleMatches.map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) }));
+            await Promise.all(promises); closeModal(); init(true); showToast("Round Schedule Updated");
+        }
+
+        function calculateStandings(matches, participants) {
+            let stats = {}; participants.forEach(pid => { const team = allTeams.find(t=>t._id === pid); if(team) stats[pid] = { id: pid, name: team.shortName, wins:0, losses:0, played:0, diff:0, mapsWon:0, mapsLost:0, mapDiff:0 }; });
+            matches.forEach(m => {
+                if(m.status === 'finished' && m.winner) {
+                    const winnerId = m.winner._id || m.winner; const loserId = (m.teamA._id === winnerId || m.teamA === winnerId) ? (m.teamB._id || m.teamB) : (m.teamA._id || m.teamA);
+                    if(stats[winnerId]) { stats[winnerId].wins++; stats[winnerId].played++; } if(stats[loserId]) { stats[loserId].losses++; stats[loserId].played++; }
+                    let sA = 0, sB = 0; let mapsA = 0, mapsB = 0;
+                    if(m.scores && m.scores.length > 0) {
+                        m.scores.forEach(s => { const scA = parseInt(s.teamAScore)||0; const scB = parseInt(s.teamBScore)||0; sA += scA; sB += scB; if (scA > scB) mapsA++; else if (scB > scA) mapsB++; });
+                        const tA = m.teamA._id || m.teamA; const tB = m.teamB._id || m.teamB;
+                        if(stats[tA]) { stats[tA].diff += (sA - sB); stats[tA].mapsWon += mapsA; stats[tA].mapsLost += mapsB; stats[tA].mapDiff += (mapsA - mapsB); }
+                        if(stats[tB]) { stats[tB].diff += (sB - sA); stats[tB].mapsWon += mapsB; stats[tB].mapsLost += mapsA; stats[tB].mapDiff += (mapsB - mapsA); }
+                    }
+                }
+            });
+            return Object.values(stats).sort((a,b) => { if(b.wins !== a.wins) return b.wins - a.wins; if(b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff; return b.diff - a.diff; });
+        }
+
+        function renderDashboard(matches) {
+            const query = document.getElementById('dashSearch')?.value.toLowerCase() || '';
+            const live = matches.filter(m => (m.status === 'live' || m.status === 'scheduled') && (m.name.toLowerCase().includes(query) || m.teamA?.name.toLowerCase().includes(query)));
+            document.getElementById('liveMatches').innerHTML = live.map(m => renderMatchCard(m)).join('') || '<div class="col-span-3 text-center text-gray-600 text-sm italic py-10">No active matches found</div>';
+        }
+        function renderTeams(t){
+            const pendingCount = t.filter(x => x.status === 'pending').length; const nameChangeCount = t.filter(x => x.members.some(m => m.pendingUpdate)).length; const totalAction = pendingCount + nameChangeCount;
+            const badge = document.getElementById('navBadgeTeams'); if (totalAction > 0) { badge.innerText = totalAction; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
+            document.getElementById('teamGrid').innerHTML = t.map(x => {
+                const isPending = x.status === 'pending'; const hasNameChange = x.members.some(m => m.pendingUpdate);
+                return `<div class="bg-[#15171a] p-5 border border-[#2d3139] flex justify-between items-center hover:border-gray-500 transition rounded-lg relative overflow-hidden">${isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 animate-pulse"></div>' : ''}${hasNameChange && !isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>' : ''}<div class="flex items-center gap-5"><img src="${x.logo||DEFAULT_LOGO}" class="w-12 h-12 rounded bg-black object-cover border border-[#333]"><div onclick="openRosterModal('${x._id}')" class="cursor-pointer group"><div class="flex items-center gap-3"><div class="font-bold text-lg text-white group-hover:text-[#ff4655] transition">${x.name}</div>${isPending ? '<span class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-500/30 font-bold uppercase tracking-widest">PENDING</span>' : ''}${hasNameChange ? '<span class="text-[10px] bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30 font-bold uppercase tracking-widest">NAME CHANGE</span>' : ''}</div><div class="text-sm text-gray-400 font-mono mt-1">TAG: ${x.shortName} <span class="mx-2 text-gray-600">|</span> <span class="text-gray-500">${x.members.length} Members</span></div></div></div><div class="flex items-center gap-3">${isPending ? `<button onclick="approveTeam('${x._id}')" class="w-10 h-10 rounded bg-green-500/10 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white transition flex items-center justify-center shadow-lg"><i class="fa-solid fa-check"></i></button>` : ''}<button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="w-10 h-10 rounded bg-[#222] border border-[#333] text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center"><i class="fa-solid fa-pen text-sm"></i></button><button onclick="deleteTeam('${x._id}')" class="w-10 h-10 rounded bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center"><i class="fa-solid fa-trash text-sm"></i></button></div></div>`;
+            }).join('');
+        }
+        function renderRequests(matches) {
+            const pending = matches.filter(m => m.status === 'pending_approval'); const el = document.getElementById('pendingScores'); const badge = document.getElementById('navBadgeReq');
+            if(pending.length > 0) { badge.innerText = pending.length; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
+            if(pending.length === 0) { el.innerHTML = `<div class="col-span-2 flex flex-col items-center justify-center py-20 border-2 border-dashed border-[#333] rounded-lg text-gray-500"><i class="fa-solid fa-check-circle text-4xl mb-4 opacity-20"></i><span class="font-bold text-xs uppercase tracking-widest">All caught up</span></div>`; return; }
+            el.innerHTML = pending.map(m => {
+                const [winsA, winsB] = calculateMatchScore(m.scoreSubmission.tempScores);
+                const mapsHtml = m.scoreSubmission.tempScores.map((s) => `<div class="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0 text-sm"><div class="w-1/3 truncate text-gray-300 font-bold">${s.mapName}</div><div class="flex items-center justify-center gap-4 font-mono font-bold text-white"><span class="${parseInt(s.teamAScore)>parseInt(s.teamBScore)?'text-green-400':'text-gray-500'}">${m.teamA.shortName} ${s.teamAScore}</span><span class="text-gray-700">:</span><span class="${parseInt(s.teamBScore)>parseInt(s.teamAScore)?'text-green-400':'text-gray-500'}">${s.teamBScore} ${m.teamB.shortName}</span></div><div class="w-1/3 text-right">${s.proofImage?`<button onclick="viewImage('${s.proofImage}')" class="text-[10px] bg-[#ff4655] hover:bg-white hover:text-[#ff4655] text-white px-2 py-1 rounded transition ml-2 font-bold"><i class="fa-regular fa-image mr-1"></i> VIEW PROOF</button>`:`<span class="text-[10px] text-gray-600 italic">No Proof</span>`}</div></div>`).join('');
+                return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden shadow-xl hover:border-gray-500 transition group"><div class="bg-[#1a1d21] px-6 py-4 flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div><h4 class="text-xs font-bold text-gray-300 uppercase tracking-widest">${m.name}</h4></div><span class="text-xs font-mono text-gray-500">${new Date(m.scheduledTime).toLocaleDateString()}</span></div><div class="p-6"><div class="flex justify-between items-end mb-6 px-4"><div class="text-center"><div class="text-xl font-header font-bold text-white">${m.teamA.name}</div><div class="text-[10px] text-gray-500 font-bold uppercase">Score: <span class="text-white text-lg ml-1">${winsA}</span></div></div><div class="text-gray-700 font-header text-lg pb-1">VS</div><div class="text-center"><div class="text-xl font-header font-bold text-white">${m.teamB.name}</div><div class="text-[10px] text-gray-500 font-bold uppercase">Score: <span class="text-white text-lg ml-1">${winsB}</span></div></div></div><div class="bg-[#0f1113] rounded p-3 mb-5 border border-white/5">${mapsHtml}</div><div class="grid grid-cols-2 gap-3"><button onclick="approveScore('${m._id}')" class="bg-green-500/10 hover:bg-green-600 hover:text-white text-green-500 border border-green-500/20 py-3 rounded text-xs font-bold uppercase transition">Approve</button><button onclick="rejectScore('${m._id}')" class="bg-red-500/10 hover:bg-red-600 hover:text-white text-red-500 border border-red-500/20 py-3 rounded text-xs font-bold uppercase transition">Reject</button></div></div></div>`;
+            }).join('');
+        }
+        function renderMemberRow(tid, m) { if (m.status === 'pending' && m.pendingUpdate) return `<div class="bg-[#1a1d21] border border-orange-500/50 rounded p-4 mb-3 relative group shadow-lg shadow-orange-900/10"><div class="flex justify-between items-center mb-3"><span class="text-[9px] font-bold bg-orange-500 text-black px-2 py-0.5 rounded uppercase tracking-widest">Name Change Request</span><div class="text-[10px] text-gray-500 font-mono">ID: ${m.pendingUpdate.riotId || 'N/A'}</div></div><div class="flex items-center gap-4 mb-4 bg-black/20 p-2 rounded"><div class="flex-1 text-right opacity-60"><div class="text-[8px] text-gray-500 uppercase font-bold mb-0.5">Current</div><div class="font-bold text-white text-sm line-through decoration-red-500">${m.name}</div><div class="font-mono text-[10px] text-gray-500">#${m.tag}</div></div><div class="text-orange-500 text-sm"><i class="fa-solid fa-arrow-right"></i></div><div class="flex-1 text-left"><div class="text-[8px] text-orange-500 uppercase font-bold mb-0.5">New Name</div><div class="font-bold text-white text-sm text-shadow-glow">${m.pendingUpdate.name}</div><div class="font-mono text-[10px] text-orange-200">#${m.pendingUpdate.tag}</div></div></div><div class="flex gap-2 border-t border-white/5 pt-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="flex-1 bg-green-600/20 hover:bg-green-600 hover:text-white text-green-400 border border-green-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-check mr-1"></i> Approve Change</button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="flex-1 bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 border border-red-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-xmark mr-1"></i> Reject</button></div></div>`; else if (m.status === 'pending') return `<div class="bg-[#1a1d21] border border-blue-500/30 rounded p-3 mb-2 flex justify-between items-center relative overflow-hidden"><div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div><div class="pl-4"><div class="flex items-center gap-2"><span class="text-white font-bold text-base leading-none">${m.name}</span><span class="bg-blue-500/20 text-blue-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-500/20">NEW</span></div><div class="text-xs font-mono text-gray-500 mt-1">#${m.tag} • ${m.role}</div></div><div class="flex gap-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-green-500 hover:bg-green-600 hover:text-white hover:border-green-600 transition"><i class="fa-solid fa-check text-sm"></i></button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 transition"><i class="fa-solid fa-xmark text-sm"></i></button></div></div>`; return `<div class="group flex justify-between items-center p-3 rounded hover:bg-[#15171a] border border-transparent hover:border-[#333] transition mb-1"><div class="flex items-center gap-4"><div class="w-2 h-2 rounded-full ${m.status==='rejected'?'bg-red-500':'bg-[#1fa474]'}"></div><div><div class="text-sm font-bold text-gray-300 group-hover:text-white transition">${m.name}</div><div class="text-[10px] font-mono text-gray-600">#${m.tag} <span class="text-gray-700">|</span> ${m.role}</div></div></div><button onclick="deleteMember('${tid}', '${m._id}')" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition px-2"><i class="fa-solid fa-trash-can text-sm"></i></button></div>`; }
+        function openRosterModal(teamId) { const team = allTeams.find(t => t._id === teamId); if(!team) return; document.getElementById('rosterModalContent').innerHTML = `<div class="mb-6 flex items-center gap-5 border-b border-[#333] pb-6 bg-[#21252b] p-6 -m-8 rounded-t-lg"><img src="${team.logo || DEFAULT_LOGO}" class="w-20 h-20 rounded bg-black object-cover border border-[#333]"><div><h2 class="text-3xl font-header text-white leading-none mb-1">${team.name}</h2><div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><span class="text-[#ff4655]">[${team.shortName}]</span> ROSTER MANAGEMENT</div></div></div><div class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scroll mt-6">${team.members.map(m => renderMemberRow(team._id, m)).join('')}</div>`; openModal('rosterModal'); }
+        async function updateMemberStatus(tid, mid, status) { await fetch(`/api/teams/${tid}/members/${mid}/status`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); await init(true); openRosterModal(tid); showToast(status === 'approved' ? 'Action Completed' : 'Rejected / Reverted'); }
+        async function deleteMember(tid, mid) { if(!confirm("Kick Member?")) return; await fetch(`/api/teams/${tid}/members/${mid}`, { method: 'DELETE', headers: { 'Authorization': token } }); await init(true); openRosterModal(tid); showToast('Member Removed'); }
+        
+        function toggleBulkMode() { bulkMode = !bulkMode; const btn = document.getElementById('btnBulkMode'); if(bulkMode) { btn.classList.add('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.remove('text-gray-400'); } else { btn.classList.remove('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.add('text-gray-400'); selectedMatches.clear(); updateBulkUI(); } init(true); }
+        function toggleMatchSelect(id) { if(selectedMatches.has(id)) selectedMatches.delete(id); else selectedMatches.add(id); updateBulkUI(); }
+        function updateBulkUI() { const bar = document.getElementById('bulkActionBar'); document.getElementById('bulkCount').innerText = selectedMatches.size; if(selectedMatches.size > 0) bar.classList.remove('translate-y-full'); else bar.classList.add('translate-y-full'); }
+        async function applyBulkTime() { const time = document.getElementById('bulkTime').value; if(!time || selectedMatches.size===0) return; const promises = Array.from(selectedMatches).map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) })); await Promise.all(promises); selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); showToast("Schedule Updated"); }
+        function clearSelection() { selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); }
+        function viewImage(url) { const fullUrl = url.startsWith('http') ? url : `/${url}`; document.getElementById('imageViewerSrc').src = fullUrl; document.getElementById('imageViewerModal').classList.remove('hidden'); document.getElementById('imageViewerModal').classList.add('flex'); }
+        function openStageModal() { 
+            stageSelected = []; 
+            stagePool = allTeams.filter(t => t.status === 'approved'); 
+            
+            // Populate Source Dropdown
+            const sel = document.getElementById('stSourceSelect');
+            sel.innerHTML = '<option value="-1">Manual Selection (Drag & Drop)</option>';
+            if(activeTourneyData && activeTourneyData.stages) {
+                activeTourneyData.stages.forEach((s, i) => {
+                    sel.innerHTML += `<option value="${i}">From: ${s.name} (${s.type.toUpperCase()})</option>`;
+                });
+            }
+            
+            renderStageLists(); 
+            toggleStageOptions();
+            toggleSourceMode();
+            openModal('stageModal'); 
+        }
+
+        function toggleStageOptions() {
+            const type = document.getElementById('stType').value;
+            const lc = document.getElementById('stRoundCountContainer');
+            const tp = document.getElementById('stThirdPlaceContainer');
+            
+            if(type==='round_robin') lc.classList.remove('hidden'); else lc.classList.add('hidden');
+            // Allow 3rd place for GSL/Single Elim
+            if(type==='single_elim') tp.classList.remove('hidden'); else tp.classList.add('hidden');
+        }
+
+        function toggleSourceMode() {
+            const val = document.getElementById('stSourceSelect').value;
+            const type = document.getElementById('stType').value;
+            
+            if(val === "-1") {
+                document.getElementById('manualSelectUI').classList.remove('hidden');
+                document.getElementById('autoSourceUI').classList.add('hidden');
+            } else {
+                document.getElementById('manualSelectUI').classList.add('hidden');
+                document.getElementById('autoSourceUI').classList.remove('hidden');
+                document.getElementById('autoSourceUI').classList.add('flex');
+            }
+        }
+        function renderStageLists() { document.getElementById('poolList').innerHTML = stagePool.map(t => `<div onclick="selectTeamForStage('${t._id}')" class="cursor-pointer p-2 rounded bg-[#1a1d21] border border-[#333] hover:border-gray-500 flex items-center gap-3 group transition"><i class="fa-solid fa-plus text-gray-600 text-xs group-hover:text-green-500"></i><span class="text-xs text-gray-300 font-bold truncate">${t.name}</span></div>`).join(''); document.getElementById('availCount').innerText = stagePool.length; document.getElementById('selectedList').innerHTML = stageSelected.map((t, idx) => `<div onclick="removeTeamFromStage('${t._id}')" class="cursor-pointer p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`).join(''); document.getElementById('selCount').innerText = stageSelected.length; }
+        function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); } }
+        function removeTeamFromStage(tid) { const idx = stageSelected.findIndex(t => t._id === tid); if(idx > -1) { stagePool.push(stageSelected[idx]); stageSelected.splice(idx, 1); stagePool.sort((a,b) => a.name.localeCompare(b.name)); renderStageLists(); } }
+        function clearStageSelection() { stagePool = [...stagePool, ...stageSelected].sort((a,b)=>a.name.localeCompare(b.name)); stageSelected = []; renderStageLists(); }
+        function toggleRoundCount() { const type = document.getElementById('stType').value; const div = document.getElementById('stRoundCountContainer'); if(type==='round_robin') div.classList.remove('hidden'); else div.classList.add('hidden'); }
+        function calculateMatchScore(scores) { if (!scores) return [0,0]; let a=0,b=0; scores.forEach(s=>{ if(parseInt(s.teamAScore)>parseInt(s.teamBScore)) a++; else if(parseInt(s.teamBScore)>parseInt(s.teamAScore)) b++; }); return [a,b]; }
+        function updateStats(teams, matches) { document.getElementById('stat-live').innerText=matches.filter(m=>m.status==='live').length; document.getElementById('stat-pending').innerText=matches.filter(m=>m.status==='pending_approval').length; document.getElementById('stat-teams').innerText=teams.length; document.getElementById('stat-finished').innerText=matches.filter(m=>m.status==='finished').length; }
+        function openModal(id) { document.getElementById('modalBackdrop').classList.remove('hidden', 'flex'); document.getElementById('modalBackdrop').classList.add('flex'); document.querySelectorAll('.modal-content').forEach(e=>e.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+        function closeModal() { document.getElementById('modalBackdrop').classList.add('hidden'); document.getElementById('modalBackdrop').classList.remove('flex'); }
+        
+        function showToast(msg, type='success') { 
+            const t=document.getElementById('toast'); 
+            document.getElementById('toastMsg').innerText=msg; 
+            const icon = t.querySelector('i');
+            if(type === 'error') {
+                t.classList.replace('border-[#ff4655]', 'border-red-600');
+                icon.className = 'fa-solid fa-triangle-exclamation text-red-600 text-2xl';
+            } else {
+                t.classList.replace('border-red-600', 'border-[#ff4655]');
+                icon.className = 'fa-solid fa-circle-check text-[#ff4655] text-2xl';
+            }
+            t.style.transform="translateX(0)"; 
+            setTimeout(()=>t.style.transform="translateX(150%)",4000); 
+        }
+
+        function logout() { localStorage.removeItem('token'); location.href='/login.html'; }
+        function openEditMatch(id) { 
+            const m = allMatches.find(x=>x._id===id); if(!m) return; activeMatchId = id; 
+            document.getElementById('emName').value = m.name; 
+            document.getElementById('emStatus').value = m.status; 
+            document.getElementById('emFormat').value = m.format || 'BO1'; 
+            document.getElementById('emTime').value = m.scheduledTime ? new Date(new Date(m.scheduledTime).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
+            document.getElementById('forceNameA').innerText = m.teamA?.shortName || 'Team A'; 
+            document.getElementById('forceNameB').innerText = m.teamB?.shortName || 'Team B';
+            switchMatchTab('overview'); 
+            updateScoreInputs(m); 
+            openModal('editMatchModal'); 
+        }
+        function switchMatchTab(t) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); ['overview','scoreboard','admin'].forEach(x=>document.getElementById('view-tab-'+x).classList.add('hidden')); document.getElementById('view-tab-'+t).classList.remove('hidden'); }
+        function updateScoreInputs(mIn) { 
+            const m = mIn || allMatches.find(x => x._id === activeMatchId); if(!m) return;
+            const format = document.getElementById('emFormat').value;
+            const count = format === 'BO1' ? 1 : (format === 'BO3' ? 3 : 5);
+            const nameA = m.teamA ? m.teamA.shortName : 'TEAM A'; const nameB = m.teamB ? m.teamB.shortName : 'TEAM B';
+            let html = `<div class="grid grid-cols-12 gap-2 mb-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest text-center"><div class="col-span-4 text-left pl-2">Map Name</div><div class="col-span-3 text-[#ff4655]">${nameA} Score</div><div class="col-span-2">VS</div><div class="col-span-3 text-[#ff4655]">${nameB} Score</div></div>`;
+            for(let i=0; i<count; i++) { const s = m.scores[i] || { mapName: `Map ${i+1}`, teamAScore: 0, teamBScore: 0 }; html += `<div class="grid grid-cols-12 gap-2 mb-2 items-center bg-[#15171a] p-2 rounded border border-[#333]"><div class="col-span-4"><input id="ms_m_${i}" value="${s.mapName}" class="w-full bg-black/30 border border-[#444] px-2 py-1.5 rounded text-gray-300 text-xs focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Map Name"></div><div class="col-span-3"><input type="number" id="ms_a_${i}" value="${s.teamAScore}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div><div class="col-span-2 text-center text-gray-600 font-bold">:</div><div class="col-span-3"><input type="number" id="ms_b_${i}" value="${s.teamBScore}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div></div>`; }
+            document.getElementById('manualScoreInputs').innerHTML = html; 
+        }
+        async function saveMatchEdit() { 
+            const body = { name:document.getElementById('emName').value, status:document.getElementById('emStatus').value, scheduledTime:document.getElementById('emTime').value, format:document.getElementById('emFormat').value };
+            await fetch(`/api/matches/${activeMatchId}`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify(body)});
+            const c = document.getElementById('emFormat').value==='BO1'?1:(document.getElementById('emFormat').value==='BO3'?3:5);
+            const scores = []; for(let i=0; i<c; i++) scores.push({ mapName:document.getElementById(`ms_m_${i}`).value, teamAScore: parseInt(document.getElementById(`ms_a_${i}`).value)||0, teamBScore: parseInt(document.getElementById(`ms_b_${i}`).value)||0 });
+            await fetch(`/api/matches/${activeMatchId}/manual-score`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({scores})});
+            closeModal(); init(); showToast('Match Saved');
+        }
+
+        // --- [UPDATED] IMPROVED MAP SELECTOR LOGIC WITH IMAGES ---
+        function renderMapCheckboxes(ctx, preselected = []) {
+            const id = ctx === 'create' ? 'createMapPoolList' : 'editMapPoolList';
+            const countId = ctx === 'create' ? 'count-create' : 'count-edit';
+            const container = document.getElementById(id);
+            if(!container) return; 
+            
+            // Generate HTML for map cards
+            container.innerHTML = ALL_MAPS.map(m => {
+                let isChecked = false;
+                // Create mode: Use Default Pool (7 maps)
+                if (ctx === 'create') isChecked = COMPETITIVE_POOL.includes(m);
+                // Edit mode: Use saved data
+                else isChecked = preselected.includes(m);
+                
+                // Use Map Image or Fallback
+                const bgImg = MAP_IMAGES[m] || MAP_IMAGES['Abyss'];
+
+                return `
+                <div class="map-option ${isChecked ? 'selected' : ''}" onclick="toggleMap('${ctx}', '${m}', this)" style="background-image: url('${bgImg}');">
+                    <input type="checkbox" value="${m}" class="chk-map-${ctx} hidden" ${isChecked ? 'checked' : ''}>
+                    <span class="map-name">${m}</span>
+                    <i class="fa-solid fa-circle-check check-icon"></i>
+                </div>`;
+            }).join('');
+
+            updateMapSelectionUI(ctx);
+        }
+
+        function toggleMap(ctx, mapName, el) {
+            const checkbox = el.querySelector('input');
+            const container = el.parentElement;
+            const currentCount = container.querySelectorAll('input:checked').length;
+            
+            // Logic: Force limit 7
+            if (!checkbox.checked) {
+                // ถ้าจะติ๊กเพิ่ม แต่ครบ 7 แล้ว -> ห้ามติ๊ก
+                if (currentCount >= 7) {
+                    showToast("Map Pool Limited to 7 Maps", 'error');
+                    // Effect shake/warn could be added here
+                    return;
+                }
+                checkbox.checked = true;
+                el.classList.add('selected');
+            } else {
+                // เอาออกได้เสมอ
+                checkbox.checked = false;
+                el.classList.remove('selected');
+            }
+            
+            updateMapSelectionUI(ctx);
+        }
+
+        function updateMapSelectionUI(ctx) {
+            const id = ctx === 'create' ? 'createMapPoolList' : 'editMapPoolList';
+            const countId = ctx === 'create' ? 'count-create' : 'count-edit';
+            const container = document.getElementById(id);
+            const countEl = document.getElementById(countId);
+            
+            const checkboxes = container.querySelectorAll('input');
+            const checkedCount = container.querySelectorAll('input:checked').length;
+            
+            // Update Counter Text
+            countEl.innerText = `${checkedCount}/7`;
+            countEl.className = checkedCount === 7 
+                ? "text-xs font-mono font-bold text-[#22c55e]" // Green if complete
+                : "text-xs font-mono font-bold text-[#ff4655]"; // Red if incomplete
+            
+            // Disable unselected options if limit reached
+            const options = container.querySelectorAll('.map-option');
+            options.forEach(opt => {
+                const cb = opt.querySelector('input');
+                if (!cb.checked) {
+                    if (checkedCount >= 7) opt.classList.add('disabled');
+                    else opt.classList.remove('disabled');
+                } else {
+                    opt.classList.remove('disabled');
+                }
+            });
+        }
+
+        // --- UPDATED ACTIONS WITH VALIDATION ---
+        
+        async function createTournament() { 
+            const name = document.getElementById('tnName').value; 
+            if(!name) return showToast("Name is required", 'error');
+
+            const approvedTeams = allTeams.filter(t=>t.status==='approved');
+            if(approvedTeams.length < 2) return showToast("Need at least 2 approved teams!", 'error');
+
+            const selectedMaps = Array.from(document.querySelectorAll('.chk-map-create:checked')).map(c => c.value);
+            
+            // [VALIDATION] Force exactly 7 maps
+            if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
+
+            await fetch('/api/tournaments', {
+                method:'POST', 
+                headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
+                body:JSON.stringify({name, teamIds: approvedTeams.map(t=>t._id), mapPool: selectedMaps})
+            }); 
+            closeModal(); init(); 
+        }
+
+        async function updateTourneyName() { 
+            const id = document.getElementById('tsId').value;
+            const name = document.getElementById('tsName').value; 
+            const selectedMaps = Array.from(document.querySelectorAll('.chk-map-edit:checked')).map(c => c.value);
+            
+            // [VALIDATION] Force exactly 7 maps
+            if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
+
+            await fetch(`/api/tournaments/${id}`, {
+                method:'PUT', 
+                headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
+                body:JSON.stringify({name, mapPool: selectedMaps})
+            }); 
+            closeModal(); init(); showToast('System Updated'); 
+        }
+
+        
+        function openTourneySettings(id, name) { 
+            document.getElementById('tsId').value = id; 
+            document.getElementById('tsName').value = name; 
+            const currentPool = activeTourneyData.mapPool && activeTourneyData.mapPool.length > 0 ? activeTourneyData.mapPool : ALL_MAPS;
+            renderMapCheckboxes('edit', currentPool);
+            openModal('tourneySettingsModal'); 
+        }
+        
+        async function deleteTourney() { const id=document.getElementById('tsId').value; if(confirm("DELETE SYSTEM?")) { await fetch(`/api/tournaments/${id}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); showToast('Deleted'); } }
+        async function approveScore(id) { if(confirm('Approve Result?')) await fetch(`/api/matches/${id}/approve-score`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Score Approved'); }
+        async function rejectScore(id) { const r=prompt('Reason for rejection:'); if(r) await fetch(`/api/matches/${id}/reject-score`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({reason:r})}); init(); showToast('Score Rejected'); }
+        async function forceWinner(side) { const m=allMatches.find(x=>x._id===activeMatchId); if(confirm('Force Win?')) await fetch(`/api/matches/${activeMatchId}/force-winner`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({winnerId: side==='teamA'?m.teamA._id:m.teamB._id})}); closeModal(); init(); }
+        async function deleteMatch() { if(confirm('Delete Match?')) await fetch(`/api/matches/${activeMatchId}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); }
+        async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
+        async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
+        async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
+        function editTeam(id, name, short) { document.getElementById('teId').value = id; document.getElementById('teName').value = name; document.getElementById('teShort').value = short; openModal('teamEditModal'); }
+        async function saveTeamEdit() { alert("To implement: Backend PUT /api/teams/:id"); closeModal(); }
+        async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
+        async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
+        function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
+        function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
+        async function generateStage() { 
+            const sourceIdx = parseInt(document.getElementById('stSourceSelect').value);
+            
+            const body = { 
+                name: document.getElementById('stName').value, 
+                type: document.getElementById('stType').value, 
+                participants: stageSelected.map(t=>t._id), 
+                settings: { 
+                    defaultFormat: document.getElementById('stDefBO').value, 
+                    roundCount: parseInt(document.getElementById('stRoundCount').value) || 1, 
+                    randomize: document.getElementById('stRandom').checked,
+                    hasThirdPlace: document.getElementById('stThirdPlace').checked,
+                    
+                    // Advanced Settings
+                    sourceStageIndex: sourceIdx,
+                    advanceCount: parseInt(document.getElementById('stAdvanceCount').value) || 4,
+                    advanceMethod: document.getElementById('stAdvanceMethod').value
+                } 
+            }; 
+
+            await fetch(`/api/tournaments/${activeTourneyData._id}/stages/generate`, {
+                method:'POST', 
+                headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
+                body:JSON.stringify(body)
+            }); 
+            closeModal(); init(); 
+        }
+
+        // Initialize Render with Default Checks
+        document.addEventListener('DOMContentLoaded', () => {
+             renderMapCheckboxes('create');
+        });
+
+        init();
+    </script>
+</body>
+</html>

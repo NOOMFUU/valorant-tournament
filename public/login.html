@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tournament Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Minimal Input Style */
+        .min-input {
+            background: transparent;
+            border: 1px solid #e5e7eb; /* Gray-200 */
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 0.95rem;
+            color: #111;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .min-input:focus {
+            border-color: #18181b; /* Zinc-900 */
+            box-shadow: 0 0 0 1px #18181b;
+        }
+        .min-input::placeholder { color: #9ca3af; }
+
+        /* Minimal Button Style */
+        .min-btn {
+            background: #18181b;
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 14px;
+            transition: all 0.2s ease;
+            letter-spacing: 0.025em;
+        }
+        .min-btn:hover { background: #27272a; transform: translateY(-1px); }
+        .min-btn:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; transform: none; }
+
+        /* Animation */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="flex h-screen bg-white">
+
+    <div class="hidden lg:flex w-1/2 bg-zinc-900 relative items-center justify-center overflow-hidden">
+        <div class="absolute w-96 h-96 bg-zinc-800 rounded-full blur-3xl opacity-50 -top-20 -left-20"></div>
+        <div class="absolute w-[500px] h-[500px] bg-zinc-800 rounded-full blur-3xl opacity-30 bottom-0 right-0"></div>
+        
+        <div class="relative z-10 text-white p-12 max-w-lg">
+            <div class="text-zinc-500 font-medium mb-4 tracking-widest text-xs uppercase">Tournament System</div>
+            <h1 class="text-5xl font-light mb-6 leading-tight">Manage your team <br> <span class="font-semibold">with precision.</span></h1>
+            <p class="text-zinc-400 font-light text-lg">The minimalist platform for professional esports management.</p>
+        </div>
+    </div>
+
+    <div class="w-full lg:w-1/2 flex flex-col items-center justify-center p-8 bg-white">
+        <div class="w-full max-w-md space-y-10">
+            
+            <div>
+                <h2 class="text-2xl font-semibold text-zinc-900 mb-8">Welcome back</h2>
+                <div class="flex gap-8 border-b border-gray-100 pb-1">
+                    <button onclick="setTab('login')" id="tabLogin" class="pb-3 text-sm font-medium transition-colors border-b-2 border-black text-black">
+                        Login
+                    </button>
+                    <button onclick="setTab('register')" id="tabRegister" class="pb-3 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors border-b-2 border-transparent">
+                        Create Team
+                    </button>
+                </div>
+            </div>
+
+            <div id="loginForm" class="space-y-6 animate-fade-in">
+                <div class="flex items-center gap-3 p-1 bg-gray-50 rounded-lg w-fit">
+                    <button onclick="setRole('team')" id="roleTeam" class="px-4 py-2 text-xs font-semibold rounded-md bg-white shadow-sm text-black ring-1 ring-gray-200 transition-all">Captain</button>
+                    <button onclick="setRole('admin')" id="roleAdmin" class="px-4 py-2 text-xs font-medium rounded-md text-gray-500 hover:text-black transition-all">Admin</button>
+                </div>
+                <input type="hidden" id="role" value="team">
+
+                <div class="space-y-4">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs font-medium text-gray-700 ml-1">Username</label>
+                        <input id="lUser" class="min-input w-full" placeholder="Enter your username">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs font-medium text-gray-700 ml-1">Password</label>
+                        <input id="lPass" type="password" class="min-input w-full" placeholder="Enter your password">
+                    </div>
+                </div>
+
+                <button onclick="login()" class="min-btn w-full mt-4 flex justify-center items-center gap-2">
+                    <span>Continue</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </div>
+
+            <div id="registerForm" class="hidden space-y-5 animate-fade-in">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs font-medium text-gray-700 ml-1">Team Name</label>
+                        <input id="rName" class="min-input w-full" placeholder="e.g. Sentinels">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs font-medium text-gray-700 ml-1">Tag</label>
+                        <input id="rShort" class="min-input w-full uppercase" placeholder="SEN" maxlength="4">
+                    </div>
+                </div>
+                
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs font-medium text-gray-700 ml-1">Password</label>
+                    <input id="rPass" type="password" class="min-input w-full" placeholder="Create a password">
+                </div>
+                
+                <div class="relative border border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 hover:border-gray-400 transition cursor-pointer group" onclick="document.getElementById('rLogo').click()">
+                    <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-white group-hover:shadow-sm transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-gray-500 text-sm"></i>
+                    </div>
+                    <div class="text-xs text-gray-600 font-medium">Click to upload logo</div>
+                    <div class="text-[10px] text-gray-400 mt-1">SVG, PNG, JPG</div>
+                    <input id="rLogo" type="file" class="hidden" onchange="this.parentElement.querySelector('.text-gray-600').innerText = this.files[0].name">
+                </div>
+
+                <button onclick="register()" class="min-btn w-full !bg-zinc-900 hover:!bg-black">Create Account</button>
+            </div>
+
+            <p id="msg" class="text-center text-xs font-medium text-red-500 min-h-[20px]"></p>
+            
+            <div class="text-center mt-12">
+                <p class="text-[10px] text-gray-400">© 2024 Protocol System v1.2</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ฟังก์ชันเดิมทั้งหมด (Logic ไม่เปลี่ยน เปลี่ยนแค่ Class ที่ใช้ toggle)
+        function setTab(t) {
+            document.getElementById('loginForm').classList.toggle('hidden', t!=='login');
+            document.getElementById('registerForm').classList.toggle('hidden', t!=='register');
+            
+            // Minimal Tab Styles
+            const activeClass = 'pb-3 text-sm font-medium transition-colors border-b-2 border-black text-black';
+            const inactiveClass = 'pb-3 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors border-b-2 border-transparent';
+            
+            document.getElementById('tabLogin').className = t==='login' ? activeClass : inactiveClass;
+            document.getElementById('tabRegister').className = t==='register' ? activeClass : inactiveClass;
+            document.getElementById('msg').innerText = '';
+        }
+
+        function setRole(r) {
+            document.getElementById('role').value = r;
+            const activeBtn = 'px-4 py-2 text-xs font-semibold rounded-md bg-white shadow-sm text-black ring-1 ring-gray-200 transition-all';
+            const inactiveBtn = 'px-4 py-2 text-xs font-medium rounded-md text-gray-500 hover:text-black transition-all';
+            
+            document.getElementById('roleTeam').className = r==='team' ? activeBtn : inactiveBtn;
+            document.getElementById('roleAdmin').className = r==='admin' ? activeBtn : inactiveBtn;
+        }
+
+        async function login() {
+            const btn = document.querySelector('button[onclick="login()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true; 
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            
+            try {
+                // จำลอง Delay เพื่อดู Loading state (ลบออกได้ตอนใช้จริง)
+                // await new Promise(r => setTimeout(r, 800)); 
+
+                const res = await fetch('/api/login', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        role: document.getElementById('role').value,
+                        username: document.getElementById('lUser').value,
+                        password: document.getElementById('lPass').value
+                    })
+                });
+                const d = await res.json();
+                if(res.ok) {
+                    localStorage.setItem('token', d.token); 
+                    localStorage.setItem('id', d.id);
+                    localStorage.setItem('role', d.role);
+                    location.href = d.role==='admin' ? '/admin.html' : '/team-dashboard.html';
+                } else {
+                    document.getElementById('msg').innerText = d.msg;
+                    btn.disabled = false; btn.innerHTML = originalText;
+                }
+            } catch(e) {
+                document.getElementById('msg').innerText = "Connection Error";
+                btn.disabled = false; btn.innerHTML = originalText;
+            }
+        }
+
+        async function register() {
+            const btn = document.querySelector('button[onclick="register()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+
+            const fd = new FormData();
+            fd.append('name', document.getElementById('rName').value);
+            fd.append('shortName', document.getElementById('rShort').value);
+            fd.append('password', document.getElementById('rPass').value);
+            const logo = document.getElementById('rLogo').files[0];
+            if(logo) fd.append('logo', logo);
+
+            try {
+                const res = await fetch('/api/register', { method:'POST', body: fd });
+                const d = await res.json();
+                if(res.ok) {
+                    document.getElementById('msg').className = 'text-center text-xs font-medium text-emerald-600 min-h-[20px]';
+                    document.getElementById('msg').innerText = 'Registration Successful';
+                    setTimeout(()=>setTab('login'), 1500);
+                } else {
+                    document.getElementById('msg').className = 'text-center text-xs font-medium text-red-500 min-h-[20px]';
+                    document.getElementById('msg').innerText = d.msg || 'Error registering';
+                }
+            } catch(e) {
+                document.getElementById('msg').innerText = "Connection Error";
+            }
+            btn.disabled = false; btn.innerHTML = originalText;
+        }
+    </script>
+</body>
+</html>
