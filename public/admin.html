@@ -693,7 +693,7 @@
         function updateBulkUI() { const bar = document.getElementById('bulkActionBar'); document.getElementById('bulkCount').innerText = selectedMatches.size; if(selectedMatches.size > 0) bar.classList.remove('translate-y-full'); else bar.classList.add('translate-y-full'); }
         async function applyBulkTime() { const time = document.getElementById('bulkTime').value; if(!time || selectedMatches.size===0) return; const promises = Array.from(selectedMatches).map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) })); await Promise.all(promises); selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); showToast("Schedule Updated"); }
         function clearSelection() { selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); }
-        function viewImage(url) { const fullUrl = url.startsWith('http') ? url : `/${url}`; document.getElementById('imageViewerSrc').src = fullUrl; document.getElementById('imageViewerModal').classList.remove('hidden'); document.getElementById('imageViewerModal').classList.add('flex'); }
+        function viewImage(url) { const fullUrl = url.startsWith('http') ? url : `${url}`; document.getElementById('imageViewerSrc').src = fullUrl; document.getElementById('imageViewerModal').classList.remove('hidden'); document.getElementById('imageViewerModal').classList.add('flex'); }
         function openStageModal() { 
             stageSelected = []; 
             stagePool = allTeams.filter(t => t.status === 'approved'); 
