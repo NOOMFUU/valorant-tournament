@@ -930,7 +930,29 @@
         async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
         async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
         function editTeam(id, name, short) { document.getElementById('teId').value = id; document.getElementById('teName').value = name; document.getElementById('teShort').value = short; openModal('teamEditModal'); }
-        async function saveTeamEdit() { alert("To implement: Backend PUT /api/teams/:id"); closeModal(); }
+        async function saveTeamEdit() { 
+            const id = document.getElementById('teId').value;
+            const name = document.getElementById('teName').value;
+            const shortName = document.getElementById('teShort').value;
+
+            if(!name || !shortName) return showToast('Please fill all fields', 'error');
+
+            const res = await fetch(`/api/teams/${id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, shortName })
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                showToast('Team Updated Successfully');
+                closeModal();
+                init(); // Refresh Grid
+            } else {
+                showToast(data.msg || 'Update Failed', 'error');
+            }
+        }
         async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
         async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }

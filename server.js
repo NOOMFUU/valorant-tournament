@@ -343,6 +343,33 @@ app.put('/api/teams/roster', auth(['team']), async(req,res)=>{
     } catch(e) { res.status(500).json({msg: 'Server Error'}); }
 });
 
+app.put('/api/teams/:id', auth(['admin']), async (req, res) => {
+    try {
+        const { name, shortName } = req.body;
+        
+        // Validations
+        if (!name || !shortName) return res.status(400).json({ msg: 'Name and Short Name are required' });
+
+        // Check if new name already exists (excluding current team)
+        const existingName = await Team.findOne({ name: name, _id: { $ne: req.params.id } });
+        if (existingName) return res.status(400).json({ msg: 'Team Name is already taken' });
+
+        // Update
+        const updatedTeam = await Team.findByIdAndUpdate(req.params.id, {
+            name: name,
+            shortName: shortName.toUpperCase() // Force Uppercase for Tag
+        }, { new: true });
+
+        if (!updatedTeam) return res.status(404).json({ msg: 'Team not found' });
+
+        io.emit('teams_update'); // แจ้ง Client ให้รีเฟรชข้อมูล
+        res.json({ success: true, team: updatedTeam });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
 app.put('/api/teams/:id/members/:mid/status', auth(['admin']), async(req,res)=>{
     try {
         const { status } = req.body;
