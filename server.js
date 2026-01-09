@@ -23,7 +23,6 @@ const Team = require('./models/Team');
 const Match = require('./models/Match');
 const Tournament = require('./models/Tournament');
 
-
 // Import Managers
 const VetoManager = require('./managers/vetoManager');
 const BracketManager = require('./managers/bracketManager'); 

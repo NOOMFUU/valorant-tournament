@@ -21,7 +21,7 @@
             --val-red: #ff4655;
             --val-green: #1fa474;
             --val-white: #ece8e1;
-            --sidebar-width: 360px;
+            --sidebar-width: 360px; /* ขยาย Sidebar นิดหน่อยให้ใส่รายละเอียดได้พอดี */
         }
 
         body {
@@ -113,6 +113,7 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
 
+        /* --- END SCREEN DRAWER --- */
         .chat-drawer {
             position: fixed; bottom: 0; right: 2rem; width: 400px; height: 60vh;
             background: rgba(15, 25, 35, 0.98);
@@ -125,6 +126,7 @@
         }
         .chat-drawer.open { transform: translateY(0); }
 
+        /* --- END SCREEN CARDS --- */
         .roster-row { transition: all 0.2s ease; border-left: 3px solid transparent; }
         .roster-row:hover { background: rgba(255,255,255,0.08); border-left-color: currentColor; padding-left: 1rem; }
         .end-map-card { position: relative; flex: 1; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); overflow: hidden; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.1); }
@@ -135,23 +137,12 @@
         .coin-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 50%; border: 5px solid white; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: #0f1923; }
         .face-heads { color: #1fa474; } .face-tails { color: #ff4655; transform: rotateY(180deg); }
         .spin-to-heads { transform: rotateY(1800deg); }
-
-        /* --- NEW DYNAMIC BG --- */
-        #bgLayer {
-            transition: background-image 0.8s ease-in-out, transform 1.2s ease-out;
-        }
-        .bg-overlay {
-            position: fixed; inset: 0;
-            background: radial-gradient(circle at center, transparent 0%, var(--val-dark) 90%);
-            z-index: 1; pointer-events: none;
-        }
     </style>
 </head>
 <body>
 
     <div class="scanlines"></div>
-    <div id="bgLayer" class="fixed inset-0 z-0 bg-cover bg-center opacity-40 scale-105" style="background-image: url('https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png');"></div>
-    <div class="bg-overlay"></div>
+    <div id="bgLayer" class="fixed inset-0 z-0 bg-cover bg-center transition-all duration-500 opacity-30 scale-105" style="background-image: url('https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png');"></div>
 
     <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 opacity-0 -translate-y-8 pointer-events-none">
         <div class="bg-[#ff4655] text-white px-8 py-3 text-xl font-ui font-bold tracking-widest clip-val shadow-xl flex items-center gap-3">
@@ -170,10 +161,9 @@
 
             <div class="p-4 bg-black/20">
                 <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1">Lobby ID / Password</div>
-                <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 transition group">
+                <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 cursor-pointer hover:border-white/30 transition group">
                     <span id="roomPassContent" class="font-mono text-xl text-white font-bold flex-1 truncate tracking-wider">---</span>
-                    <div id="lobbyBtnGroup" class="flex gap-2">
-                        </div>
+                    <i class="fa-regular fa-copy text-gray-500 group-hover:text-white transition"></i>
                 </div>
             </div>
 
@@ -327,14 +317,10 @@
         const socket = io();
         const matchId = new URLSearchParams(location.search).get('match');
         const teamId = localStorage.getItem('id');
-        if (!teamId) {
-            alert("Session expired. Please login again.");
-            window.location.href = "/login.html";
-        }
         let timerInt;
         let coinFlipDone = false; 
-        let currentMatchBg = 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png';
 
+        // Map Assets
         const maps = {
             'Abyss': 'https://media.valorant-api.com/maps/224b0a95-48b9-f703-1bd8-67aca101a61f/splash.png',
             'Sunset': 'https://media.valorant-api.com/maps/92584fbe-486a-b1b2-9faa-39b0f486b498/splash.png',
@@ -349,6 +335,7 @@
             'Ascent': 'https://media.valorant-api.com/maps/7eaecc1b-4337-bbf6-6ab9-04b8f06b3319/splash.png',  
             'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg'
         };
+        const defaultBg = 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png';
 
         window.addEventListener('DOMContentLoaded', () => {
             const tl = gsap.timeline();
@@ -359,13 +346,7 @@
               .to("#grid", { opacity: 1, scale: 1, duration: 0.8 }, "-=0.2");
         });
 
-        const areIdsEqual = (id1, id2) => {
-            if (!id1 || !id2) return false;
-            // แปลงทุกอย่างเป็น String ก่อนเทียบกันเสมอ
-            const rawId1 = typeof id1 === 'object' ? (id1._id || id1) : id1;
-            const rawId2 = typeof id2 === 'object' ? (id2._id || id2) : id2;
-            return String(rawId1) === String(rawId2);
-        };
+        const areIdsEqual = (id1, id2) => String(id1?._id || id1) === String(id2?._id || id2);
 
         if(matchId) socket.emit('join_match', matchId);
         
@@ -426,14 +407,7 @@
 
         function setBg(url) {
             const bg = document.getElementById('bgLayer');
-            gsap.to(bg, { 
-                opacity: 0, 
-                duration: 0.3, 
-                onComplete: () => {
-                    bg.style.backgroundImage = `url('${url}')`;
-                    gsap.to(bg, { opacity: 0.4, duration: 0.5 });
-                }
-            });
+            bg.style.backgroundImage = `url('${url}')`;
         }
 
         socket.on('notification', (d) => showToast(d.msg));
@@ -452,72 +426,41 @@
 
         socket.on('veto_update', (m) => {
             const v = m.vetoData;
-            // เช็คว่าเป็น Team A หรือไม่ (โดยดูจาก ID ใน LocalStorage เทียบกับ DB)
             const isA = areIdsEqual(teamId, m.teamA._id);
             
-            // --- 1. จัดการ Background ---
-            if(v.pickedMaps && v.pickedMaps.length > 0) {
-                const lastMap = v.pickedMaps[v.pickedMaps.length - 1].map;
-                currentMatchBg = maps[lastMap];
-                setBg(currentMatchBg);
-            }
-
-            // --- 2. อัปเดต Header และ Grid ---
             updateHeader(m, v, isA);
             renderGrid(v, teamId, m.teamA, m.teamB);
             renderMiniSummary(v, m.teamA, m.teamB); 
             
-            // --- 3. [FIX] ส่วนจัดการรหัสห้องและปุ่ม ---
             const passEl = document.getElementById('roomPassContent');
-            const btnGroup = document.getElementById('lobbyBtnGroup');
+            const lobbyCont = document.getElementById('lobbyActionArea');
+            lobbyCont.removeAttribute('onclick'); 
             
-            // ล้างค่าเดิมก่อนเสมอ
-            btnGroup.innerHTML = ''; 
-            passEl.onclick = null; // ล้าง Event Click เก่า
-            passEl.classList.remove('cursor-pointer', 'hover:text-white', 'transition'); // ล้าง Style เก่า
-
             if(m.roomPassword) {
-                // กรณี: มีรหัสห้องแล้ว
                 passEl.innerText = m.roomPassword;
                 passEl.classList.add('text-white');
                 passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
-                
-                // ปุ่ม Copy (ทุกคนเห็น)
-                btnGroup.innerHTML += `<i onclick="copyLobbyID(event)" class="fa-regular fa-copy text-gray-500 hover:text-white cursor-pointer transition" title="Copy Code"></i>`;
-                
-                // ปุ่ม Edit (เฉพาะ Team A เห็น)
-                if(isA) {
-                    btnGroup.innerHTML += `<i onclick="setRoomPass()" class="fa-solid fa-pen text-gray-500 hover:text-[#ff4655] cursor-pointer transition ml-2" title="Edit Code"></i>`;
-                }
+                lobbyCont.onclick = function(e) { copyLobbyID(e); };
+                if(isA) passEl.innerHTML += ` <i class="fa-solid fa-pen text-[10px] text-gray-500 hover:text-[#ff4655] ml-2" onclick="event.stopPropagation(); setRoomPass()"></i>`;
             } else if(isA) {
-                // กรณี: ยังไม่มีรหัส และฉันคือ Team A (Host)
-                passEl.innerText = "SET CODE";
-                
-                // [FIX] ทำให้กดที่ข้อความได้เลย
-                passEl.classList.add('text-[#ff4655]', 'cursor-pointer', 'hover:text-white', 'transition'); 
+                passEl.innerHTML = `SET CODE <i class="fa-solid fa-pen ml-2"></i>`;
                 passEl.classList.remove('text-white', 'text-gray-500');
-                passEl.onclick = function() { setRoomPass(); }; 
-
-                // ปุ่มปากกา
-                btnGroup.innerHTML = `<i onclick="setRoomPass()" class="fa-solid fa-pen text-[#ff4655] hover:text-white cursor-pointer transition"></i>`;
+                passEl.classList.add('text-[#ff4655]');
+                lobbyCont.onclick = function() { setRoomPass(); };
             } else {
-                // กรณี: ยังไม่มีรหัส และฉันคือ Team B (Guest)
-                passEl.innerText = "WAITING FOR HOST";
-                passEl.classList.add('text-gray-500');
-                passEl.classList.remove('text-[#ff4655]', 'text-white');
+                 passEl.innerText = "WAITING FOR HOST";
+                 passEl.classList.add('text-gray-500');
+                 passEl.classList.remove('text-[#ff4655]', 'text-white');
             }
 
-            // --- 4. ปุ่ม Ready ---
             const amIReady = isA ? v.teamAReady : v.teamBReady;
             const rBtn = document.getElementById('readyBtn');
-            // ปุ่ม Ready จะโผล่ก็ต่อเมื่อ: มีรหัสห้องแล้ว + ฉันยังไม่ Ready + สถานะคือ Pending
             if(m.roomPassword && !amIReady && v.status === 'pending') {
                 rBtn.classList.remove('hidden');
             } else {
                 rBtn.classList.add('hidden');
             }
 
-            // --- 5. Timer & Logs ---
             if(v.status === 'in_progress') runTimer(v.currentTurnStartTime, v.turnTimeLimit);
             else { document.getElementById('timerBar').style.width = '0%'; clearInterval(timerInt); }
 
@@ -525,8 +468,8 @@
             document.getElementById('logContainer').innerHTML = logHtml;
             document.getElementById('view-endLogs').innerHTML = logHtml;
 
-            // --- 6. Modal & End Screen ---
             handleModals(v, teamId);
+
             if(v.status === 'completed' || m.status === 'live') showEndScreen(m);
         });
 
@@ -576,19 +519,25 @@
                 }
                 el.innerHTML = html;
                 
+                // --- DYNAMIC BG EVENT ---
                 el.addEventListener('mouseenter', () => setBg(maps[map]));
-                el.addEventListener('mouseleave', () => setBg(currentMatchBg));
+                el.addEventListener('mouseleave', () => setBg(defaultBg));
                 
                 grid.appendChild(el);
             });
         }
 
+        // --- ENHANCED MAP SUMMARY ---
         function renderMiniSummary(v, tA, tB) {
             const container = document.getElementById('miniSummary');
             let html = '';
             
+            // Loop through picked maps
             v.pickedMaps.forEach(p => { 
                 const picker = areIdsEqual(p.pickedBy, tA._id) ? tA.shortName : tB.shortName;
+                const pickerFull = areIdsEqual(p.pickedBy, tA._id) ? tA.name : tB.name;
+                
+                // Determine Sides
                 let sideA = '<span class="text-gray-500">?</span>';
                 let sideB = '<span class="text-gray-500">?</span>';
                 
@@ -604,14 +553,20 @@
                 <div class="relative w-full h-16 border-b border-white/10 overflow-hidden group shrink-0">
                     <div class="absolute inset-0 bg-cover bg-center opacity-30 group-hover:opacity-50 transition" style="background-image: url('${maps[p.map]}');"></div>
                     <div class="absolute inset-0 bg-gradient-to-r from-[#0f1923] via-[#0f1923]/80 to-transparent"></div>
+                    
                     <div class="relative z-10 h-full flex items-center justify-between px-4">
                         <div class="flex flex-col">
                             <span class="font-header text-xl text-white leading-none tracking-wide drop-shadow">${p.map.toUpperCase()}</span>
                             <span class="text-[9px] text-gray-400 font-mono mt-0.5">PICKED BY: <span class="text-white font-bold">${picker}</span></span>
                         </div>
+                        
                         <div class="flex flex-col items-end text-[10px] font-mono">
-                            <div class="flex gap-2 mb-0.5"><span class="text-gray-400">${tA.shortName}</span> ${sideA}</div>
-                            <div class="flex gap-2"><span class="text-gray-400">${tB.shortName}</span> ${sideB}</div>
+                            <div class="flex gap-2 mb-0.5">
+                                <span class="text-gray-400">${tA.shortName}</span> ${sideA}
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="text-gray-400">${tB.shortName}</span> ${sideB}
+                            </div>
                         </div>
                     </div>
                 </div>`; 
