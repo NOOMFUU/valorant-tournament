@@ -61,14 +61,27 @@ class VetoManager {
         this.io.to(matchId).emit('chat_new', { sender: senderName, message, senderId: teamId });
     }
 
+    // แก้ไขฟังก์ชัน handleSetRoomPass (บรรทัดที่ 50)
     async handleSetRoomPass(matchId, teamId, password) {
+        // populate teamA เพื่อเอา ID มาเช็ค
         const match = await Match.findById(matchId).populate('teamA');
-        if (!match || match.teamA._id.toString() !== teamId) return;
-        match.roomPassword = password;
-        await this.logAction(match, `HOST: Room Code Updated`);
-        await match.save();
-        await this.broadcastState(matchId);
-        this.io.to(matchId).emit('notification', { msg: `Room Password Updated!` });
+        if (!match) return;
+
+        // ตรวจสอบ ID โดยแปลงเป็น String ทั้งคู่
+        const isTeamA = match.teamA._id.toString() === teamId.toString();
+        
+        if (isTeamA) {
+            match.roomPassword = password;
+            // บันทึก Log การกระทำ
+            await this.logAction(match, `HOST: Room Code Updated`);
+            await match.save();
+            
+            // ส่งข้อมูลใหม่ให้ทุกคนในห้อง
+            await this.broadcastState(matchId);
+            this.io.to(matchId).emit('notification', { msg: `Room Password Updated!` });
+        } else {
+            console.log("Permission Denied: Only Team A (Host) can set password.");
+        }
     }
 
     async handleReady(matchId, teamId) {

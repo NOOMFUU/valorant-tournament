@@ -327,6 +327,10 @@
         const socket = io();
         const matchId = new URLSearchParams(location.search).get('match');
         const teamId = localStorage.getItem('id');
+        if (!teamId) {
+            alert("Session expired. Please login again.");
+            window.location.href = "/login.html";
+        }
         let timerInt;
         let coinFlipDone = false; 
         let currentMatchBg = 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png';
@@ -355,7 +359,13 @@
               .to("#grid", { opacity: 1, scale: 1, duration: 0.8 }, "-=0.2");
         });
 
-        const areIdsEqual = (id1, id2) => String(id1?._id || id1) === String(id2?._id || id2);
+        const areIdsEqual = (id1, id2) => {
+            if (!id1 || !id2) return false;
+            // แปลงทุกอย่างเป็น String ก่อนเทียบกันเสมอ
+            const rawId1 = typeof id1 === 'object' ? (id1._id || id1) : id1;
+            const rawId2 = typeof id2 === 'object' ? (id2._id || id2) : id2;
+            return String(rawId1) === String(rawId2);
+        };
 
         if(matchId) socket.emit('join_match', matchId);
         
@@ -442,54 +452,72 @@
 
         socket.on('veto_update', (m) => {
             const v = m.vetoData;
+            // เช็คว่าเป็น Team A หรือไม่ (โดยดูจาก ID ใน LocalStorage เทียบกับ DB)
             const isA = areIdsEqual(teamId, m.teamA._id);
             
+            // --- 1. จัดการ Background ---
             if(v.pickedMaps && v.pickedMaps.length > 0) {
                 const lastMap = v.pickedMaps[v.pickedMaps.length - 1].map;
                 currentMatchBg = maps[lastMap];
                 setBg(currentMatchBg);
             }
 
+            // --- 2. อัปเดต Header และ Grid ---
             updateHeader(m, v, isA);
             renderGrid(v, teamId, m.teamA, m.teamB);
             renderMiniSummary(v, m.teamA, m.teamB); 
             
-            // --- FIX รหัสห้องและปุ่มแก้ไข ---
+            // --- 3. [FIX] ส่วนจัดการรหัสห้องและปุ่ม ---
             const passEl = document.getElementById('roomPassContent');
             const btnGroup = document.getElementById('lobbyBtnGroup');
+            
+            // ล้างค่าเดิมก่อนเสมอ
             btnGroup.innerHTML = ''; 
+            passEl.onclick = null; // ล้าง Event Click เก่า
+            passEl.classList.remove('cursor-pointer', 'hover:text-white', 'transition'); // ล้าง Style เก่า
 
             if(m.roomPassword) {
+                // กรณี: มีรหัสห้องแล้ว
                 passEl.innerText = m.roomPassword;
                 passEl.classList.add('text-white');
                 passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
                 
-                // ปุ่ม Copy
-                btnGroup.innerHTML += `<i onclick="copyLobbyID(event)" class="fa-regular fa-copy text-gray-500 hover:text-white cursor-pointer transition"></i>`;
+                // ปุ่ม Copy (ทุกคนเห็น)
+                btnGroup.innerHTML += `<i onclick="copyLobbyID(event)" class="fa-regular fa-copy text-gray-500 hover:text-white cursor-pointer transition" title="Copy Code"></i>`;
                 
-                // ปุ่ม Edit (ถ้าเป็น Team A)
+                // ปุ่ม Edit (เฉพาะ Team A เห็น)
                 if(isA) {
-                    btnGroup.innerHTML += `<i onclick="setRoomPass()" class="fa-solid fa-pen text-gray-500 hover:text-[#ff4655] cursor-pointer transition ml-1"></i>`;
+                    btnGroup.innerHTML += `<i onclick="setRoomPass()" class="fa-solid fa-pen text-gray-500 hover:text-[#ff4655] cursor-pointer transition ml-2" title="Edit Code"></i>`;
                 }
             } else if(isA) {
+                // กรณี: ยังไม่มีรหัส และฉันคือ Team A (Host)
                 passEl.innerText = "SET CODE";
-                passEl.classList.add('text-[#ff4655]');
+                
+                // [FIX] ทำให้กดที่ข้อความได้เลย
+                passEl.classList.add('text-[#ff4655]', 'cursor-pointer', 'hover:text-white', 'transition'); 
                 passEl.classList.remove('text-white', 'text-gray-500');
+                passEl.onclick = function() { setRoomPass(); }; 
+
+                // ปุ่มปากกา
                 btnGroup.innerHTML = `<i onclick="setRoomPass()" class="fa-solid fa-pen text-[#ff4655] hover:text-white cursor-pointer transition"></i>`;
             } else {
+                // กรณี: ยังไม่มีรหัส และฉันคือ Team B (Guest)
                 passEl.innerText = "WAITING FOR HOST";
                 passEl.classList.add('text-gray-500');
                 passEl.classList.remove('text-[#ff4655]', 'text-white');
             }
 
+            // --- 4. ปุ่ม Ready ---
             const amIReady = isA ? v.teamAReady : v.teamBReady;
             const rBtn = document.getElementById('readyBtn');
+            // ปุ่ม Ready จะโผล่ก็ต่อเมื่อ: มีรหัสห้องแล้ว + ฉันยังไม่ Ready + สถานะคือ Pending
             if(m.roomPassword && !amIReady && v.status === 'pending') {
                 rBtn.classList.remove('hidden');
             } else {
                 rBtn.classList.add('hidden');
             }
 
+            // --- 5. Timer & Logs ---
             if(v.status === 'in_progress') runTimer(v.currentTurnStartTime, v.turnTimeLimit);
             else { document.getElementById('timerBar').style.width = '0%'; clearInterval(timerInt); }
 
@@ -497,8 +525,8 @@
             document.getElementById('logContainer').innerHTML = logHtml;
             document.getElementById('view-endLogs').innerHTML = logHtml;
 
+            // --- 6. Modal & End Screen ---
             handleModals(v, teamId);
-
             if(v.status === 'completed' || m.status === 'live') showEndScreen(m);
         });
 
