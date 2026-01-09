@@ -113,7 +113,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
 
-        /* --- END SCREEN DRAWER --- */
         .chat-drawer {
             position: fixed; bottom: 0; right: 2rem; width: 400px; height: 60vh;
             background: rgba(15, 25, 35, 0.98);
@@ -126,7 +125,6 @@
         }
         .chat-drawer.open { transform: translateY(0); }
 
-        /* --- END SCREEN CARDS --- */
         .roster-row { transition: all 0.2s ease; border-left: 3px solid transparent; }
         .roster-row:hover { background: rgba(255,255,255,0.08); border-left-color: currentColor; padding-left: 1rem; }
         .end-map-card { position: relative; flex: 1; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); overflow: hidden; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.1); }
@@ -172,9 +170,10 @@
 
             <div class="p-4 bg-black/20">
                 <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1">Lobby ID / Password</div>
-                <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 cursor-pointer hover:border-white/30 transition group">
+                <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 transition group">
                     <span id="roomPassContent" class="font-mono text-xl text-white font-bold flex-1 truncate tracking-wider">---</span>
-                    <i class="fa-regular fa-copy text-gray-500 group-hover:text-white transition"></i>
+                    <div id="lobbyBtnGroup" class="flex gap-2">
+                        </div>
                 </div>
             </div>
 
@@ -417,7 +416,6 @@
 
         function setBg(url) {
             const bg = document.getElementById('bgLayer');
-            // ใช้ GSAP เพื่อความสมูท
             gsap.to(bg, { 
                 opacity: 0, 
                 duration: 0.3, 
@@ -446,7 +444,6 @@
             const v = m.vetoData;
             const isA = areIdsEqual(teamId, m.teamA._id);
             
-            // อัปเดตพื้นหลังหลักตามแมพล่าสุดที่ Picked
             if(v.pickedMaps && v.pickedMaps.length > 0) {
                 const lastMap = v.pickedMaps[v.pickedMaps.length - 1].map;
                 currentMatchBg = maps[lastMap];
@@ -457,25 +454,32 @@
             renderGrid(v, teamId, m.teamA, m.teamB);
             renderMiniSummary(v, m.teamA, m.teamB); 
             
+            // --- FIX รหัสห้องและปุ่มแก้ไข ---
             const passEl = document.getElementById('roomPassContent');
-            const lobbyCont = document.getElementById('lobbyActionArea');
-            lobbyCont.removeAttribute('onclick'); 
-            
+            const btnGroup = document.getElementById('lobbyBtnGroup');
+            btnGroup.innerHTML = ''; 
+
             if(m.roomPassword) {
                 passEl.innerText = m.roomPassword;
                 passEl.classList.add('text-white');
                 passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
-                lobbyCont.onclick = function(e) { copyLobbyID(e); };
-                if(isA) passEl.innerHTML += ` <i class="fa-solid fa-pen text-[10px] text-gray-500 hover:text-[#ff4655] ml-2" onclick="event.stopPropagation(); setRoomPass()"></i>`;
+                
+                // ปุ่ม Copy
+                btnGroup.innerHTML += `<i onclick="copyLobbyID(event)" class="fa-regular fa-copy text-gray-500 hover:text-white cursor-pointer transition"></i>`;
+                
+                // ปุ่ม Edit (ถ้าเป็น Team A)
+                if(isA) {
+                    btnGroup.innerHTML += `<i onclick="setRoomPass()" class="fa-solid fa-pen text-gray-500 hover:text-[#ff4655] cursor-pointer transition ml-1"></i>`;
+                }
             } else if(isA) {
-                passEl.innerHTML = `SET CODE <i class="fa-solid fa-pen ml-2"></i>`;
-                passEl.classList.remove('text-white', 'text-gray-500');
+                passEl.innerText = "SET CODE";
                 passEl.classList.add('text-[#ff4655]');
-                lobbyCont.onclick = function() { setRoomPass(); };
+                passEl.classList.remove('text-white', 'text-gray-500');
+                btnGroup.innerHTML = `<i onclick="setRoomPass()" class="fa-solid fa-pen text-[#ff4655] hover:text-white cursor-pointer transition"></i>`;
             } else {
-                 passEl.innerText = "WAITING FOR HOST";
-                 passEl.classList.add('text-gray-500');
-                 passEl.classList.remove('text-[#ff4655]', 'text-white');
+                passEl.innerText = "WAITING FOR HOST";
+                passEl.classList.add('text-gray-500');
+                passEl.classList.remove('text-[#ff4655]', 'text-white');
             }
 
             const amIReady = isA ? v.teamAReady : v.teamBReady;
@@ -544,7 +548,6 @@
                 }
                 el.innerHTML = html;
                 
-                // --- DYNAMIC BG EVENT ---
                 el.addEventListener('mouseenter', () => setBg(maps[map]));
                 el.addEventListener('mouseleave', () => setBg(currentMatchBg));
                 
