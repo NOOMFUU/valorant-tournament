@@ -16,6 +16,8 @@
             --val-dark-blue: #1c252e;
             --text-primary: #ece8e1;
             --accent-gold: #c6b784;
+            --bracket-mid: #dda828;  /* สีสำหรับ Middle Bracket */
+            --bracket-low: #00d4ff;  /* สีสำหรับ Lower Bracket */
         }
 
         body { 
@@ -31,9 +33,9 @@
         .font-mono { font-family: 'JetBrains Mono', monospace; }
 
         /* Custom Scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
 
         /* Navigation */
@@ -68,6 +70,11 @@
             border: 1px solid var(--val-red);
             box-shadow: 0 0 20px rgba(255, 70, 85, 0.15);
         }
+        .match-card-finished {
+            border-left: 3px solid #444;
+            opacity: 0.8;
+        }
+        .match-card-finished:hover { opacity: 1; border-color: white; }
 
         /* Team Card Special */
         .team-card-hover .team-logo-container { transition: transform 0.5s ease; }
@@ -94,8 +101,6 @@
         .rank-1 { border-left: 3px solid var(--accent-gold); background: linear-gradient(90deg, rgba(198, 183, 132, 0.1) 0%, transparent 100%); }
         .rank-2 { border-left: 3px solid silver; }
         .rank-3 { border-left: 3px solid #cd7f32; }
-        .rank-qualify { border-left: 3px solid #1fa474; }
-        .rank-eliminate { border-left: 3px solid #ff4655; opacity: 0.7; }
 
         /* Animations */
         .animate-enter { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(30px); }
@@ -107,6 +112,16 @@
                 linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 60px 60px;
+        }
+
+        /* Bracket Connectors (Simple CSS) */
+        .bracket-connector {
+            position: absolute;
+            right: -32px;
+            top: 50%;
+            width: 32px;
+            height: 1px;
+            background: rgba(255,255,255,0.1);
         }
     </style>
 </head>
@@ -172,16 +187,8 @@
         let tournamentData = null, matchesData = [], teamsData = [];
         const DEFAULT_LOGO = "https://via.placeholder.com/100?text=TEAM";
 
-        // --- CONFIGURATION: TIE BREAKER SYSTEM ---
-        // ปรับลำดับความสำคัญในการเรียงคะแนนได้ที่นี่
-        const TIE_BREAKER_ORDER = [
-            'POINTS',        // 1. คะแนนรวม (Wins)
-            'HEAD_TO_HEAD',  // 2. ผลการเจอกันเอง (ใครชนะอยู่เหนือกว่า)
-            'MAP_DIFF',      // 3. ผลต่าง Map (ได้ - เสีย)
-            'ROUND_DIFF',    // 4. ผลต่าง Round (ได้ - เสีย)
-            'MAP_WINS',      // 5. จำนวน Map ที่ชนะรวม
-            'ROUND_WINS'     // 6. จำนวน Round ที่ชนะรวม
-        ];
+        // --- CONFIGURATION ---
+        const TIE_BREAKER_ORDER = ['POINTS', 'HEAD_TO_HEAD', 'MAP_DIFF', 'ROUND_DIFF'];
 
         // Clock
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'}), 1000);
@@ -252,7 +259,7 @@
             if(btn) btn.classList.add('active');
         }
 
-        // --- TEAMS PAGE (V2.1 Fixed & Improved) ---
+        // --- TEAMS PAGE ---
         function renderTeamsPage() {
             const container = document.getElementById('contentArea');
             container.innerHTML = `
@@ -267,32 +274,12 @@
                         ${teamsData.map(t => `
                             <div onclick="openTeamDetail('${t._id}')" class="broadcast-card p-8 group relative overflow-hidden team-card-hover cursor-pointer h-[320px] flex flex-col items-center justify-center border hover:border-[#ff4655] transition-colors duration-300">
                                 <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-[#1a1d21]/50 to-transparent opacity-60"></div>
-                                
-                                <div class="absolute inset-0 bg-black/80 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center z-20">
-                                    <div class="transform translate-y-4 group-hover:translate-y-0 transition duration-300 delay-75 border border-[#ff4655] hover:bg-[#ff4655] hover:text-white px-6 py-3 text-[#ff4655] font-header tracking-widest text-sm uppercase shadow-[0_0_15px_rgba(255,70,85,0.3)]">
-                                        View Data
-                                    </div>
-                                </div>
-
                                 <div class="team-logo-container w-32 h-32 mb-6 bg-black/20 rounded-full flex items-center justify-center transition duration-500 shadow-xl relative z-10 group-hover:scale-105 group-hover:grayscale-[0.5]">
                                     <img src="${t.logo || DEFAULT_LOGO}" class="w-24 h-24 object-contain drop-shadow-md">
                                 </div>
-                                
                                 <div class="relative z-10 text-center">
                                     <h3 class="font-header text-3xl text-white font-bold uppercase truncate tracking-wide mb-1 drop-shadow-md group-hover:text-gray-300 transition-colors">${t.name}</h3>
                                     <p class="font-mono text-sm text-[#ff4655] font-bold tracking-[0.3em] uppercase mb-4">${t.shortName || 'TAG'}</p>
-                                    
-                                    <div class="flex justify-center gap-4 text-xs font-mono text-gray-500 border-t border-white/5 pt-4 w-full group-hover:opacity-20 transition-opacity">
-                                        <div class="text-center">
-                                            <span class="block text-gray-300 font-bold text-lg">${t.wins || 0}</span>
-                                            <span class="text-[9px] uppercase tracking-wider">WINS</span>
-                                        </div>
-                                        <div class="w-[1px] bg-white/10"></div>
-                                        <div class="text-center">
-                                            <span class="block text-gray-300 font-bold text-lg">${t.losses || 0}</span>
-                                            <span class="text-[9px] uppercase tracking-wider">LOSS</span>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         `).join('')}
@@ -312,120 +299,182 @@
                 let stageTeams = [];
                 if (stage.stageParticipants && stage.stageParticipants.length > 0) {
                     stageTeams = teamsData.filter(t => stage.stageParticipants.includes(t._id));
-                } else {
-                    stageTeams = teamsData; 
-                }
+                } else { stageTeams = teamsData; }
                 renderStandingsAndSchedule(container, ms, stage.type, stageTeams);
             } else {
-                renderBracket(container, ms);
+                // Supports Single, Double, Triple Elim & GSL
+                renderBracket(container, ms, stage.type);
             }
         }
 
-        // --- ADVANCED RANKING LOGIC ENGINE ---
+        // --- BRACKET RENDERER (Updated for Triple Elim) ---
+        function renderBracket(container, matches, stageType) {
+            const upper = [], middle = [], lower = [], final = [];
+
+            // Logic matching bracketManager.js
+            matches.forEach(m => {
+                if (m.matchOrder === 999 || m.round === 999) final.push(m);
+                else if (m.round >= 200) lower.push(m); // Lower/Last Chance Bracket
+                else if (m.round >= 100) middle.push(m); // Middle Bracket
+                else upper.push(m); // Upper Bracket
+            });
+
+            const groupByRound = (arr, roundOffset = 0) => {
+                const map = {};
+                arr.forEach(m => {
+                    const r = m.round;
+                    if(!map[r]) map[r] = [];
+                    map[r].push(m);
+                });
+                return Object.keys(map).sort((a,b)=>a-b).map(k => ({ 
+                    round: k, 
+                    displayRound: k - roundOffset,
+                    matches: map[k].sort((a,b)=>a.matchOrder-b.matchOrder) 
+                }));
+            };
+
+            const createSection = (rounds, title, colorClass, iconClass) => {
+                if(!rounds.length) return '';
+                return `
+                <div class="mb-12 border-b border-white/5 pb-8 last:border-0">
+                    <div class="flex items-center gap-3 mb-8 sticky left-0">
+                        <div class="w-1.5 h-8 ${colorClass} shadow-[0_0_15px_currentColor]"></div>
+                        <h3 class="text-3xl font-header text-white tracking-widest italic drop-shadow uppercase flex items-center gap-3">
+                            <i class="${iconClass} text-lg opacity-50"></i> ${title}
+                        </h3>
+                    </div>
+                    <div class="flex gap-16 pb-4">
+                        ${rounds.map(r => `
+                            <div class="flex flex-col gap-8 w-[340px] shrink-0 relative">
+                                <div class="mb-2 text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-white/10"></span> Round ${r.displayRound}
+                                </div>
+                                ${r.matches.map(m => createMatchCard(m)).join('')}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            };
+
+            // Structure: Upper -> Middle -> Lower -> Finals
+            // We use a wide container for horizontal scrolling of deep brackets
+            container.innerHTML = `
+            <div class="w-full h-full overflow-x-auto custom-scroll p-4 animate-enter">
+                <div class="min-w-max pl-6 pr-20 flex flex-col gap-4">
+                    
+                    ${createSection(groupByRound(upper), 'UPPER BRACKET', 'bg-[#ff4655]', 'fa-solid fa-arrow-up')}
+                    
+                    ${createSection(groupByRound(middle, 100), stageType === 'triple_elim' ? 'MIDDLE BRACKET' : 'LOWER BRACKET', 'bg-[#dda828]', 'fa-solid fa-arrow-right')}
+                    
+                    ${createSection(groupByRound(lower, 200), 'LAST CHANCE BRACKET', 'bg-[#00d4ff]', 'fa-solid fa-turn-up')}
+                    
+                    ${final.length ? `
+                    <div class="mt-8 pt-8 border-t border-white/10 relative">
+                        <div class="absolute -top-3 left-10 bg-[#0f1923] px-4 text-[#ff4655] font-header text-sm tracking-widest uppercase">CHAMPIONSHIP MATCH</div>
+                        <div class="flex items-center gap-16">
+                            ${groupByRound(final).map(r => `
+                                <div class="flex flex-col gap-8 w-[400px] shrink-0">
+                                     ${r.matches.map(m => createMatchCard(m, true)).join('')}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+
+                </div>
+            </div>`;
+        }
+
+        // --- COMPONENT: MATCH CARD ---
+        function createMatchCard(m, isFinal = false) {
+            const [sA, sB] = calculateScores(m.scores);
+            const isLive = m.status === 'live';
+            const isFinished = m.status === 'finished';
+            
+            let statusBadge = `<span class="text-gray-600">${m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD'}</span>`;
+            if (isLive) statusBadge = `<span class="text-[#ff4655] animate-pulse font-bold tracking-widest">LIVE</span>`;
+            if (isFinished) statusBadge = `<span class="text-gray-500 font-bold">FINAL</span>`;
+
+            // Logic for winners
+            const winA = m.winner && String(m.winner._id || m.winner) === String(m.teamA?._id);
+            const winB = m.winner && String(m.winner._id || m.winner) === String(m.teamB?._id);
+
+            const renderTeam = (team, score, isWinner, isLoser) => {
+                const name = team ? team.name : 'TBD';
+                const logo = team ? team.logo : null;
+                // Highlighting
+                const bgClass = isWinner ? 'bg-gradient-to-r from-[#ff4655]/10 to-transparent' : '';
+                const scoreClass = isWinner ? 'text-[#ff4655] text-shadow-red' : (team ? 'text-white' : 'text-gray-600');
+                const rowOpacity = (isFinished && isLoser) ? 'opacity-40 grayscale' : 'opacity-100';
+                const borderClass = isWinner ? 'border-l-2 border-[#ff4655]' : 'border-l-2 border-transparent';
+
+                return `
+                <div class="flex justify-between items-center h-12 px-3 bg-[#15171a] ${rowOpacity} ${borderClass} ${bgClass} transition-all hover:bg-[#1a1e24] group-hover:bg-[#1c2026]">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        ${logo ? `<img src="${logo}" class="w-6 h-6 object-contain">` : '<div class="w-6 h-6 bg-white/5 rounded-full"></div>'}
+                        <span class="font-header text-lg ${team ? 'text-gray-200' : 'text-gray-600 italic'} truncate uppercase tracking-wide max-w-[150px] pt-1">${name}</span>
+                    </div>
+                    <span class="font-header text-2xl font-bold ${scoreClass}">${team ? score : '-'}</span>
+                </div>`;
+            };
+
+            return `
+            <div onclick="openMatchDetail('${m._id}')" class="broadcast-card rounded-sm overflow-hidden cursor-pointer relative group ${isLive ? 'match-card-live' : (isFinished ? 'match-card-finished' : '')} ${isFinal ? 'scale-110 shadow-2xl border-purple-500/30' : ''}">
+                <div class="bg-[#111] px-3 py-1.5 flex justify-between items-center border-b border-white/5">
+                    <span class="text-[9px] text-gray-500 font-bold uppercase truncate pr-2 tracking-widest">${m.name || 'MATCH'}</span>
+                    <div class="text-[9px] uppercase font-mono bg-white/5 px-2 py-0.5 rounded text-gray-400 border border-white/5">${statusBadge}</div>
+                </div>
+                <div class="py-0">
+                    ${renderTeam(m.teamA, sA, winA, winB)}
+                    <div class="h-[1px] bg-white/5 mx-2"></div>
+                    ${renderTeam(m.teamB, sB, winB, winA)}
+                </div>
+                ${isFinal ? '<div class="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-ping"></div>' : ''}
+            </div>`;
+        }
+
+        // --- ROUND ROBIN RENDERER (Keep existing logic) ---
         function calculateDetailedStats(matches, teams) {
             const stats = {};
-            // Init with filtered teams
-            teams.forEach(t => stats[t._id] = { 
-                id: t._id, 
-                name: t.name,
-                logo: t.logo,
-                w:0, l:0, pts:0, 
-                mapW:0, mapL:0, mapDiff:0, 
-                roundsWon:0, roundsLost:0, roundDiff:0,
-                matchesPlayed: 0,
-                h2hResults: {} // เก็บผล Head-to-Head: { 'opponentId': { win: boolean, mapDiff: int } }
-            });
+            teams.forEach(t => stats[t._id] = { id: t._id, name: t.name, logo: t.logo, w:0, l:0, pts:0, mapW:0, mapL:0, mapDiff:0, roundsWon:0, roundsLost:0, roundDiff:0, matchesPlayed: 0, h2hResults: {} });
 
             matches.forEach(m => {
                 if(m.status === 'finished' && m.winner) {
-                    const idA = m.teamA?._id;
-                    const idB = m.teamB?._id;
-                    
+                    const idA = m.teamA?._id; const idB = m.teamB?._id;
                     if(!stats[idA] || !stats[idB]) return;
-
-                    stats[idA].matchesPlayed++;
-                    stats[idB].matchesPlayed++;
-
+                    stats[idA].matchesPlayed++; stats[idB].matchesPlayed++;
                     const winnerId = m.winner._id || m.winner;
                     const [scoreA, scoreB] = calculateScores(m.scores);
-
-                    // Basic Stats
                     if(String(winnerId) === String(idA)) { 
                         stats[idA].w++; stats[idA].pts += 1; stats[idB].l++; 
-                        // Record H2H
-                        stats[idA].h2hResults[idB] = { win: true, mapDiff: scoreA - scoreB };
-                        stats[idB].h2hResults[idA] = { win: false, mapDiff: scoreB - scoreA };
+                        stats[idA].h2hResults[idB] = { win: true }; stats[idB].h2hResults[idA] = { win: false };
                     } else { 
                         stats[idB].w++; stats[idB].pts += 1; stats[idA].l++; 
-                        // Record H2H
-                        stats[idB].h2hResults[idA] = { win: true, mapDiff: scoreB - scoreA };
-                        stats[idA].h2hResults[idB] = { win: false, mapDiff: scoreA - scoreB };
+                        stats[idB].h2hResults[idA] = { win: true }; stats[idA].h2hResults[idB] = { win: false };
                     }
-
                     stats[idA].mapW += scoreA; stats[idA].mapL += scoreB;
                     stats[idB].mapW += scoreB; stats[idB].mapL += scoreA;
-
                     if(m.scores) {
                         m.scores.forEach(s => {
-                            const rA = parseInt(s.teamAScore) || 0;
-                            const rB = parseInt(s.teamBScore) || 0;
+                            const rA = parseInt(s.teamAScore) || 0; const rB = parseInt(s.teamBScore) || 0;
                             stats[idA].roundsWon += rA; stats[idA].roundsLost += rB;
                             stats[idB].roundsWon += rB; stats[idB].roundsLost += rA;
                         });
                     }
                 }
             });
-
-            // Calculate Differentials
-            Object.values(stats).forEach(s => { 
-                s.mapDiff = s.mapW - s.mapL; 
-                s.roundDiff = s.roundsWon - s.roundsLost; 
-            });
-
-            // --- MULTI-LAYER SORTING COMPARATOR ---
+            Object.values(stats).forEach(s => { s.mapDiff = s.mapW - s.mapL; s.roundDiff = s.roundsWon - s.roundsLost; });
             return Object.values(stats).sort((a, b) => {
-                for (let criteria of TIE_BREAKER_ORDER) {
-                    let diff = 0;
-                    switch (criteria) {
-                        case 'POINTS':
-                            diff = b.pts - a.pts; // มากไปน้อย
-                            break;
-                        case 'HEAD_TO_HEAD':
-                            // Check if A and B played against each other
-                            if (a.h2hResults[b.id]) {
-                                if (a.h2hResults[b.id].win) diff = -1; // A beat B -> A comes first
-                                else diff = 1; // B beat A -> B comes first
-                            }
-                            break;
-                        case 'MAP_DIFF':
-                            diff = b.mapDiff - a.mapDiff;
-                            break;
-                        case 'ROUND_DIFF':
-                            diff = b.roundDiff - a.roundDiff;
-                            break;
-                        case 'MAP_WINS':
-                            diff = b.mapW - a.mapW;
-                            break;
-                        case 'ROUND_WINS':
-                            diff = b.roundsWon - a.roundsWon;
-                            break;
-                    }
-                    if (diff !== 0) return diff;
-                }
-                return 0; // Tied perfectly
+                if (b.pts !== a.pts) return b.pts - a.pts;
+                if (a.h2hResults[b.id]) return a.h2hResults[b.id].win ? -1 : 1;
+                if (b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff;
+                return b.roundDiff - a.roundDiff;
             });
         }
 
-        // --- ROUND ROBIN / SWISS RENDERER ---
         function renderStandingsAndSchedule(container, matches, type, participants) {
             const stats = calculateDetailedStats(matches, participants);
-            
             const rounds = {};
-            matches.forEach(m => {
-                const r = m.round || 1;
-                if(!rounds[r]) rounds[r] = [];
-                rounds[r].push(m);
-            });
+            matches.forEach(m => { const r = m.round || 1; if(!rounds[r]) rounds[r] = []; rounds[r].push(m); });
             const sortedRounds = Object.keys(rounds).sort((a,b) => parseInt(a)-parseInt(b));
 
             let scheduleHtml = sortedRounds.map(r => `
@@ -439,14 +488,8 @@
                     </div>
                 </div>
             `).join('');
-            
-            if(matches.length === 0) scheduleHtml = `<div class="p-12 border border-dashed border-white/10 rounded text-center text-gray-600 font-mono text-sm uppercase">Pending Schedule Generation...</div>`;
 
-            // Dynamic Sorting Legend
-            const sortLegend = TIE_BREAKER_ORDER.map(k => {
-                const map = { 'POINTS':'Pts', 'HEAD_TO_HEAD':'H2H', 'MAP_DIFF':'Map Δ', 'ROUND_DIFF':'Rnd Δ', 'MAP_WINS':'Map Wins', 'ROUND_WINS':'Rnd Wins' };
-                return map[k];
-            }).join(' > ');
+            if(matches.length === 0) scheduleHtml = `<div class="p-12 border border-dashed border-white/10 rounded text-center text-gray-600 font-mono text-sm uppercase">Pending Schedule Generation...</div>`;
 
             container.innerHTML = `
             <div class="max-w-[1920px] mx-auto animate-enter grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
@@ -465,7 +508,6 @@
                                         <th class="text-center text-white" title="Wins - Losses">W-L</th>
                                         <th class="text-center hidden sm:table-cell" title="Maps Won - Lost">MAP</th>
                                         <th class="text-center" title="Map Difference">MAPΔ</th>
-                                        <th class="text-center" title="Round Difference">RNDΔ</th>
                                     </tr>
                                 </thead>
                                 <tbody class="text-gray-300">
@@ -477,21 +519,17 @@
                                                     <img src="${s.logo || DEFAULT_LOGO}" class="w-8 h-8 object-contain drop-shadow">
                                                     <div class="flex flex-col">
                                                         <span class="uppercase tracking-tight leading-none text-white text-lg font-header">${s.name || 'Unknown'}</span>
-                                                        <span class="text-[9px] text-gray-500 font-mono hidden md:block mt-0.5">MP: ${s.matchesPlayed} / PTS: ${s.pts}</span>
+                                                        <span class="text-[9px] text-gray-500 font-mono hidden md:block mt-0.5">PTS: ${s.pts}</span>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td class="text-center font-mono font-bold text-lg text-white">${s.w}-${s.l}</td>
                                             <td class="text-center font-mono text-xs text-gray-400 hidden sm:table-cell">${s.mapW}-${s.mapL}</td>
                                             <td class="text-center font-mono font-bold text-sm ${getColor(s.mapDiff)}">${s.mapDiff>0?'+':''}${s.mapDiff}</td>
-                                            <td class="text-center font-mono text-xs ${getColor(s.roundDiff)}">${s.roundDiff>0?'+':''}${s.roundDiff}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
-                        </div>
-                        <div class="p-2 bg-[#111] border-t border-white/5 flex items-center justify-center gap-2 text-[9px] text-gray-600 font-mono text-center uppercase">
-                            <i class="fa-solid fa-sort"></i> Priority: <span class="text-gray-400">${sortLegend}</span>
                         </div>
                     </div>
                 </div>
@@ -502,101 +540,7 @@
             </div>`;
         }
 
-        // --- BRACKET RENDERER (Unchanged) ---
-        function renderBracket(container, matches) {
-            const upper = [], lower = [], final = [];
-            matches.forEach(m => {
-                if (m.matchOrder === 999 || m.round === 999) final.push(m);
-                else if (m.round >= 100) lower.push(m);
-                else upper.push(m);
-            });
-
-            const groupByRound = (arr) => {
-                const map = {};
-                arr.forEach(m => {
-                    const r = m.round;
-                    if(!map[r]) map[r] = [];
-                    map[r].push(m);
-                });
-                return Object.keys(map).sort((a,b)=>a-b).map(k => ({ round: k, matches: map[k].sort((a,b)=>a.matchOrder-b.matchOrder) }));
-            };
-
-            const createSection = (rounds, title, accent) => {
-                if(!rounds.length) return '';
-                return `
-                <div class="mb-16">
-                    <div class="flex items-center gap-3 mb-8 border-b border-white/10 pb-2">
-                        <div class="w-3 h-3 rounded-full ${accent} shadow-[0_0_10px_currentColor]"></div>
-                        <h3 class="text-3xl font-header text-white tracking-widest italic drop-shadow">${title}</h3>
-                    </div>
-                    <div class="flex gap-16 overflow-x-visible pb-10">
-                        ${rounds.map(r => `
-                            <div class="flex flex-col gap-8 w-[340px] shrink-0 relative">
-                                <div class="absolute -top-10 left-0 text-[10px] text-gray-600 font-bold uppercase tracking-[0.2em]">
-                                    Round ${r.round > 100 ? r.round-100 : r.round}
-                                </div>
-                                ${r.matches.map(m => createMatchCard(m)).join('')}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-            };
-
-            container.innerHTML = `
-            <div class="w-full h-full overflow-x-auto custom-scroll p-4 animate-enter flex items-center">
-                <div class="min-w-max pl-10">
-                    ${createSection(groupByRound(upper), 'UPPER BRACKET', 'bg-[#ff4655]')}
-                    ${createSection(groupByRound(lower), 'LOWER BRACKET', 'bg-yellow-500')}
-                    ${groupByRound(final).length ? createSection(groupByRound(final), 'GRAND FINALS', 'bg-purple-500 animate-pulse') : ''}
-                </div>
-            </div>`;
-        }
-
-        // --- COMPONENT: MATCH CARD ---
-        function createMatchCard(m) {
-            const [sA, sB] = calculateScores(m.scores);
-            const isLive = m.status === 'live';
-            const isFinished = m.status === 'finished';
-            
-            let statusBadge = `<span class="text-gray-500">${m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD'}</span>`;
-            if (isLive) statusBadge = `<span class="text-[#ff4655] animate-pulse font-bold tracking-widest">LIVE</span>`;
-            if (isFinished) statusBadge = `<span class="text-gray-600 font-bold">FINAL</span>`;
-
-            const renderTeam = (team, score, isWinner, isLoser) => {
-                const name = team ? team.name : 'TBD';
-                const logo = team ? team.logo : null;
-                const scoreClass = isWinner ? 'text-[#ff4655] text-shadow-red' : (team ? 'text-white' : 'text-gray-600');
-                const rowOpacity = (isFinished && isLoser) ? 'opacity-40 grayscale' : 'opacity-100';
-                const borderClass = isWinner ? 'border-l-4 border-[#ff4655]' : 'border-l-4 border-transparent';
-
-                return `
-                <div class="flex justify-between items-center h-12 px-4 bg-[#15171a] ${rowOpacity} ${borderClass} transition-all hover:bg-[#1a1e24]">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        ${logo ? `<img src="${logo}" class="w-6 h-6 object-contain">` : '<div class="w-6 h-6 bg-white/5 rounded-full"></div>'}
-                        <span class="font-header text-xl ${team ? 'text-gray-200' : 'text-gray-600 italic'} truncate uppercase tracking-wide max-w-[180px] pt-1">${name}</span>
-                    </div>
-                    <span class="font-header text-2xl font-bold ${scoreClass}">${team ? score : '-'}</span>
-                </div>`;
-            };
-
-            const winA = m.winner && String(m.winner._id || m.winner) === String(m.teamA?._id);
-            const winB = m.winner && String(m.winner._id || m.winner) === String(m.teamB?._id);
-
-            return `
-            <div onclick="openMatchDetail('${m._id}')" class="broadcast-card rounded-sm overflow-hidden cursor-pointer relative group ${isLive ? 'match-card-live' : ''}">
-                <div class="bg-[#111] px-4 py-2 flex justify-between items-center border-b border-white/5">
-                    <span class="text-[10px] text-gray-500 font-bold uppercase truncate pr-2 tracking-widest">${m.name || 'MATCH'}</span>
-                    <div class="text-[10px] uppercase font-mono bg-white/5 px-2 py-0.5 rounded text-gray-300 border border-white/5">${statusBadge}</div>
-                </div>
-                <div class="py-0">
-                    ${renderTeam(m.teamA, sA, winA, winB)}
-                    <div class="h-[1px] bg-white/5 mx-2"></div>
-                    ${renderTeam(m.teamB, sB, winB, winA)}
-                </div>
-            </div>`;
-        }
-
-        // --- UTILS ---
+        // --- UTILS & MODALS (Reused) ---
         function calculateScores(scores) {
             if (!scores) return [0,0];
             let a=0,b=0; 
@@ -614,240 +558,87 @@
             return 'text-gray-500';
         }
 
-        // --- NEW: TEAM DETAIL MODAL ---
+        // Team Modal
         function openTeamDetail(teamId) {
             const team = teamsData.find(t => t._id === teamId);
             if (!team) return;
-
-            // Filter Matches for this team
-            const teamMatches = matchesData.filter(m => 
-                (m.teamA && m.teamA._id === teamId) || (m.teamB && m.teamB._id === teamId)
-            ).sort((a,b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
-
-            // Helpers for Roster Rendering
-            const renderMemberCard = (m, type) => {
-                const colors = {
-                    'Main': 'border-[#1fa474]',
-                    'Sub': 'border-[#dda828]',
-                    'Coach': 'border-[#ff4655]'
-                };
-                const tagColor = {
-                    'Main': 'bg-[#1fa474]/20 text-[#1fa474]',
-                    'Sub': 'bg-[#dda828]/20 text-[#dda828]',
-                    'Coach': 'bg-[#ff4655]/20 text-[#ff4655]'
-                };
-                return `
-                <div class="bg-[#15171a] p-4 border-l-4 ${colors[type] || 'border-gray-500'} flex items-center justify-between group hover:bg-[#1a1e24] transition">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 bg-black/50 rounded flex items-center justify-center font-header text-xl text-gray-500 group-hover:text-white transition">
-                            ${m.name.charAt(0)}
-                        </div>
-                        <div>
-                            <div class="font-header text-xl text-white leading-none tracking-wide">${m.name}</div>
-                            <div class="font-mono text-xs text-gray-500">#${m.tag}</div>
-                        </div>
-                    </div>
-                    <div class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${tagColor[type]} border border-white/5">
-                        ${type}
-                    </div>
-                </div>`;
-            };
-
-            const mainRoster = team.members.filter(m => m.role === 'Main').map(m => renderMemberCard(m, 'Main')).join('');
-            const subRoster = team.members.filter(m => m.role === 'Sub').map(m => renderMemberCard(m, 'Sub')).join('');
-            const coachRoster = team.members.filter(m => m.role === 'Coach').map(m => renderMemberCard(m, 'Coach')).join('');
-
-            // Helper for Match List in Modal
-            const renderTinyMatch = (m) => {
-                const isA = m.teamA._id === teamId;
-                const opp = isA ? m.teamB : m.teamA;
-                const oppName = opp ? opp.name : 'TBD';
-                const oppLogo = opp ? opp.logo : null;
-                const result = m.status === 'finished' ? (
-                    (m.winner && ((isA && m.winner._id === teamId) || (!isA && m.winner._id === teamId))) 
-                    ? '<span class="text-green-400 font-bold">WIN</span>' 
-                    : '<span class="text-red-500 font-bold">LOSS</span>'
-                ) : '<span class="text-gray-500">UPCOMING</span>';
-                
-                return `
-                <div class="flex items-center justify-between p-3 bg-black/20 border-b border-white/5 last:border-0 hover:bg-white/5 transition">
-                    <div class="flex items-center gap-3 w-1/3">
-                        <span class="text-[10px] font-mono text-gray-500 w-16">${new Date(m.scheduledTime).toLocaleDateString()}</span>
-                        <div class="text-xs font-bold text-gray-300 uppercase truncate">${m.name}</div>
-                    </div>
-                    <div class="flex items-center justify-center gap-4 w-1/3">
-                         <span class="font-header text-lg ${isA ? 'text-white' : 'text-gray-500'}">VS</span>
-                         <div class="flex items-center gap-2">
-                            <img src="${oppLogo || DEFAULT_LOGO}" class="w-5 h-5 object-contain">
-                            <span class="font-bold text-sm text-gray-200">${oppName}</span>
-                         </div>
-                    </div>
-                    <div class="w-1/3 text-right font-mono text-xs tracking-widest">${result}</div>
-                </div>`;
-            };
-
-            const matchListHtml = teamMatches.length ? teamMatches.map(renderTinyMatch).join('') : '<div class="text-center py-4 text-gray-600 italic">No match records found.</div>';
-
-            const modalHtml = `
-                <div class="flex flex-col lg:flex-row gap-8 h-full">
-                    <div class="w-full lg:w-1/3 flex flex-col gap-6">
-                        <div class="bg-[#15171a] p-8 flex flex-col items-center border border-white/10 relative overflow-hidden">
-                            <div class="absolute inset-0 bg-gradient-to-b from-[#ff4655]/10 to-transparent"></div>
-                            <img src="${team.logo || DEFAULT_LOGO}" class="w-32 h-32 object-contain drop-shadow-2xl relative z-10 mb-4">
-                            <h2 class="text-5xl font-header text-white uppercase tracking-tight relative z-10">${team.name}</h2>
-                            <span class="text-[#ff4655] font-mono font-bold tracking-[0.4em] uppercase text-sm relative z-10">${team.shortName}</span>
-                        </div>
-                        
-                        <div class="bg-[#15171a] border border-white/10 p-6">
-                            <h4 class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Season Performance</h4>
-                            <div class="grid grid-cols-2 gap-4 text-center">
-                                <div class="bg-black/20 p-3">
-                                    <div class="text-3xl font-header text-white">${team.wins || 0}</div>
-                                    <div class="text-[9px] text-green-500 uppercase font-bold tracking-widest">Victories</div>
-                                </div>
-                                <div class="bg-black/20 p-3">
-                                    <div class="text-3xl font-header text-white">${team.losses || 0}</div>
-                                    <div class="text-[9px] text-red-500 uppercase font-bold tracking-widest">Defeats</div>
-                                </div>
+            // Simplified Logic for Demo
+            document.getElementById('teamModalContent').innerHTML = `
+                <div class="flex flex-col items-center gap-6">
+                    <img src="${team.logo || DEFAULT_LOGO}" class="w-40 h-40 object-contain">
+                    <h2 class="text-6xl font-header text-white">${team.name}</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                        ${team.members.map(m => `
+                            <div class="bg-black/30 p-4 border border-white/10 flex justify-between">
+                                <span class="text-xl font-header text-white">${m.name}</span>
+                                <span class="text-sm font-mono text-gray-500">${m.role}</span>
                             </div>
-                        </div>
-
-                        <div class="flex-1 bg-[#15171a] border border-white/10 p-6 flex flex-col overflow-hidden">
-                            <h4 class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Match History</h4>
-                            <div class="overflow-y-auto custom-scroll flex-1 pr-2">
-                                ${matchListHtml}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="w-full lg:w-2/3 flex flex-col gap-6 overflow-y-auto custom-scroll pr-2">
-                         <div>
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-1 h-6 bg-[#1fa474]"></div>
-                                <h4 class="text-xl font-header text-white tracking-wide">ACTIVE ROSTER</h4>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                ${mainRoster || '<div class="text-gray-600 italic">No active players assigned.</div>'}
-                            </div>
-                         </div>
-
-                         ${subRoster ? `
-                             <div>
-                                <div class="flex items-center gap-3 mb-4 mt-2">
-                                    <div class="w-1 h-6 bg-[#dda828]"></div>
-                                    <h4 class="text-xl font-header text-white tracking-wide">RESERVES</h4>
-                                </div>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    ${subRoster}
-                                </div>
-                             </div>` : ''}
-
-                         ${coachRoster ? `
-                             <div>
-                                <div class="flex items-center gap-3 mb-4 mt-2">
-                                    <div class="w-1 h-6 bg-[#ff4655]"></div>
-                                    <h4 class="text-xl font-header text-white tracking-wide">STAFF</h4>
-                                </div>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    ${coachRoster}
-                                </div>
-                             </div>` : ''}
+                        `).join('')}
                     </div>
                 </div>
             `;
-
-            document.getElementById('teamModalContent').innerHTML = modalHtml;
             document.getElementById('teamModal').classList.remove('hidden');
             document.getElementById('teamModal').classList.add('flex');
         }
+        function closeTeamModal() { document.getElementById('teamModal').classList.add('hidden'); document.getElementById('teamModal').classList.remove('flex'); }
 
-        function closeTeamModal() {
-            document.getElementById('teamModal').classList.add('hidden');
-            document.getElementById('teamModal').classList.remove('flex');
-        }
-
-        // --- MATCH DETAIL MODAL ---
+        // Match Modal (Detail View)
         function openMatchDetail(matchId) {
             const m = matchesData.find(x => x._id === matchId);
             if (!m) return;
-            
             const [sA, sB] = calculateScores(m.scores);
             const content = document.getElementById('modalContent');
             const isLive = m.status === 'live';
-
-            const renderBigTeam = (team, score, align) => `
-                <div class="flex flex-col items-center gap-2 flex-1 relative z-10 ${align === 'right' ? 'md:order-3' : 'md:order-1'}">
-                    <img src="${team?.logo || DEFAULT_LOGO}" class="w-24 h-24 md:w-40 md:h-40 object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
-                    <h3 class="font-header text-4xl md:text-5xl font-bold text-white uppercase tracking-tighter leading-none mt-4 text-center">${team?.name || 'TBD'}</h3>
-                    <p class="font-mono text-sm text-[#ff4655] font-bold uppercase tracking-[0.3em]">${team?.shortName || ''}</p>
-                </div>`;
 
             content.innerHTML = `
                 <div class="bg-[#0f1113] p-4 flex justify-between items-center border-b border-white/10">
                     <div class="flex items-center gap-4">
                         <span class="text-xs bg-white/5 text-gray-300 px-3 py-1 font-bold uppercase tracking-widest border border-white/10">${m.name}</span>
-                        <span class="text-xs text-[#ff4655] font-mono tracking-widest">${new Date(m.scheduledTime).toLocaleDateString()} // ${new Date(m.scheduledTime).toLocaleTimeString()}</span>
+                        <span class="text-xs text-[#ff4655] font-mono tracking-widest">${new Date(m.scheduledTime).toLocaleDateString()}</span>
                     </div>
                     <button onclick="closeMatchModal()" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
                 </div>
-
-                <div class="relative py-16 px-8 overflow-hidden bg-[url('https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png')] bg-cover bg-center">
-                    <div class="absolute inset-0 bg-[#0f1923]/90 backdrop-blur-sm"></div>
-                    <div class="relative z-10 flex flex-col md:flex-row items-center justify-center gap-10">
-                        ${renderBigTeam(m.teamA, sA, 'left')}
-                        
-                        <div class="flex flex-col items-center md:order-2 z-20 mx-8">
-                            <div class="font-header text-8xl text-white font-bold flex items-center gap-8 italic tracking-tighter drop-shadow-2xl">
-                                <span class="${sA > sB ? 'text-[#ff4655]' : 'text-gray-400'}">${sA}</span>
-                                <span class="text-gray-600 text-6xl opacity-50">-</span>
-                                <span class="${sB > sA ? 'text-[#ff4655]' : 'text-gray-400'}">${sB}</span>
+                <div class="relative py-16 px-8 overflow-hidden bg-[#1a1d21]">
+                    <div class="flex items-center justify-center gap-10">
+                        <div class="flex flex-col items-center gap-2 w-1/3">
+                            <img src="${m.teamA?.logo || DEFAULT_LOGO}" class="w-32 h-32 object-contain">
+                            <h3 class="font-header text-3xl text-white uppercase text-center">${m.teamA?.name || 'TBD'}</h3>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="font-header text-7xl text-white font-bold flex gap-4">
+                                <span class="${sA > sB ? 'text-[#ff4655]' : ''}">${sA}</span>
+                                <span class="text-gray-600">-</span>
+                                <span class="${sB > sA ? 'text-[#ff4655]' : ''}">${sB}</span>
                             </div>
-                            <div class="mt-4 px-4 py-2 rounded border ${isLive ? 'border-[#ff4655] bg-[#ff4655] text-white animate-pulse' : 'border-gray-600 bg-black/50 text-gray-400'} text-xs font-bold tracking-[0.3em] uppercase">
-                                ${isLive ? 'LIVE MATCH' : (m.status === 'finished' ? 'FINAL RESULT' : 'UPCOMING')}
+                            <div class="mt-2 text-xs font-bold uppercase tracking-[0.2em] ${isLive ? 'text-[#ff4655] animate-pulse' : 'text-gray-500'}">
+                                ${isLive ? 'LIVE NOW' : m.status}
                             </div>
                         </div>
-
-                        ${renderBigTeam(m.teamB, sB, 'right')}
+                        <div class="flex flex-col items-center gap-2 w-1/3">
+                            <img src="${m.teamB?.logo || DEFAULT_LOGO}" class="w-32 h-32 object-contain">
+                            <h3 class="font-header text-3xl text-white uppercase text-center">${m.teamB?.name || 'TBD'}</h3>
+                        </div>
                     </div>
                 </div>
-
-                <div class="p-8 bg-[#1a1d21] border-t border-white/10">
-                    <div class="flex items-center gap-2 mb-6">
-                        <i class="fa-solid fa-map text-[#ff4655]"></i>
-                        <h4 class="text-sm text-gray-400 font-bold uppercase tracking-[0.2em]">Map Breakdown</h4>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${m.scores && m.scores.length > 0 ? m.scores.map((s, idx) => `
-                            <div class="bg-[#0f1113] border border-white/10 flex flex-col relative overflow-hidden group hover:border-[#ff4655]/50 transition">
-                                <div class="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">MAP 0${idx+1}</span>
-                                    <span class="text-sm font-header text-white uppercase italic tracking-wide">${s.mapName || 'VETO'}</span>
-                                </div>
-                                <div class="flex items-center p-4 justify-between">
-                                    <div class="text-2xl font-header font-bold ${parseInt(s.teamAScore) > parseInt(s.teamBScore) ? 'text-[#ff4655]' : 'text-gray-500'}">${s.teamAScore}</div>
-                                    <div class="text-xs text-gray-700 font-mono">VS</div>
-                                    <div class="text-2xl font-header font-bold ${parseInt(s.teamBScore) > parseInt(s.teamAScore) ? 'text-[#ff4655]' : 'text-gray-500'}">${s.teamBScore}</div>
-                                </div>
+                <div class="p-8 bg-[#1a1d21] border-t border-white/10 grid grid-cols-1 gap-2">
+                     ${m.scores.map((s,i) => `
+                        <div class="bg-black/20 p-3 flex justify-between items-center border-l-2 border-white/10">
+                            <span class="text-xs text-gray-500 uppercase tracking-widest">MAP ${i+1}: ${s.mapName || 'VETO'}</span>
+                            <div class="font-header text-white text-xl">
+                                <span class="${parseInt(s.teamAScore) > parseInt(s.teamBScore) ? 'text-[#ff4655]' : ''}">${s.teamAScore}</span>
+                                <span class="px-2 text-gray-600">:</span>
+                                <span class="${parseInt(s.teamBScore) > parseInt(s.teamAScore) ? 'text-[#ff4655]' : ''}">${s.teamBScore}</span>
                             </div>
-                        `).join('') : '<div class="col-span-3 text-center py-6 border border-dashed border-gray-700 text-gray-600 text-xs uppercase tracking-widest">Awaiting Map Data...</div>'}
-                    </div>
+                        </div>
+                     `).join('')}
                 </div>
             `;
             document.getElementById('matchModal').classList.remove('hidden');
             document.getElementById('matchModal').classList.add('flex');
         }
-        function closeMatchModal() { 
-            document.getElementById('matchModal').classList.add('hidden'); 
-            document.getElementById('matchModal').classList.remove('flex');
-        }
+        function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); document.getElementById('matchModal').classList.remove('flex'); }
 
-        // Close on Esc
-        window.addEventListener('keydown', (e) => { 
-            if(e.key === 'Escape') {
-                closeMatchModal();
-                closeTeamModal();
-            }
-        });
+        window.addEventListener('keydown', (e) => { if(e.key === 'Escape') { closeMatchModal(); closeTeamModal(); } });
     </script>
 </body>
 </html>

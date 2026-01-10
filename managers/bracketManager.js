@@ -86,8 +86,7 @@ class BracketManager {
                 const groupTeams = teams.slice(g * 4, g * 4 + 4);
                 while(groupTeams.length < 4) groupTeams.push(null);
 
-                const gName = letters[g] || (g+1);
-                const prefix = `${stageName} Group ${gName}`;
+                const prefix = `${stageName} `;
 
                 // Opening Matches (Seed 1 vs 4, Seed 2 vs 3)
                 const m1 = await createMatch(`${prefix}: Opening A`, groupTeams[0], groupTeams[3], 1, (g*10)+1);

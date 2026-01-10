@@ -21,7 +21,7 @@
             --val-red: #ff4655;
             --val-green: #1fa474;
             --val-white: #ece8e1;
-            --sidebar-width: 360px; /* ขยาย Sidebar นิดหน่อยให้ใส่รายละเอียดได้พอดี */
+            --sidebar-width: 360px;
         }
 
         body {
@@ -50,52 +50,58 @@
         /* --- MAP CARDS --- */
         .map-grid-container {
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); 
-            gap: 0.8rem;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+            gap: 1rem;
             width: 100%; max-width: 1800px;
-            padding: 1rem 2rem;
+            padding: 1rem 3rem 5rem 3rem; /* Added bottom padding for timeline */
             align-content: center;
         }
         
         .map-card {
             position: relative; width: 100%; aspect-ratio: 9/16; 
             background-color: #1a1d21; border: 1px solid #333;
-            transition: all 0.3s ease; overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
         }
 
         .map-card-bg {
             position: absolute; inset: 0;
             background-size: cover; background-position: center;
-            transition: transform 0.5s ease;
-            filter: brightness(0.5) saturate(0.5);
+            transition: transform 0.6s ease, filter 0.3s ease;
+            filter: brightness(0.6) saturate(0);
         }
 
         .map-name {
             position: absolute; bottom: 1.5rem; left: 0; right: 0; text-align: center; z-index: 10;
-            font-family: 'Anton'; font-size: 1.8rem; color: rgba(255,255,255,0.8);
+            font-family: 'Anton'; font-size: 2rem; color: rgba(255,255,255,0.7);
             text-shadow: 0 4px 10px rgba(0,0,0,1); 
             letter-spacing: 0.1em; transition: 0.3s;
+            text-transform: uppercase;
         }
 
-        .map-card.interactive:hover { border-color: var(--val-white); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .map-card.interactive:hover .map-card-bg { transform: scale(1.1); filter: brightness(1) saturate(1.1); }
-        .map-card.interactive:hover .map-name { color: var(--val-red); bottom: 2rem; transform: scale(1.1); }
+        /* Interactive States */
+        .map-card.interactive:hover { border-color: var(--val-white); transform: translateY(-8px); box-shadow: 0 15px 40px rgba(0,0,0,0.6); z-index: 20; }
+        .map-card.interactive:hover .map-card-bg { transform: scale(1.15); filter: brightness(1) saturate(1.1); }
+        .map-card.interactive:hover .map-name { color: var(--val-red); bottom: 2.5rem; transform: scale(1.1); }
 
+        /* Banned State */
         .map-card.banned .map-card-bg { filter: grayscale(100%) brightness(0.2); }
-        .map-card.banned { border-color: #333; opacity: 0.6; }
+        .map-card.banned { border-color: #333; opacity: 0.5; pointer-events: none; }
         
-        .ban-overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-        .ban-x { font-size: 5rem; color: var(--val-red); opacity: 0; animation: banStrike 0.3s forwards; }
+        .ban-overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.6); }
+        .ban-x { font-size: 6rem; color: var(--val-red); opacity: 0; animation: banStrike 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; text-shadow: 0 0 20px var(--val-red); }
         
-        .map-card.picked { border: 2px solid var(--val-green); box-shadow: 0 0 20px rgba(31, 164, 116, 0.4); z-index: 15; transform: scale(1.02); }
+        /* Picked State */
+        .map-card.picked { border: 2px solid var(--val-green); box-shadow: 0 0 30px rgba(31, 164, 116, 0.3); z-index: 15; transform: scale(1.02); }
+        .map-card.picked .map-card-bg { filter: brightness(0.8) saturate(1); }
         .pick-indicator {
             position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 30;
-            background: var(--val-green); color: white; padding: 4px 20px;
-            font-family: 'Oswald'; font-weight: bold; font-size: 0.8rem; letter-spacing: 1px;
+            background: var(--val-green); color: white; padding: 6px 0;
+            font-family: 'Oswald'; font-weight: bold; font-size: 0.9rem; letter-spacing: 2px;
             clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
-            width: 90%; text-align: center;
+            width: 100%; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        @keyframes banStrike { from { transform: scale(2); opacity: 0; } to { opacity: 1; transform: scale(1); } }
+        @keyframes banStrike { from { transform: scale(3) rotate(-45deg); opacity: 0; } to { opacity: 1; transform: scale(1) rotate(0deg); } }
 
         /* --- FX & UTILS --- */
         .scanlines {
@@ -107,11 +113,24 @@
         .font-ui { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         .clip-val { clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px); }
+        .clip-diag { clip-path: polygon(0 0, 100% 0, 100% 100%, 15px 100%); }
 
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         .custom-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
+
+        /* --- TIMELINE --- */
+        .timeline-container {
+            position: absolute; bottom: 2rem; left: 0; right: 0;
+            display: flex; justify-content: center; align-items: center;
+            z-index: 40; pointer-events: none;
+        }
+        .timeline-pip { width: 40px; height: 6px; background: rgba(255,255,255,0.15); transition: all 0.3s; margin: 0 3px; border-radius: 1px; }
+        .timeline-pip.active { background: white; height: 12px; box-shadow: 0 0 15px white; transform: scaleX(1.1); }
+        .timeline-pip.passed { background: #444; }
+        .timeline-pip.future-pick { border-bottom: 3px solid var(--val-green); }
+        .timeline-pip.future-ban { border-bottom: 3px solid var(--val-red); }
 
         /* --- END SCREEN DRAWER --- */
         .chat-drawer {
@@ -127,8 +146,17 @@
         .chat-drawer.open { transform: translateY(0); }
 
         /* --- END SCREEN CARDS --- */
-        .roster-row { transition: all 0.2s ease; border-left: 3px solid transparent; }
-        .roster-row:hover { background: rgba(255,255,255,0.08); border-left-color: currentColor; padding-left: 1rem; }
+        .roster-card { 
+            position: relative; 
+            background: rgba(255,255,255,0.03); 
+            border-left: 3px solid rgba(255,255,255,0.1);
+            transition: all 0.2s ease;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+        }
+        .roster-card:hover { 
+            background: rgba(255,255,255,0.08); 
+            padding-left: 1.2rem;
+        }
         .end-map-card { position: relative; flex: 1; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); overflow: hidden; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.1); }
         .end-map-card:hover { flex: 1.5; border-color: var(--val-red); z-index: 10; }
 
@@ -142,7 +170,8 @@
 <body>
 
     <div class="scanlines"></div>
-    <div id="bgLayer" class="fixed inset-0 z-0 bg-cover bg-center transition-all duration-500 opacity-30 scale-105" style="background-image: url('https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png');"></div>
+    <div id="bgLayer" class="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000 opacity-20 scale-105" style="background-image: url('https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png');"></div>
+    <div class="fixed inset-0 z-1 bg-gradient-to-t from-[#0f1923] via-[#0f1923]/50 to-transparent"></div>
 
     <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 opacity-0 -translate-y-8 pointer-events-none">
         <div class="bg-[#ff4655] text-white px-8 py-3 text-xl font-ui font-bold tracking-widest clip-val shadow-xl flex items-center gap-3">
@@ -210,25 +239,27 @@
                 </div>
             </div>
 
-            <header class="flex justify-between items-end px-12 py-4 shrink-0 relative z-30 min-h-[140px]">
-                <div class="w-1/3 text-left opacity-0 -translate-x-10 transition-all duration-700" id="headerTA">
-                    <div class="flex items-center gap-2 mb-1">
-                        <div id="sA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
-                        <div id="sA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
+            <header class="flex flex-col shrink-0 relative z-30 min-h-[160px] pt-12 pb-2">
+                <div class="flex justify-between items-end px-12">
+                    <div class="w-1/3 text-left opacity-0 -translate-x-10 transition-all duration-700" id="headerTA">
+                        <div class="flex items-center gap-2 mb-1">
+                            <div id="sA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                            <div id="sA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
+                        </div>
+                        <h1 id="tA" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM A</h1>
                     </div>
-                    <h1 id="tA" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM A</h1>
-                </div>
 
-                <div class="w-1/3 text-center flex flex-col items-center opacity-0 scale-90 transition-all duration-500" id="headerStatus">
-                    <div id="status" class="bg-white text-black px-12 py-1 font-ui text-5xl font-bold tracking-[0.1em] clip-val shadow-lg z-10 whitespace-nowrap">LOADING</div>
-                </div>
-
-                <div class="w-1/3 text-right opacity-0 translate-x-10 transition-all duration-700" id="headerTB">
-                    <div class="flex items-center justify-end gap-2 mb-1">
-                        <div id="sB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
-                        <div id="sB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                    <div class="w-1/3 text-center flex flex-col items-center opacity-0 scale-90 transition-all duration-500" id="headerStatus">
+                        <div id="status" class="bg-white text-black px-12 py-1 font-ui text-5xl font-bold tracking-[0.1em] clip-val shadow-lg z-10 whitespace-nowrap">LOADING</div>
                     </div>
-                    <h1 id="tB" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM B</h1>
+
+                    <div class="w-1/3 text-right opacity-0 translate-x-10 transition-all duration-700" id="headerTB">
+                        <div class="flex items-center justify-end gap-2 mb-1">
+                            <div id="sB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
+                            <div id="sB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                        </div>
+                        <h1 id="tB" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM B</h1>
+                    </div>
                 </div>
             </header>
 
@@ -238,8 +269,12 @@
                 </button>
             </div>
 
-            <div class="flex-1 flex items-center justify-center w-full overflow-hidden">
+            <div class="flex-1 flex items-center justify-center w-full overflow-hidden relative">
                 <div id="grid" class="map-grid-container opacity-0 scale-95 transition-all duration-700"></div>
+                
+                <div id="sequencerContainer" class="timeline-container opacity-0 transition-opacity duration-1000">
+                    <div id="sequencerBar" class="flex items-center bg-black/40 px-4 py-2 rounded-lg border border-white/5 backdrop-blur-md"></div>
+                </div>
             </div>
         </main>
     </div>
@@ -271,11 +306,11 @@
 
             <div class="flex-1 grid grid-cols-12 gap-8 h-full overflow-hidden pb-2">
                 <div class="col-span-3 flex flex-col h-full animate-slide-right">
-                    <div class="mb-2 border-l-4 border-[#1fa474] pl-4">
+                    <div class="mb-4 border-l-4 border-[#1fa474] pl-4">
                          <h3 id="endTA" class="text-4xl font-header truncate text-white">TEAM A</h3>
                          <div class="text-[#1fa474] font-bold tracking-widest text-[10px] uppercase">Roster Verified</div>
                     </div>
-                    <div id="listTA" class="flex-1 flex flex-col justify-start gap-1 overflow-y-auto custom-scroll pr-1"></div>
+                    <div id="listTA" class="flex-1 flex flex-col justify-start gap-2 overflow-y-auto custom-scroll pr-1"></div>
                 </div>
                 <div class="col-span-6 flex flex-col h-full animate-scale-up delay-100 relative">
                     <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#1fa474]/5 to-transparent pointer-events-none"></div>
@@ -283,11 +318,11 @@
                     <div id="endMaps" class="flex-1 flex flex-col gap-2 justify-center mb-4 overflow-y-auto custom-scroll px-2"></div>
                 </div>
                 <div class="col-span-3 flex flex-col h-full animate-slide-left items-end">
-                    <div class="mb-2 border-r-4 border-[#ff4655] pr-4 text-right">
+                    <div class="mb-4 border-r-4 border-[#ff4655] pr-4 text-right">
                         <h3 id="endTB" class="text-4xl font-header truncate text-white">TEAM B</h3>
                         <div class="text-[#ff4655] font-bold tracking-widest text-[10px] uppercase">Roster Verified</div>
                    </div>
-                   <div id="listTB" class="flex-1 w-full flex flex-col justify-start gap-1 overflow-y-auto custom-scroll pl-1"></div>
+                   <div id="listTB" class="flex-1 w-full flex flex-col justify-start gap-2 overflow-y-auto custom-scroll pl-1"></div>
                 </div>
             </div>
         </div>
@@ -343,7 +378,8 @@
               .to("#headerTB", { opacity: 1, x: 0, duration: 0.8 }, "-=0.6")
               .to("#headerStatus", { opacity: 1, scale: 1, duration: 0.5, ease: "back.out" }, "-=0.4")
               .to("#topInfo", { opacity: 1, y: 0, duration: 0.5 }, "-=0.3")
-              .to("#grid", { opacity: 1, scale: 1, duration: 0.8 }, "-=0.2");
+              .to("#grid", { opacity: 1, scale: 1, duration: 0.8 }, "-=0.2")
+              .to("#sequencerContainer", { opacity: 1, duration: 0.5 }, "-=0.2");
         });
 
         const areIdsEqual = (id1, id2) => String(id1?._id || id1) === String(id2?._id || id2);
@@ -429,6 +465,7 @@
             const isA = areIdsEqual(teamId, m.teamA._id);
             
             updateHeader(m, v, isA);
+            renderTimeline(v); 
             renderGrid(v, teamId, m.teamA, m.teamB);
             renderMiniSummary(v, m.teamA, m.teamB); 
             
@@ -472,6 +509,30 @@
 
             if(v.status === 'completed' || m.status === 'live') showEndScreen(m);
         });
+
+        // --- TIMELINE SEQUENCER ---
+        function renderTimeline(v) {
+            const container = document.getElementById('sequencerBar');
+            let html = '';
+            
+            const mainSteps = v.sequence.filter(s => s.act === 'ban' || s.act === 'pick');
+            const currentIndex = v.sequenceIndex; 
+            
+            mainSteps.forEach((step, idx) => {
+                const originalIndex = v.sequence.indexOf(step);
+                
+                let stateClass = '';
+                if (originalIndex < currentIndex) stateClass = 'passed';
+                else if (originalIndex === currentIndex) stateClass = 'active';
+                else {
+                    stateClass = step.act === 'pick' ? 'future-pick' : 'future-ban';
+                }
+
+                html += `<div class="timeline-pip ${stateClass}" title="${step.act.toUpperCase()}"></div>`;
+            });
+            
+            container.innerHTML = html;
+        }
 
         function updateHeader(m, v, isA) {
             document.getElementById('tA').innerText = m.teamA.name;
@@ -527,17 +588,13 @@
             });
         }
 
-        // --- ENHANCED MAP SUMMARY ---
         function renderMiniSummary(v, tA, tB) {
             const container = document.getElementById('miniSummary');
             let html = '';
             
-            // Loop through picked maps
             v.pickedMaps.forEach(p => { 
                 const picker = areIdsEqual(p.pickedBy, tA._id) ? tA.shortName : tB.shortName;
-                const pickerFull = areIdsEqual(p.pickedBy, tA._id) ? tA.name : tB.name;
                 
-                // Determine Sides
                 let sideA = '<span class="text-gray-500">?</span>';
                 let sideB = '<span class="text-gray-500">?</span>';
                 
@@ -582,11 +639,87 @@
             gsap.to("#endContent", { opacity: 1, duration: 1, delay: 0.2 });
             document.getElementById('endTA').innerText = m.teamA.name;
             document.getElementById('endTB').innerText = m.teamB.name;
+            
+            // --- NEW ROSTER RENDER (Same Line) ---
             const roleCol = {'Main':'text-[#1fa474]','Sub':'text-[#dda828]','Coach':'text-[#ff4655]'};
-            const renderRoster = (members, align) => { return (members||[]).map(p => `<div class="roster-row flex-1 max-h-[80px] min-h-[50px] flex items-center gap-3 p-2 bg-white/5 border-b border-white/5 relative group w-full" style="color: ${p.role==='Coach'?'#ff4655':'inherit'}">${align==='left' ? `<div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-sm text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0">${(p.name||'?').charAt(0)}</div>` : ''}<div class="flex flex-col justify-center min-w-0 ${align==='right'?'items-end text-right flex-1':''}"><span class="font-ui text-2xl leading-none text-white tracking-wide uppercase truncate w-full group-hover:text-[#1fa474] transition">${p.name||'Unknown'}</span><div class="flex items-center gap-2 mt-0.5"><span class="bg-black/50 px-1.5 py-px rounded text-[10px] font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>${p.role ? `<span class="text-[9px] font-bold uppercase tracking-widest ${roleCol[p.role]||'text-gray-500'}">[${p.role}]</span>` : ''}</div></div>${align==='right' ? `<div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-sm text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 ml-3">${(p.name||'?').charAt(0)}</div>` : ''}</div>`).join(''); };
+            const roleBorder = {'Main':'border-[#1fa474]','Sub':'border-[#dda828]','Coach':'border-[#ff4655]'};
+
+            const renderRoster = (members, align) => { 
+                return (members||[]).map(p => {
+                    const borderColor = p.role ? roleBorder[p.role] : 'border-gray-500';
+                    const roleColor = p.role ? roleCol[p.role] : 'text-gray-500';
+                    const initial = (p.name || '?').charAt(0);
+                    
+                    // Left Align Template (Team A)
+                    if(align === 'left') {
+                        return `
+                        <div class="roster-card w-full mb-1 flex items-center gap-3 p-2 group ${borderColor} border-l-[4px]">
+                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-lg text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
+                                ${initial}
+                            </div>
+                            <div class="flex flex-col justify-center min-w-0">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="font-ui text-2xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#1fa474] transition">${p.name||'Unknown'}</span>
+                                    <span class="text-[10px] font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
+                                </div>
+                                ${p.role ? `<div class="text-[9px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
+                            </div>
+                        </div>`;
+                    } 
+                    // Right Align Template (Team B)
+                    else {
+                        return `
+                        <div class="roster-card w-full mb-1 flex items-center justify-end gap-3 p-2 group ${borderColor} border-l-[0px] border-r-[4px] text-right" style="clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);">
+                            <div class="flex flex-col justify-center items-end min-w-0">
+                                <div class="flex items-baseline gap-2 justify-end">
+                                    <span class="text-[10px] font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
+                                    <span class="font-ui text-2xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#ff4655] transition">${p.name||'Unknown'}</span>
+                                </div>
+                                ${p.role ? `<div class="text-[9px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
+                            </div>
+                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-lg text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
+                                ${initial}
+                            </div>
+                        </div>`;
+                    }
+                }).join(''); 
+            };
+
             document.getElementById('listTA').innerHTML = renderRoster(m.teamA.members, 'left');
             document.getElementById('listTB').innerHTML = renderRoster(m.teamB.members, 'right');
-            const mapHTML = m.vetoData.pickedMaps.map((p, i) => { const tAS = m.teamA.shortName || 'TA'; const tBS = m.teamB.shortName || 'TB'; const sideA = p.teamAStartingSide === 'atk' ? '<span class="text-[#ff4655]">ATK</span>' : '<span class="text-[#1fa474]">DEF</span>'; const sideB = p.teamBStartingSide === 'atk' ? '<span class="text-[#ff4655]">ATK</span>' : '<span class="text-[#1fa474]">DEF</span>'; return `<div class="end-map-card group w-full bg-[#1c252e] flex relative overflow-hidden shrink-0 min-h-[80px]"><div class="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition duration-500" style="background-image: url('${maps[p.map]}');"></div><div class="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-black/90"></div><div class="relative z-10 w-full flex items-center justify-between px-6"><div class="text-5xl font-header text-white/10 group-hover:text-white/20 transition">0${i+1}</div><div class="text-center"><div class="text-3xl font-header text-white drop-shadow-lg tracking-wider">${p.map.toUpperCase()}</div><div class="flex items-center gap-3 text-[10px] font-mono font-bold mt-1 bg-black/60 px-3 py-1 rounded-full border border-white/10"><div class="flex gap-2 text-gray-300"><span>${tAS}</span> ${sideA}</div><div class="text-gray-600">VS</div><div class="flex gap-2 text-gray-300"><span>${tBS}</span> ${sideB}</div></div></div><div class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white/50 group-hover:text-white group-hover:border-white transition"><i class="fa-solid fa-map"></i></div></div></div>`; }).join('');
+            
+            // --- UPDATED MAP SUMMARY with BADGES ---
+            const mapHTML = m.vetoData.pickedMaps.map((p, i) => { 
+                const tAS = m.teamA.shortName || 'TA'; 
+                const tBS = m.teamB.shortName || 'TB'; 
+                
+                // Badges for ATK/DEF
+                const sideA = p.teamAStartingSide === 'atk' 
+                    ? '<span class="bg-[#ff4655] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
+                    : '<span class="bg-[#1fa474] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>';
+                
+                const sideB = p.teamBStartingSide === 'atk' 
+                    ? '<span class="bg-[#ff4655] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
+                    : '<span class="bg-[#1fa474] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>'; 
+
+                return `
+                <div class="end-map-card group w-full bg-[#1c252e] flex relative overflow-hidden shrink-0 min-h-[80px]">
+                    <div class="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition duration-500" style="background-image: url('${maps[p.map]}');"></div>
+                    <div class="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-black/90"></div>
+                    <div class="relative z-10 w-full flex items-center justify-between px-6">
+                        <div class="text-5xl font-header text-white/10 group-hover:text-white/20 transition">0${i+1}</div>
+                        <div class="text-center">
+                            <div class="text-3xl font-header text-white drop-shadow-lg tracking-wider">${p.map.toUpperCase()}</div>
+                            <div class="flex items-center gap-3 text-[10px] font-mono font-bold mt-1 bg-black/60 px-3 py-1 rounded-full border border-white/10">
+                                <div class="flex items-center text-gray-300"><span>${tAS}</span> ${sideA}</div>
+                                <div class="text-gray-600 mx-1">VS</div>
+                                <div class="flex items-center text-gray-300"><span>${tBS}</span> ${sideB}</div>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white/50 group-hover:text-white group-hover:border-white transition"><i class="fa-solid fa-map"></i></div>
+                    </div>
+                </div>`; 
+            }).join('');
             document.getElementById('endMaps').innerHTML = mapHTML;
         }
 

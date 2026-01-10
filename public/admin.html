@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VALORANT // ADMIN PROTOCOL V7.2 (MAP PREVIEW)</title>
+    <title>VALORANT // ADMIN PROTOCOL V8.0 (MISSION CONTROL)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
@@ -54,6 +54,16 @@
         
         .nav-badge { background: #ff4655; color: white; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: auto; font-weight: bold; min-width: 24px; text-align: center; }
         
+        /* --- NEW: TEAM CARDS --- */
+        .team-card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            border-color: #555;
+        }
+        .status-indicator {
+            position: absolute; top: 0; left: 0; bottom: 0; width: 4px;
+        }
+
         /* --- TABLE STYLES --- */
         .table-val { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.95rem; }
         .table-val th { text-align: left; padding: 12px 16px; font-family: 'Oswald', sans-serif; color: #8b978f; font-weight: 500; text-transform: uppercase; border-bottom: 2px solid #333; font-size: 0.85rem; }
@@ -65,7 +75,7 @@
         .bracket-round { min-width: 320px; display: flex; flex-direction: column; gap: 1.25rem; }
         .bracket-header { font-family: 'Oswald', sans-serif; font-size: 0.9rem; color: #8b978f; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 0.75rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
 
-        /* --- [UPDATED] MAP SELECTOR STYLES (WITH PREVIEW) --- */
+        /* --- MAP SELECTOR STYLES --- */
         .map-select-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -91,7 +101,6 @@
             user-select: none;
             overflow: hidden;
         }
-        /* Dark Overlay for text readability */
         .map-option::before {
             content: ''; position: absolute; inset: 0;
             background: rgba(0,0,0,0.6);
@@ -101,7 +110,6 @@
         .map-option:hover { border-color: #888; transform: translateY(-2px); }
         .map-option:hover::before { background: rgba(0,0,0,0.3); }
         
-        /* Selected State */
         .map-option.selected {
             border-color: #ff4655;
             box-shadow: 0 4px 12px rgba(255, 70, 85, 0.3);
@@ -113,7 +121,6 @@
         .map-option.selected .map-name { color: #fff; text-shadow: 0 0 10px #ff4655; }
         .map-option.selected .check-icon { opacity: 1; transform: scale(1); }
         
-        /* Elements inside map card */
         .map-option i.fa-map { display: none; }
         .map-name { 
             position: relative; z-index: 2; 
@@ -131,7 +138,6 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
         
-        /* Disabled State */
         .map-option.disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
     </style>
 </head>
@@ -219,31 +225,60 @@
                 </div>
             </header>
 
-            <section id="view-dashboard" class="animate-slide-up space-y-10">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div class="glass-panel p-6 border-l-4 border-l-[#ff4655]">
-                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Live Matches</div>
-                        <div class="text-5xl font-header text-white" id="stat-live">0</div>
+            <section id="view-dashboard" class="animate-slide-up space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div class="md:col-span-8 bg-[#15171a] border border-[#ff4655] rounded-lg p-6 relative overflow-hidden group shadow-lg shadow-red-900/10">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                            <i class="fa-solid fa-tower-broadcast text-9xl text-[#ff4655]"></i>
+                        </div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="w-3 h-3 rounded-full bg-[#ff4655] animate-pulse shadow-[0_0_10px_#ff4655]"></span>
+                                <h3 class="font-header text-xl text-white">LIVE OPERATIONS</h3>
+                            </div>
+                            <div class="text-6xl font-header text-white font-bold tracking-tighter" id="stat-live">0</div>
+                            <p class="text-gray-400 text-sm mt-2 font-mono">ACTIVE MATCHES IN PROGRESS</p>
+                            <div class="mt-6 flex gap-3">
+                                <button onclick="nav('structure')" class="btn-val px-4 py-2 text-xs rounded">MANAGE MATCHES</button>
+                                <a href="/scoreboard.html" target="_blank" class="px-4 py-2 border border-[#333] hover:bg-[#333] text-gray-300 text-xs rounded transition font-bold uppercase">View Scoreboard</a>
+                            </div>
+                        </div>
                     </div>
-                    <div onclick="nav('requests')" class="glass-panel p-6 border-l-4 border-l-yellow-500 cursor-pointer hover:bg-[#1a1d21] transition">
-                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Pending Scores</div>
-                        <div class="text-5xl font-header text-white" id="stat-pending">0</div>
+
+                    <div onclick="nav('requests')" class="md:col-span-4 bg-[#1a1d21] border-l-4 border-yellow-500 rounded-r-lg p-6 cursor-pointer hover:bg-[#222] transition relative">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">Attention Needed</div>
+                                <h3 class="font-header text-lg text-white">SCORE APPROVALS</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                <i class="fa-solid fa-inbox"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-baseline gap-2">
+                            <span class="text-4xl font-header text-white" id="stat-pending">0</span>
+                            <span class="text-xs text-gray-500">requests</span>
+                        </div>
                     </div>
-                    <div onclick="nav('teams')" class="glass-panel p-6 border-l-4 border-l-blue-500 cursor-pointer hover:bg-[#1a1d21] transition">
-                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Teams</div>
-                        <div class="text-5xl font-header text-white" id="stat-teams">0</div>
+
+                    <div onclick="nav('teams')" class="md:col-span-2 bg-[#1a1d21] border border-[#2d3139] rounded-lg p-5 cursor-pointer hover:border-blue-500 transition">
+                        <div class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Total Teams</div>
+                        <div class="text-3xl font-header text-white" id="stat-teams">0</div>
                     </div>
-                    <div class="glass-panel p-6 border-l-4 border-l-purple-500">
-                        <div class="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Finished</div>
-                        <div class="text-5xl font-header text-white" id="stat-finished">0</div>
+                    <div class="md:col-span-2 bg-[#1a1d21] border border-[#2d3139] rounded-lg p-5">
+                        <div class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Finished</div>
+                        <div class="text-3xl font-header text-white" id="stat-finished">0</div>
                     </div>
                 </div>
-                <div class="space-y-6">
-                     <div class="flex items-center justify-between">
-                        <h3 class="text-2xl font-header text-white">LIVE COMBAT OVERVIEW</h3>
-                        <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search match..." class="bg-[#1a1d21] border border-[#333] text-sm p-3 rounded text-white focus:border-[#ff4655] outline-none w-80 placeholder-gray-600">
+
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between border-b border-[#333] pb-4">
+                        <h3 class="text-xl font-header text-white flex items-center gap-3">
+                            <i class="fa-solid fa-chart-line text-[#ff4655]"></i> LIVE FEED
+                        </h3>
+                        <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search active match..." class="bg-[#0f1113] border border-[#333] text-sm px-4 py-2 rounded text-white focus:border-[#ff4655] outline-none w-64 placeholder-gray-600 font-mono">
                     </div>
-                    <div id="liveMatches" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4"></div>
+                    <div id="liveMatches" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
                 </div>
             </section>
 
@@ -259,9 +294,6 @@
                 <div id="mainTourneyHeader" class="glass-panel p-8 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div class="text-center w-full py-6 text-gray-500">Loading...</div>
                 </div>
-                <div class="flex justify-end pb-4 border-b border-white/5">
-                    <button onclick="toggleBulkMode()" id="btnBulkMode" class="px-5 py-2.5 border border-[#333] hover:border-[#ff4655] text-gray-400 hover:text-[#ff4655] rounded text-xs font-bold uppercase transition flex items-center gap-3"><i class="fa-solid fa-list-check"></i> Manual Batch Mode</button>
-                </div>
                 <div id="stageList" class="space-y-10"></div>
             </section>
 
@@ -273,7 +305,7 @@
                         <input type="text" id="teamSearch" oninput="renderTeams(allTeams)" placeholder="Search team..." class="w-full bg-[#0f1113] border border-[#2d3139] pl-10 pr-4 py-3 rounded text-sm focus:border-[#ff4655] outline-none transition text-white placeholder-gray-500">
                     </div>
                 </div>
-                <div id="teamGrid" class="flex flex-col gap-3"></div>
+                <div id="teamGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
             </section>
         </div>
     </main>
@@ -491,6 +523,7 @@
         let selectedMatches = new Set();
         let stagePool = [], stageSelected = [];
         let bulkMode = false;
+        let activeStageIndex = 0; // NEW: For Tab System
 
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
 
@@ -531,8 +564,6 @@
             } catch(e) { console.error(e); }
         }
 
-        // ... Existing Functions ...
-        
         function nav(id) {
             document.querySelectorAll('section').forEach(s=>s.classList.add('hidden'));
             document.getElementById('view-'+id).classList.remove('hidden');
@@ -561,7 +592,6 @@
             const nameA = m.teamA ? `<span class="${sA>sB?'text-[#ff4655]':'text-gray-200'}">${m.teamA.shortName}</span>` : getSmartTBD(m._id, 'teamA');
             const nameB = m.teamB ? `<span class="${sB>sA?'text-[#ff4655]':'text-gray-200'}">${m.teamB.shortName}</span>` : getSmartTBD(m._id, 'teamB');
 
-            // [NEW] Match Number Formatting (e.g., #001)
             const matchNumStr = m.matchNumber ? `#${String(m.matchNumber).padStart(3, '0')}` : '';
 
             return `
@@ -591,18 +621,67 @@
             </div>`;
         }
 
+        // --- UPDATED RENDER STRUCTURE WITH TABS ---
         function renderStructure(tourneys, matches) {
             const list = document.getElementById('stageList');
-            if(!tourneys.length) { document.getElementById('mainTourneyHeader').innerHTML = `<div class="text-center w-full"><h3 class="text-base text-gray-500 font-bold">NO SYSTEM INITIALIZED</h3><button onclick="openModal('createTourneyModal'); renderMapCheckboxes('create');" class="btn-val px-6 py-2 rounded mt-3 text-xs font-bold">CREATE NEW SYSTEM</button></div>`; list.innerHTML = ''; return; }
-            const t = tourneys[0]; activeTourneyData = t; 
+            if(!tourneys.length) { 
+                document.getElementById('mainTourneyHeader').innerHTML = `<div class="text-center w-full py-10"><div class="text-[#ff4655] text-5xl mb-4"><i class="fa-solid fa-server"></i></div><h3 class="text-xl text-white font-header">SYSTEM UNINITIALIZED</h3><button onclick="openModal('createTourneyModal'); renderMapCheckboxes('create');" class="btn-val px-8 py-3 rounded mt-6 text-sm font-bold tracking-widest">INITIALIZE NEW TOURNAMENT</button></div>`; 
+                list.innerHTML = ''; 
+                return; 
+            }
             
-            document.getElementById('mainTourneyHeader').innerHTML = `<div><div class="text-xs text-[#ff4655] font-bold uppercase mb-1 tracking-widest">Active System</div><div class="flex items-center gap-4"><h2 class="text-3xl font-header text-white">${t.name}</h2><button onclick="openTourneySettings('${t._id}', '${t.name}')" class="text-gray-500 hover:text-white transition text-lg"><i class="fa-solid fa-gear"></i></button></div></div><button onclick="openStageModal()" class="btn-val px-6 py-3 rounded text-xs font-bold shadow-lg shadow-red-900/10 tracking-widest"><i class="fa-solid fa-plus mr-2"></i> ADD STAGE</button>`;
+            const t = tourneys[0]; 
+            activeTourneyData = t; 
+            
+            // 1. Render Header & Tab Bar
+            let tabsHtml = t.stages.map((s, idx) => {
+                const isActive = idx === activeStageIndex;
+                return `<button onclick="activeStageIndex=${idx}; renderStructure([activeTourneyData], allMatches)" 
+                class="px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition shrink-0 ${isActive ? 'border-[#ff4655] text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300'}">
+                ${s.name}
+                </button>`;
+            }).join('');
 
-            list.innerHTML = t.stages.map((s, idx) => {
+            // Add Stage Button
+            tabsHtml += `<button onclick="openStageModal()" class="px-4 py-3 text-sm font-bold uppercase tracking-wider text-[#ff4655] hover:bg-[#ff4655]/10 transition ml-2"><i class="fa-solid fa-plus"></i></button>`;
+
+            document.getElementById('mainTourneyHeader').innerHTML = `
+                <div class="flex flex-col gap-6 w-full">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-[0.2em] mb-1">Active Protocol</div>
+                            <h2 class="text-4xl font-header text-white">${t.name}</h2>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="toggleBulkMode()" id="btnBulkMode" class="px-4 py-2 border border-[#333] text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-list-check mr-2"></i> Batch Mode</button>
+                            <button onclick="openTourneySettings('${t._id}', '${t.name}')" class="px-4 py-2 border border-[#333] hover:border-white text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-gear mr-2"></i> Settings</button>
+                        </div>
+                    </div>
+                    <div class="flex border-b border-[#333] w-full overflow-x-auto custom-scroll">
+                        ${tabsHtml}
+                    </div>
+                </div>
+            `;
+
+            // 2. Render Content (Only active stage)
+            if (t.stages.length > 0 && t.stages[activeStageIndex]) {
+                const s = t.stages[activeStageIndex];
                 const ms = s.matches.map(mid => matches.find(x=>x._id===mid)).filter(x=>x);
-                let swissBtn = '';
-                if (s.type === 'swiss') swissBtn = `<button onclick="generateSwissNext('${t._id}', ${idx})" class="text-[10px] bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-600/40 px-3 py-1.5 rounded font-bold uppercase tracking-widest transition flex items-center gap-2"><i class="fa-solid fa-shuffle"></i> Generate Next</button>`;
                 
+                let contentHtml = '';
+                let swissBtn = '';
+                if (s.type === 'swiss') swissBtn = `<button onclick="generateSwissNext('${t._id}', ${activeStageIndex})" class="btn-val px-4 py-2 rounded text-[10px] font-bold ml-4">GENERATE ROUND</button>`;
+
+                const stageControls = `
+                    <div class="flex justify-between items-center mb-6 bg-[#1a1d21] p-4 rounded border border-[#2d3139]">
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Type: <span class="text-white">${s.type.replace('_',' ')}</span></span>
+                            ${swissBtn}
+                        </div>
+                        <button onclick="deleteStage('${t._id}', ${activeStageIndex})" class="text-red-500 hover:text-red-400 text-xs font-bold uppercase"><i class="fa-solid fa-trash mr-2"></i> Delete Stage</button>
+                    </div>
+                `;
+
                 if (s.type === 'round_robin' || s.type === 'swiss') {
                     const standings = calculateStandings(ms, s.stageParticipants);
                     const standingsHtml = standings.map((st, i) => `<tr><td class="font-mono text-center text-gray-600 border-r border-[#222]">${i+1}</td><td class="font-bold text-white">${st.name}</td><td class="text-center">${st.played}</td><td class="text-center font-bold text-green-400">${st.wins}</td><td class="text-center text-red-400">${st.losses}</td><td class="text-center font-mono text-gray-300 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td><td class="text-center font-mono ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td><td class="text-center font-mono text-gray-500 border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td></tr>`).join('');
@@ -613,7 +692,7 @@
                         return `<div class="mb-6"><div class="flex justify-between items-center bg-[#1a1d21] p-2 rounded mb-3 border border-[#2d3139]"><span class="text-xs font-bold text-[#ff4655] uppercase tracking-widest pl-2">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-xs bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
                     }).join('');
                     
-                    return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden mb-10 shadow-xl"><div class="p-4 bg-[#1a1d21] flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-4"><h4 class="font-header text-xl text-white uppercase">${s.name} <span class="ml-2 text-[10px] bg-[#333] px-2 py-0.5 rounded text-gray-400 align-middle">${s.type.replace('_',' ')}</span></h4>${swissBtn}</div><button onclick="deleteStage('${t._id}', ${idx})" class="text-gray-600 hover:text-red-500 px-2 transition"><i class="fa-solid fa-trash text-sm"></i></button></div><div class="grid grid-cols-1 lg:grid-cols-12"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto"><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${standingsHtml}</tbody></table></div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto"><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${standingsHtml}</tbody></table></div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
                 }
                 else {
                     const upper = [], lower = [], final = [];
@@ -629,9 +708,13 @@
                         return `<div class="mb-8"><div class="text-xs font-bold text-[#ff4655] uppercase tracking-widest mb-4 pl-1 border-l-4 border-[#ff4655] py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container custom-scroll">${columnsHtml}</div></div>`;
                     };
                     let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333]"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => renderMatchCard(m)).join('')}</div></div>`; }
-                    return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden mb-10 shadow-xl"><div class="p-4 bg-[#1a1d21] flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-3"><h4 class="font-header text-xl text-white uppercase">${s.name} <span class="ml-2 text-[10px] bg-[#333] px-2 py-0.5 rounded text-gray-400 align-middle">${s.type.replace('_',' ')}</span></h4></div><button onclick="deleteStage('${t._id}', ${idx})" class="text-gray-600 hover:text-red-500 px-2 transition"><i class="fa-solid fa-trash text-sm"></i></button></div><div class="p-8 overflow-x-auto">${renderSection(upper, "Upper Bracket")}${renderSection(lower, "Lower Bracket")}${finalHtml}</div></div>`;
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto">${renderSection(upper, "Upper Bracket")}${renderSection(lower, "Lower Bracket")}${finalHtml}</div></div>`;
                 }
-            }).join('');
+
+                list.innerHTML = contentHtml;
+            } else {
+                list.innerHTML = `<div class="p-20 text-center text-gray-500 italic border-2 border-dashed border-[#333] rounded-lg mt-4">No stages found. Create one to begin.</div>`;
+            }
         }
 
         function openRoundScheduler(ids) { pendingRoundScheduleMatches = ids.split(','); document.getElementById('rsCount').innerText = pendingRoundScheduleMatches.length; openModal('roundSchedulerModal'); }
@@ -663,41 +746,61 @@
         function renderDashboard(matches) {
             const query = document.getElementById('dashSearch')?.value.toLowerCase() || '';
             const live = matches.filter(m => (m.status === 'live' || m.status === 'scheduled') && (m.name.toLowerCase().includes(query) || m.teamA?.name.toLowerCase().includes(query)));
-            document.getElementById('liveMatches').innerHTML = live.map(m => renderMatchCard(m)).join('') || '<div class="col-span-3 text-center text-gray-600 text-sm italic py-10">No active matches found</div>';
+            document.getElementById('liveMatches').innerHTML = live.map(m => renderMatchCard(m)).join('') || '<div class="col-span-4 text-center text-gray-600 text-sm italic py-10 bg-[#15171a] rounded border border-[#2d3139]">No active matches found</div>';
         }
+        
+        // --- UPDATED RENDER TEAMS WITH CARD STYLE ---
         function renderTeams(t){
             const pendingCount = t.filter(x => x.status === 'pending').length; const nameChangeCount = t.filter(x => x.members.some(m => m.pendingUpdate)).length; const totalAction = pendingCount + nameChangeCount;
             const badge = document.getElementById('navBadgeTeams'); if (totalAction > 0) { badge.innerText = totalAction; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
-            document.getElementById('teamGrid').innerHTML = t.map(x => {
-                const isPending = x.status === 'pending'; const hasNameChange = x.members.some(m => m.pendingUpdate);
-                return `<div class="bg-[#15171a] p-5 border border-[#2d3139] flex justify-between items-center hover:border-gray-500 transition rounded-lg relative overflow-hidden">
-                    ${isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 animate-pulse"></div>' : ''}
-                    ${hasNameChange && !isPending ? '<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>' : ''}
+            
+            const query = document.getElementById('teamSearch')?.value.toLowerCase() || '';
+            const filtered = t.filter(x => x.name.toLowerCase().includes(query) || x.shortName.toLowerCase().includes(query));
+
+            document.getElementById('teamGrid').innerHTML = filtered.map(x => {
+                const isPending = x.status === 'pending'; 
+                const hasNameChange = x.members.some(m => m.pendingUpdate);
+                
+                return `
+                <div class="bg-[#15171a] p-0 border border-[#2d3139] rounded-lg relative overflow-hidden group team-card-hover transition duration-200">
+                    ${isPending ? '<div class="status-indicator bg-yellow-500 animate-pulse"></div>' : ''}
+                    ${hasNameChange && !isPending ? '<div class="status-indicator bg-orange-500"></div>' : ''}
                     
-                    <div class="flex items-center gap-5">
-                        <img src="${x.logo||DEFAULT_LOGO}" class="w-12 h-12 rounded bg-black object-cover border border-[#333]">
-                        <div onclick="openRosterModal('${x._id}')" class="cursor-pointer group">
-                            <div class="flex items-center gap-3">
-                                <div class="font-bold text-lg text-white group-hover:text-[#ff4655] transition">${x.name}</div>
-                                ${isPending ? '<span class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-500/30 font-bold uppercase tracking-widest">PENDING</span>' : ''}
-                                ${hasNameChange ? '<span class="text-[10px] bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30 font-bold uppercase tracking-widest">NAME CHANGE</span>' : ''}
+                    <div class="p-5 flex items-start justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded bg-[#0f1113] border border-[#333] overflow-hidden flex-shrink-0">
+                                <img src="${x.logo||DEFAULT_LOGO}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition">
                             </div>
-                            <div class="text-sm text-gray-400 font-mono mt-1">TAG: ${x.shortName} <span class="mx-2 text-gray-600">|</span> <span class="text-gray-500">${x.members.length} Members</span></div>
+                            <div onclick="openRosterModal('${x._id}')" class="cursor-pointer">
+                                <h4 class="font-header text-xl text-white group-hover:text-[#ff4655] transition leading-none mb-1">${x.name}</h4>
+                                <div class="flex items-center gap-2 text-xs font-mono text-gray-500">
+                                    <span class="bg-[#222] px-1.5 rounded text-gray-300 border border-[#333]">${x.shortName}</span>
+                                    <span>•</span>
+                                    <span>${x.members.length} Players</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-[#15171a] pl-2">
+                            ${isPending ? `<button onclick="approveTeam('${x._id}')" class="text-green-500 hover:bg-green-500/10 p-2 rounded"><i class="fa-solid fa-check"></i></button>` : ''}
+                            
+                            <button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="text-gray-400 hover:text-white p-2 rounded hover:bg-[#222]"><i class="fa-solid fa-pen"></i></button>
+                            
+                            <button onclick="resetTeamPassword('${x._id}', '${x.name}')" class="text-yellow-500 hover:text-yellow-300 p-2 rounded hover:bg-yellow-500/10"><i class="fa-solid fa-key"></i></button>
+
+                            <button onclick="deleteTeam('${x._id}')" class="text-gray-600 hover:text-red-500 p-2 rounded hover:bg-red-500/10"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>
-
-                    <div class="flex items-center gap-3">
-                        ${isPending ? `<button onclick="approveTeam('${x._id}')" class="w-10 h-10 rounded bg-green-500/10 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white transition flex items-center justify-center shadow-lg"><i class="fa-solid fa-check"></i></button>` : ''}
-                        
-                        <button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="w-10 h-10 rounded bg-[#222] border border-[#333] text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center"><i class="fa-solid fa-pen text-sm"></i></button>
-                        
-                        <button onclick="resetTeamPassword('${x._id}', '${x.name}')" class="w-10 h-10 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500 hover:text-black transition flex items-center justify-center" title="Reset Password"><i class="fa-solid fa-key text-sm"></i></button>
-                        
-                        <button onclick="deleteTeam('${x._id}')" class="w-10 h-10 rounded bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center"><i class="fa-solid fa-trash text-sm"></i></button>
-                    </div>
+                    
+                    ${(isPending || hasNameChange) ? `
+                    <div class="px-5 py-2 bg-[#1a1d21] border-t border-[#222] flex gap-2">
+                        ${isPending ? '<span class="text-[9px] font-bold text-yellow-500 uppercase tracking-wider"><i class="fa-solid fa-circle-exclamation mr-1"></i> Awaiting Approval</span>' : ''}
+                        ${hasNameChange ? '<span class="text-[9px] font-bold text-orange-500 uppercase tracking-wider"><i class="fa-solid fa-pen-nib mr-1"></i> Name Change Req</span>' : ''}
+                    </div>` : ''}
                 </div>`;
             }).join('');
         }
+
         function renderRequests(matches) {
             const pending = matches.filter(m => m.status === 'pending_approval'); const el = document.getElementById('pendingScores'); const badge = document.getElementById('navBadgeReq');
             if(pending.length > 0) { badge.innerText = pending.length; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
@@ -818,22 +921,17 @@
             closeModal(); init(); showToast('Match Saved');
         }
 
-        // --- [UPDATED] IMPROVED MAP SELECTOR LOGIC WITH IMAGES ---
         function renderMapCheckboxes(ctx, preselected = []) {
             const id = ctx === 'create' ? 'createMapPoolList' : 'editMapPoolList';
             const countId = ctx === 'create' ? 'count-create' : 'count-edit';
             const container = document.getElementById(id);
             if(!container) return; 
             
-            // Generate HTML for map cards
             container.innerHTML = ALL_MAPS.map(m => {
                 let isChecked = false;
-                // Create mode: Use Default Pool (7 maps)
                 if (ctx === 'create') isChecked = COMPETITIVE_POOL.includes(m);
-                // Edit mode: Use saved data
                 else isChecked = preselected.includes(m);
                 
-                // Use Map Image or Fallback
                 const bgImg = MAP_IMAGES[m] || MAP_IMAGES['Abyss'];
 
                 return `
@@ -852,18 +950,14 @@
             const container = el.parentElement;
             const currentCount = container.querySelectorAll('input:checked').length;
             
-            // Logic: Force limit 7
             if (!checkbox.checked) {
-                // ถ้าจะติ๊กเพิ่ม แต่ครบ 7 แล้ว -> ห้ามติ๊ก
                 if (currentCount >= 7) {
                     showToast("Map Pool Limited to 7 Maps", 'error');
-                    // Effect shake/warn could be added here
                     return;
                 }
                 checkbox.checked = true;
                 el.classList.add('selected');
             } else {
-                // เอาออกได้เสมอ
                 checkbox.checked = false;
                 el.classList.remove('selected');
             }
@@ -880,13 +974,9 @@
             const checkboxes = container.querySelectorAll('input');
             const checkedCount = container.querySelectorAll('input:checked').length;
             
-            // Update Counter Text
             countEl.innerText = `${checkedCount}/7`;
-            countEl.className = checkedCount === 7 
-                ? "text-xs font-mono font-bold text-[#22c55e]" // Green if complete
-                : "text-xs font-mono font-bold text-[#ff4655]"; // Red if incomplete
+            countEl.className = checkedCount === 7 ? "text-xs font-mono font-bold text-[#22c55e]" : "text-xs font-mono font-bold text-[#ff4655]";
             
-            // Disable unselected options if limit reached
             const options = container.querySelectorAll('.map-option');
             options.forEach(opt => {
                 const cb = opt.querySelector('input');
@@ -899,20 +989,13 @@
             });
         }
 
-        // --- UPDATED ACTIONS WITH VALIDATION ---
-        
         async function createTournament() { 
             const name = document.getElementById('tnName').value; 
             if(!name) return showToast("Name is required", 'error');
-
             const approvedTeams = allTeams.filter(t=>t.status==='approved');
             if(approvedTeams.length < 2) return showToast("Need at least 2 approved teams!", 'error');
-
             const selectedMaps = Array.from(document.querySelectorAll('.chk-map-create:checked')).map(c => c.value);
-            
-            // [VALIDATION] Force exactly 7 maps
             if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
-
             await fetch('/api/tournaments', {
                 method:'POST', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
@@ -925,10 +1008,7 @@
             const id = document.getElementById('tsId').value;
             const name = document.getElementById('tsName').value; 
             const selectedMaps = Array.from(document.querySelectorAll('.chk-map-edit:checked')).map(c => c.value);
-            
-            // [VALIDATION] Force exactly 7 maps
             if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
-
             await fetch(`/api/tournaments/${id}`, {
                 method:'PUT', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
@@ -937,7 +1017,6 @@
             closeModal(); init(); showToast('System Updated'); 
         }
 
-        
         function openTourneySettings(id, name) { 
             document.getElementById('tsId').value = id; 
             document.getElementById('tsName').value = name; 
@@ -959,49 +1038,24 @@
             const id = document.getElementById('teId').value;
             const name = document.getElementById('teName').value;
             const shortName = document.getElementById('teShort').value;
-
             if(!name || !shortName) return showToast('Please fill all fields', 'error');
-
-            const res = await fetch(`/api/teams/${id}`, {
-                method: 'PUT',
-                headers: { 'Authorization': token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, shortName })
-            });
-            
+            const res = await fetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName }) });
             const data = await res.json();
-            
-            if (res.ok && data.success) {
-                showToast('Team Updated Successfully');
-                closeModal();
-                init(); // Refresh Grid
-            } else {
-                showToast(data.msg || 'Update Failed', 'error');
-            }
+            if (res.ok && data.success) { showToast('Team Updated Successfully'); closeModal(); init(); } else { showToast(data.msg || 'Update Failed', 'error'); }
         }
         async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
         async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
         async function resetTeamPassword(id, name) {
             const newPass = prompt(`Enter NEW Password for team: ${name}`);
-            if (!newPass) return; // ถ้ากด Cancel หรือไม่ใส่ ก็จบ
-
-            const res = await fetch(`/api/teams/${id}/reset-password`, {
-                method: 'PUT',
-                headers: { 'Authorization': token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ newPassword: newPass })
-            });
-
+            if (!newPass) return;
+            const res = await fetch(`/api/teams/${id}/reset-password`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: newPass }) });
             const data = await res.json();
-            if (res.ok) {
-                showToast(`Password for ${name} changed!`);
-            } else {
-                showToast(data.msg || 'Error', 'error');
-            }
+            if (res.ok) { showToast(`Password for ${name} changed!`); } else { showToast(data.msg || 'Error', 'error'); }
         }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
         function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
         async function generateStage() { 
             const sourceIdx = parseInt(document.getElementById('stSourceSelect').value);
-            
             const body = { 
                 name: document.getElementById('stName').value, 
                 type: document.getElementById('stType').value, 
@@ -1011,14 +1065,11 @@
                     roundCount: parseInt(document.getElementById('stRoundCount').value) || 1, 
                     randomize: document.getElementById('stRandom').checked,
                     hasThirdPlace: document.getElementById('stThirdPlace').checked,
-                    
-                    // Advanced Settings
                     sourceStageIndex: sourceIdx,
                     advanceCount: parseInt(document.getElementById('stAdvanceCount').value) || 4,
                     advanceMethod: document.getElementById('stAdvanceMethod').value
                 } 
             }; 
-
             await fetch(`/api/tournaments/${activeTourneyData._id}/stages/generate`, {
                 method:'POST', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
@@ -1027,11 +1078,8 @@
             closeModal(); init(); 
         }
 
-        // Initialize Render with Default Checks
-        document.addEventListener('DOMContentLoaded', () => {
-             renderMapCheckboxes('create');
-        });
-
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => { renderMapCheckboxes('create'); });
         init();
     </script>
 </body>
