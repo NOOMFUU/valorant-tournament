@@ -139,6 +139,13 @@
         }
         
         .map-option.disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
+
+        /* Drag & Drop */
+        .drag-over { background-color: rgba(255, 255, 255, 0.05) !important; border: 2px dashed #666 !important; }
+        .draggable-item { cursor: grab; user-select: none; }
+        .draggable-item:active { cursor: grabbing; }
+        .dragging { opacity: 0.5; }
+        .drag-over-item { border-top: 2px solid #ff4655 !important; background: rgba(255, 70, 85, 0.1); }
     </style>
 </head>
 <body class="flex h-screen w-full">
@@ -170,6 +177,9 @@
             <button onclick="nav('teams')" id="nav-teams" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-users-gear w-5 text-center"></i> TEAMS
                 <span id="navBadgeTeams" class="nav-badge hidden">0</span>
+            </button>
+            <button onclick="nav('logs')" id="nav-logs" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+                <i class="fa-solid fa-clipboard-list w-5 text-center"></i> LOGS
             </button>
         </nav>
 
@@ -226,6 +236,36 @@
             </header>
 
             <section id="view-dashboard" class="animate-slide-up space-y-6">
+                <!-- SYSTEM VITALS -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">CPU Load</span>
+                        <div class="flex items-end gap-2 mt-1 z-10">
+                            <span class="text-3xl text-white font-header" id="sys-cpu">0%</span>
+                            <div class="w-full bg-[#333] h-1.5 rounded-full mb-2"><div id="sys-cpu-bar" class="bg-[#ff4655] h-full rounded-full transition-all duration-500" style="width: 0%"></div></div>
+                        </div>
+                        <i class="fa-solid fa-microchip absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
+                    </div>
+                    <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">Memory Usage</span>
+                        <span class="text-3xl text-white font-header mt-1 z-10" id="sys-ram">0 GB</span>
+                        <span class="text-[9px] text-gray-500 z-10">System Free: <span id="sys-ram-free" class="text-gray-300">0 GB</span></span>
+                        <i class="fa-solid fa-memory absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
+                    </div>
+                    <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">Concurrent Users</span>
+                        <span class="text-3xl text-white font-header mt-1 z-10" id="sys-con">0</span>
+                        <span class="text-[9px] text-gray-500 z-10">Active Connections</span>
+                        <i class="fa-solid fa-users absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
+                    </div>
+                    <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">System Uptime</span>
+                        <span class="text-3xl text-white font-header mt-1 z-10" id="sys-uptime">0h 0m</span>
+                        <span class="text-[9px] text-gray-500 z-10">Server Status: <span class="text-green-500 font-bold">ONLINE</span></span>
+                        <i class="fa-solid fa-clock absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                     <div class="md:col-span-8 bg-[#15171a] border border-[#ff4655] rounded-lg p-6 relative overflow-hidden group shadow-lg shadow-red-900/10">
                         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
@@ -299,13 +339,48 @@
 
             <section id="view-teams" class="hidden animate-slide-up space-y-8">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6 bg-[#15171a] p-6 rounded-lg border border-[#2d3139]">
-                    <h2 class="text-2xl font-header text-white">REGISTERED TEAMS</h2>
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-header text-white">REGISTERED TEAMS</h2>
+                        <button onclick="resetTeamStats()" class="px-3 py-1.5 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Reset Wins/Losses for ALL teams">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset W/L
+                        </button>
+                        <button onclick="document.getElementById('csvInput').click()" class="px-3 py-1.5 border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Import Teams (CSV)">
+                            <i class="fa-solid fa-file-csv mr-1"></i> Import CSV
+                        </button>
+                        <button onclick="downloadCsvTemplate()" class="px-3 py-1.5 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Download CSV Template">
+                            <i class="fa-solid fa-file-arrow-down mr-1"></i> Template
+                        </button>
+                        <input type="file" id="csvInput" class="hidden" accept=".csv" onchange="importTeamsCSV(this)">
+                    </div>
                     <div class="relative w-full md:w-80">
                         <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
                         <input type="text" id="teamSearch" oninput="renderTeams(allTeams)" placeholder="Search team..." class="w-full bg-[#0f1113] border border-[#2d3139] pl-10 pr-4 py-3 rounded text-sm focus:border-[#ff4655] outline-none transition text-white placeholder-gray-500">
                     </div>
                 </div>
                 <div id="teamGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            </section>
+
+            <section id="view-logs" class="hidden animate-slide-up space-y-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/30 text-xl"><i class="fa-solid fa-clipboard-list"></i></div>
+                        <div><h3 class="text-2xl font-header text-white">SYSTEM LOGS</h3><p class="text-xs text-gray-500 font-bold uppercase">Audit Trail & Actions</p></div>
+                    </div>
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                        <input id="logSearch" oninput="filterLogs()" placeholder="Search logs..." class="bg-[#0f1113] border border-[#2d3139] text-sm pl-9 pr-4 py-2 rounded text-white focus:border-blue-500 outline-none w-64 placeholder-gray-600 font-mono transition-colors">
+                    </div>
+                </div>
+                <div class="bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-[#1a1d21] border-b border-[#2d3139]">
+                                <tr><th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Time</th><th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Admin</th><th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th><th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Target</th><th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Details</th></tr>
+                            </thead>
+                            <tbody id="logsList" class="text-sm text-gray-300"></tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
         </div>
     </main>
@@ -388,6 +463,16 @@
                             <label for="stRandom" class="text-xs text-gray-300 select-none">Randomize Seeding</label>
                         </div>
 
+                        <!-- Round Robin Specifics -->
+                        <div id="stRRSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-gray-500 font-bold uppercase">Group Size</label>
+                                <input type="number" id="stGroupSize" value="4" min="2" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
+                            </div>
+                            <p class="text-[9px] text-gray-600 italic">Teams will be split into groups of this size.</p>
+                        </div>
+
+                        <!-- Elim Specifics -->
                         <div id="stThirdPlaceContainer" class="flex items-center gap-2">
                             <input type="checkbox" id="stThirdPlace" class="accent-[#ff4655] w-4 h-4">
                             <label for="stThirdPlace" class="text-xs text-gray-300 select-none">Create 3rd Place Match</label>
@@ -396,42 +481,30 @@
                 </div>
 
                 <div class="p-4 bg-[#0f1113] border border-[#2d3139] rounded relative">
-                    <div class="flex justify-between items-center mb-3">
-                        <label class="text-xs text-[#ff4655] font-bold uppercase">Participants Source</label>
-                        <select id="stSourceSelect" onchange="toggleSourceMode()" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-1 rounded">
-                            <option value="-1">Manual Selection (Drag & Drop)</option>
+                    <div class="flex flex-col gap-3 mb-4 border-b border-[#333] pb-4">
+                        <label class="text-xs text-[#ff4655] font-bold uppercase">Import Participants (Optional)</label>
+                        <div class="flex gap-2">
+                            <select id="impStage" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none"></select>
+                            <select id="impType" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none" onchange="toggleImpInput()">
+                                <option value="all">All Participants</option>
+                                <option value="top_n">Top N (Standings)</option>
+                                <option value="gsl">GSL Qualified (Top 2)</option>
                             </select>
+                            <input type="number" id="impCount" value="4" class="w-16 bg-[#1a1d21] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500" placeholder="N">
+                            <button onclick="runImport()" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
+                        </div>
                     </div>
 
                     <div id="manualSelectUI" class="grid grid-cols-2 gap-6 h-[200px]">
                         <div class="flex flex-col bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
-                            <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between"><span>Pool</span><span id="availCount">0</span></div>
-                            <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll"></div>
+                            <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between items-center"><span>Pool</span><span id="availCount">0</span></div>
+                            <div class="px-2 py-1 border-b border-[#333]"><input id="poolSearch" oninput="renderStageLists()" class="w-full bg-[#0f1113] border border-[#333] text-[10px] px-2 py-1 rounded text-white focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Search team..."></div>
+                            <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'pool')"></div>
                         </div>
                         <div class="flex flex-col bg-[#1a1d21] border border-[#ff4655]/30 rounded overflow-hidden">
                             <div class="p-2 bg-[#222] text-xs font-bold text-[#ff4655] uppercase flex justify-between"><span>Selected</span><span id="selCount">0</span></div>
-                            <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll"></div>
+                            <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'selected')"></div>
                             <button onclick="clearStageSelection()" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
-                        </div>
-                    </div>
-                    
-                    <div id="autoSourceUI" class="hidden h-[200px] flex flex-col items-center justify-center text-gray-500 text-sm">
-                        <div class="text-center space-y-4">
-                            <p class="italic text-gray-400">Teams will be imported automatically from the previous stage.</p>
-                            
-                            <div class="flex items-center gap-4 bg-[#1a1d21] p-3 rounded border border-[#333]">
-                                <div>
-                                    <label class="text-[10px] font-bold uppercase block mb-1">Seeding Logic</label>
-                                    <select id="stAdvanceMethod" class="bg-[#0f1113] text-white border border-[#333] text-xs p-1 rounded">
-                                        <option value="top_standing">Top Standings (Simple)</option>
-                                        <option value="cross_group">Cross Group (A1 vs B2)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold uppercase block mb-1">Total Teams</label>
-                                    <input type="number" id="stAdvanceCount" value="4" class="w-16 bg-[#0f1113] border border-[#333] text-white text-center p-1 rounded">
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -483,6 +556,10 @@
              <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="teId"><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Team Name</label><input id="teName" class="w-full input-dark text-base"></div><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tag (Short Name)</label><input id="teShort" class="w-full input-dark text-base uppercase"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Wins</label><input type="number" id="teWins" class="w-full input-dark text-base"></div>
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Losses</label><input type="number" id="teLosses" class="w-full input-dark text-base"></div>
+                </div>
                 <button onclick="saveTeamEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm mt-2">SAVE CHANGES</button>
             </div>
         </div>
@@ -519,10 +596,11 @@
         const token = localStorage.getItem('token');
         if(!token) location.href='/login.html';
         
-        let allTeams=[], allMatches=[], activeMatchId, activeTourneyData, pendingRoundScheduleMatches=[];
+        let allTeams=[], allMatches=[], allLogs=[], activeMatchId, activeTourneyData, pendingRoundScheduleMatches=[];
         let selectedMatches = new Set();
         let stagePool = [], stageSelected = [];
         let bulkMode = false;
+        let compactMode = false;
         let activeStageIndex = 0; // NEW: For Tab System
 
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
@@ -530,6 +608,21 @@
         socket.on('match_update', ()=>init(true));
         socket.on('bracket_update', ()=>init(true));
         socket.on('teams_update', ()=>init(true)); 
+        
+        socket.on('system_stats', (d) => {
+            // CPU
+            document.getElementById('sys-cpu').innerText = d.cpu + '%';
+            document.getElementById('sys-cpu-bar').style.width = d.cpu + '%';
+            // RAM
+            const usedGB = ((d.mem.sysTotal - d.mem.sysFree) / 1024 / 1024 / 1024).toFixed(1);
+            const freeGB = (d.mem.sysFree / 1024 / 1024 / 1024).toFixed(1);
+            document.getElementById('sys-ram').innerText = usedGB + ' GB';
+            document.getElementById('sys-ram-free').innerText = freeGB + ' GB';
+            // Users & Uptime
+            document.getElementById('sys-con').innerText = d.concurrent;
+            const h = Math.floor(d.uptime / 3600); const m = Math.floor((d.uptime % 3600) / 60);
+            document.getElementById('sys-uptime').innerText = `${h}h ${m}m`;
+        });
         
         socket.on('notification', (data) => {
             const msg = data.message || data.msg || 'Update Received';
@@ -540,20 +633,25 @@
         async function init(silent=false) {
             try {
                 const ts = Date.now();
-                const [rT, rM, rTr] = await Promise.all([
-                    fetch(`/api/teams?t=${ts}`), fetch(`/api/matches?t=${ts}`), fetch(`/api/tournaments?t=${ts}`)
+                const [rT, rM, rTr, rL] = await Promise.all([
+                    fetch(`/api/teams?t=${ts}`), 
+                    fetch(`/api/matches?t=${ts}`), 
+                    fetch(`/api/tournaments?t=${ts}`),
+                    fetch(`/api/admin/logs?t=${ts}`, { headers: { 'Authorization': token } })
                 ]);
                 
                 if(rT.status === 401) { logout(); return; }
                 allTeams = await rT.json();
                 allMatches = await rM.json();
                 const tourneys = await rTr.json();
+                allLogs = rL.ok ? await rL.json() : [];
                 
                 updateStats(allTeams, allMatches);
                 renderDashboard(allMatches); 
                 renderRequests(allMatches);
                 renderTeams(allTeams); 
                 renderStructure(tourneys, allMatches);
+                filterLogs();
                 
                 if(!silent) {
                     const lastView = localStorage.getItem('currentView') || 'dashboard';
@@ -589,34 +687,64 @@
             const timeStr = dateObj ? dateObj.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : 'TBA';
             const dateStr = dateObj ? dateObj.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'}) : '';
             const isLive = m.status === 'live';
+
+            if (compactMode) {
+                return `
+                <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-2 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655]':'border-[#2d3139] hover:border-gray-400')} relative transition group cursor-pointer w-full shadow-sm text-xs">
+                    ${check}
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${isLive ? 'LIVE' : m.status.substring(0,3)}</span>
+                        <span class="text-[9px] font-mono text-gray-500">${timeStr}</span>
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <div class="flex justify-between items-center font-medium ${sA>sB?'text-white':'text-gray-400'}">
+                            <span class="truncate max-w-[100px]">${m.teamA ? m.teamA.shortName : 'TBD'}</span>
+                            <span class="font-mono ${sA>sB?'text-[#ff4655]':''}">${sA}</span>
+                        </div>
+                        <div class="flex justify-between items-center font-medium ${sB>sA?'text-white':'text-gray-400'}">
+                            <span class="truncate max-w-[100px]">${m.teamB ? m.teamB.shortName : 'TBD'}</span>
+                            <span class="font-mono ${sB>sA?'text-[#ff4655]':''}">${sB}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
             const nameA = m.teamA ? `<span class="${sA>sB?'text-[#ff4655]':'text-gray-200'}">${m.teamA.shortName}</span>` : getSmartTBD(m._id, 'teamA');
             const nameB = m.teamB ? `<span class="${sB>sA?'text-[#ff4655]':'text-gray-200'}">${m.teamB.shortName}</span>` : getSmartTBD(m._id, 'teamB');
 
             const matchNumStr = m.matchNumber ? `#${String(m.matchNumber).padStart(3, '0')}` : '';
+            
+            // Progression
+            const getShortName = (id) => {
+                const t = allMatches.find(x => x._id === id);
+                return t ? t.name.replace(/Upper Bracket|UB/gi, 'UB').replace(/Lower Bracket|LB/gi, 'LB').replace(/Round /gi, 'R') : '';
+            };
+            const nextWin = m.nextMatchId ? getShortName(m.nextMatchId) : null;
+            const nextLose = m.loserMatchId ? getShortName(m.loserMatchId) : null;
 
             return `
-            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#0f1113] p-4 rounded-md border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655] shadow-lg shadow-red-900/20':'border-[#333] hover:border-gray-400')} relative transition group cursor-pointer w-full">
+            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-3 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655]':'border-[#2d3139] hover:border-gray-400')} relative transition group cursor-pointer w-full shadow-sm">
                 ${check}
-                <div class="flex justify-between text-[10px] text-gray-500 font-bold uppercase mb-3 pl-1">
-                    <div class="truncate pr-2 tracking-wider flex items-center gap-2">
-                        <span class="text-[#ff4655] font-mono">${matchNumStr}</span>
-                        <span>${m.name}</span>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${isLive ? 'LIVE' : m.status}</span>
+                    <span class="text-[10px] font-mono text-gray-500">${timeStr}</span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between items-center text-sm font-medium ${sA>sB?'text-white':'text-gray-400'}">
+                        <span>${m.teamA ? m.teamA.shortName : 'TBD'}</span>
+                        <span class="font-mono ${sA>sB?'text-[#ff4655]':''}">${sA}</span>
                     </div>
-                    <span class="${isLive?'text-[#ff4655] animate-pulse':''}">${m.status}</span>
-                </div>
-                <div class="flex justify-between items-center font-bold text-sm mb-1.5 px-2 py-1.5 rounded ${sA>sB?'bg-white/5':''}">
-                    <div class="truncate flex-1 flex items-center gap-2">${nameA}</div>
-                    <span class="font-mono text-white text-base pl-3">${sA}</span>
-                </div>
-                <div class="flex justify-between items-center font-bold text-sm px-2 py-1.5 rounded ${sB>sA?'bg-white/5':''}">
-                    <div class="truncate flex-1 flex items-center gap-2">${nameB}</div>
-                    <span class="font-mono text-white text-base pl-3">${sB}</span>
-                </div>
-                <div class="mt-3 pt-2 border-t border-[#222] flex justify-between items-center">
-                    <div class="text-[10px] font-mono text-gray-500 font-bold">${dateStr}</div>
-                    <div class="text-[11px] font-mono font-bold ${m.scheduledTime ? 'text-gray-300' : 'text-gray-600'} bg-[#1a1d21] px-2 py-1 rounded border border-[#2d3139] flex items-center gap-1">
-                        <i class="fa-regular fa-clock text-[9px]"></i> ${timeStr}
+                    <div class="flex justify-between items-center text-sm font-medium ${sB>sA?'text-white':'text-gray-400'}">
+                        <span>${m.teamB ? m.teamB.shortName : 'TBD'}</span>
+                        <span class="font-mono ${sB>sA?'text-[#ff4655]':''}">${sB}</span>
                     </div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-600 truncate">
+                    ${m.name}
+                    ${(nextWin||nextLose) ? `<div class="flex justify-between mt-1 font-mono text-[9px]">
+                        ${nextWin ? `<span class="text-green-500/70" title="Winner to ${nextWin}">W: ${nextWin}</span>` : '<span></span>'}
+                        ${nextLose ? `<span class="text-red-500/70" title="Loser to ${nextLose}">L: ${nextLose}</span>` : ''}
+                    </div>` : ''}
                 </div>
             </div>`;
         }
@@ -653,6 +781,7 @@
                             <h2 class="text-4xl font-header text-white">${t.name}</h2>
                         </div>
                         <div class="flex gap-2">
+                            <button onclick="toggleCompactMode()" id="btnCompactMode" class="px-4 py-2 border border-[#333] ${compactMode ? 'bg-[#ff4655] text-white border-[#ff4655]' : 'text-gray-400'} hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-compress mr-2"></i> Compact</button>
                             <button onclick="toggleBulkMode()" id="btnBulkMode" class="px-4 py-2 border border-[#333] text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-list-check mr-2"></i> Batch Mode</button>
                             <button onclick="openTourneySettings('${t._id}', '${t.name}')" class="px-4 py-2 border border-[#333] hover:border-white text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-gear mr-2"></i> Settings</button>
                         </div>
@@ -695,20 +824,34 @@
                     contentHtml = `<div class="animate-slide-up">${stageControls}<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto"><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${standingsHtml}</tbody></table></div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
                 }
                 else {
-                    const upper = [], lower = [], final = [];
-                    ms.forEach(m => { if(m.matchOrder === 999 || m.round === 999) final.push(m); else if(m.round >= 100) lower.push(m); else upper.push(m); });
-                    const renderSection = (matches, label) => {
+                    const upper = [], middle = [], lower = [], final = [];
+                    ms.forEach(m => { 
+                        if(m.matchOrder === 999 || m.round === 999) final.push(m); 
+                        else if(m.round >= 200) lower.push(m); 
+                        else if(m.round >= 100) middle.push(m); 
+                        else upper.push(m); 
+                    });
+                    const renderSection = (matches, label, color = 'border-[#ff4655]') => {
                         if(matches.length === 0) return '';
                         const rounds = {}; matches.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
                         const sortedRounds = Object.keys(rounds).sort((a,b) => parseInt(a)-parseInt(b));
                         const columnsHtml = sortedRounds.map(r => {
                             const roundMatches = rounds[r].sort((a,b) => a.matchOrder - b.matchOrder); const matchIds = roundMatches.map(m => m._id).join(',');
-                            return `<div class="bracket-round"><div class="bracket-header"><span>Round ${r >= 100 ? (r-100) + ' (LB)' : r}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col gap-4">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                            let displayRound = r;
+                            if (r >= 200) displayRound = r - 200; else if (r >= 100) displayRound = r - 100;
+                            const gapClass = compactMode ? 'gap-2' : 'gap-4';
+                            const widthStyle = compactMode ? 'min-width: 200px;' : '';
+                            return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>Round ${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col ${gapClass}">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
                         }).join('');
-                        return `<div class="mb-8"><div class="text-xs font-bold text-[#ff4655] uppercase tracking-widest mb-4 pl-1 border-l-4 border-[#ff4655] py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container custom-scroll">${columnsHtml}</div></div>`;
+                        return `<div class="mb-8"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container custom-scroll">${columnsHtml}</div></div>`;
                     };
                     let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333]"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => renderMatchCard(m)).join('')}</div></div>`; }
-                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto">${renderSection(upper, "Upper Bracket")}${renderSection(lower, "Lower Bracket")}${finalHtml}</div></div>`;
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto">
+                        ${renderSection(upper, "Upper Bracket", "border-[#ff4655]")}
+                        ${renderSection(middle, s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket", "border-[#dda828]")}
+                        ${renderSection(lower, "Last Chance Bracket", "border-[#00d4ff]")}
+                        ${finalHtml}
+                    </div></div>`;
                 }
 
                 list.innerHTML = contentHtml;
@@ -784,7 +927,7 @@
                         <div class="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-[#15171a] pl-2">
                             ${isPending ? `<button onclick="approveTeam('${x._id}')" class="text-green-500 hover:bg-green-500/10 p-2 rounded"><i class="fa-solid fa-check"></i></button>` : ''}
                             
-                            <button onclick="editTeam('${x._id}', '${x.name}', '${x.shortName}')" class="text-gray-400 hover:text-white p-2 rounded hover:bg-[#222]"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="editTeam('${x._id}')" class="text-gray-400 hover:text-white p-2 rounded hover:bg-[#222]"><i class="fa-solid fa-pen"></i></button>
                             
                             <button onclick="resetTeamPassword('${x._id}', '${x.name}')" class="text-yellow-500 hover:text-yellow-300 p-2 rounded hover:bg-yellow-500/10"><i class="fa-solid fa-key"></i></button>
 
@@ -799,6 +942,31 @@
                     </div>` : ''}
                 </div>`;
             }).join('');
+        }
+
+        function renderLogs(logs) {
+            const list = document.getElementById('logsList');
+            if(!list) return;
+            list.innerHTML = logs.map(l => `
+                <tr class="border-b border-[#2d3139] hover:bg-[#1a1d21] transition">
+                    <td class="p-4 font-mono text-xs text-gray-500 whitespace-nowrap">${new Date(l.createdAt).toLocaleString('th-TH')}</td>
+                    <td class="p-4 font-bold text-white">${l.adminUsername}</td>
+                    <td class="p-4"><span class="bg-[#222] border border-[#333] px-2 py-1 rounded text-[10px] font-bold uppercase text-[#ff4655]">${l.action}</span></td>
+                    <td class="p-4 text-gray-400">${l.target}</td>
+                    <td class="p-4 font-mono text-xs text-gray-500 truncate max-w-[200px]" title='${JSON.stringify(l.details)}'>${JSON.stringify(l.details)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function filterLogs() {
+            const el = document.getElementById('logSearch');
+            const query = el ? el.value.toLowerCase() : '';
+            const filtered = allLogs.filter(l => 
+                (l.adminUsername && l.adminUsername.toLowerCase().includes(query)) || 
+                (l.action && l.action.toLowerCase().includes(query)) ||
+                (l.target && l.target.toLowerCase().includes(query))
+            );
+            renderLogs(filtered);
         }
 
         function renderRequests(matches) {
@@ -817,6 +985,7 @@
         async function deleteMember(tid, mid) { if(!confirm("Kick Member?")) return; await fetch(`/api/teams/${tid}/members/${mid}`, { method: 'DELETE', headers: { 'Authorization': token } }); await init(true); openRosterModal(tid); showToast('Member Removed'); }
         
         function toggleBulkMode() { bulkMode = !bulkMode; const btn = document.getElementById('btnBulkMode'); if(bulkMode) { btn.classList.add('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.remove('text-gray-400'); } else { btn.classList.remove('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.add('text-gray-400'); selectedMatches.clear(); updateBulkUI(); } init(true); }
+        function toggleCompactMode() { compactMode = !compactMode; init(true); }
         function toggleMatchSelect(id) { if(selectedMatches.has(id)) selectedMatches.delete(id); else selectedMatches.add(id); updateBulkUI(); }
         function updateBulkUI() { const bar = document.getElementById('bulkActionBar'); document.getElementById('bulkCount').innerText = selectedMatches.size; if(selectedMatches.size > 0) bar.classList.remove('translate-y-full'); else bar.classList.add('translate-y-full'); }
         async function applyBulkTime() { const time = document.getElementById('bulkTime').value; if(!time || selectedMatches.size===0) return; const promises = Array.from(selectedMatches).map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) })); await Promise.all(promises); selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); showToast("Schedule Updated"); }
@@ -825,46 +994,98 @@
         function openStageModal() { 
             stageSelected = []; 
             stagePool = allTeams.filter(t => t.status === 'approved'); 
+            if(document.getElementById('poolSearch')) document.getElementById('poolSearch').value = '';
             
-            // Populate Source Dropdown
-            const sel = document.getElementById('stSourceSelect');
-            sel.innerHTML = '<option value="-1">Manual Selection (Drag & Drop)</option>';
+            // Populate Import Dropdown
+            const sel = document.getElementById('impStage');
+            sel.innerHTML = '<option value="" disabled selected>Select Source Stage</option>';
             if(activeTourneyData && activeTourneyData.stages) {
                 activeTourneyData.stages.forEach((s, i) => {
-                    sel.innerHTML += `<option value="${i}">From: ${s.name} (${s.type.toUpperCase()})</option>`;
+                    sel.innerHTML += `<option value="${i}">${i+1}. ${s.name} (${s.type.toUpperCase()})</option>`;
                 });
             }
             
             renderStageLists(); 
             toggleStageOptions();
-            toggleSourceMode();
+            toggleImpInput();
             openModal('stageModal'); 
+        }
+
+        function toggleImpInput() {
+            const val = document.getElementById('impType').value;
+            const el = document.getElementById('impCount');
+            if(val === 'top_n') el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+
+        function runImport() {
+            const stageIdx = parseInt(document.getElementById('impStage').value);
+            const type = document.getElementById('impType').value;
+            if(isNaN(stageIdx) || stageIdx < 0) return showToast('Select a source stage', 'error');
+            
+            const stage = activeTourneyData.stages[stageIdx];
+            const ms = stage.matches.map(mid => allMatches.find(m => m._id === mid)).filter(m => m);
+            let importedIds = [];
+
+            if (type === 'all') {
+                importedIds = stage.stageParticipants;
+            } else if (type === 'top_n') {
+                const count = parseInt(document.getElementById('impCount').value) || 4;
+                const standings = calculateStandings(ms, stage.stageParticipants);
+                importedIds = standings.slice(0, count).map(s => s.id);
+            } else if (type === 'gsl') {
+                const winners = []; const runners = [];
+                ms.forEach(m => {
+                    if (m.status === 'finished' && m.winner) {
+                        if (m.name.includes('Winners')) winners.push({ team: m.winner._id || m.winner, group: m.name });
+                        if (m.name.includes('Decider')) runners.push({ team: m.winner._id || m.winner, group: m.name });
+                    }
+                });
+                winners.sort((a,b) => a.group.localeCompare(b.group));
+                runners.sort((a,b) => a.group.localeCompare(b.group));
+                importedIds = [...winners.map(x=>x.team), ...runners.map(x=>x.team)];
+            }
+
+            // Move to Selected
+            let movedCount = 0;
+            importedIds.forEach(id => {
+                const inPoolIdx = stagePool.findIndex(t => String(t._id) === String(id));
+                if (inPoolIdx > -1) {
+                    stageSelected.push(stagePool[inPoolIdx]);
+                    stagePool.splice(inPoolIdx, 1);
+                    movedCount++;
+                }
+            });
+            
+            renderStageLists();
+            showToast(`Imported ${movedCount} teams`);
         }
 
         function toggleStageOptions() {
             const type = document.getElementById('stType').value;
             const lc = document.getElementById('stRoundCountContainer');
+            const rr = document.getElementById('stRRSettings');
             const tp = document.getElementById('stThirdPlaceContainer');
             
             if(type==='round_robin') lc.classList.remove('hidden'); else lc.classList.add('hidden');
-            // Allow 3rd place for GSL/Single Elim
+            if(type==='round_robin') rr.classList.remove('hidden'); else rr.classList.add('hidden');
+            
             if(type==='single_elim') tp.classList.remove('hidden'); else tp.classList.add('hidden');
         }
 
-        function toggleSourceMode() {
-            const val = document.getElementById('stSourceSelect').value;
-            const type = document.getElementById('stType').value;
-            
-            if(val === "-1") {
-                document.getElementById('manualSelectUI').classList.remove('hidden');
-                document.getElementById('autoSourceUI').classList.add('hidden');
-            } else {
-                document.getElementById('manualSelectUI').classList.add('hidden');
-                document.getElementById('autoSourceUI').classList.remove('hidden');
-                document.getElementById('autoSourceUI').classList.add('flex');
-            }
+        function renderStageLists() { 
+            const query = document.getElementById('poolSearch')?.value.toLowerCase() || '';
+            const filteredPool = stagePool.filter(t => t.name.toLowerCase().includes(query) || t.shortName.toLowerCase().includes(query));
+
+            document.getElementById('poolList').innerHTML = filteredPool.map(t => 
+                `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'pool')" ondragend="handleDragEnd(event)" onclick="selectTeamForStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#333] hover:border-gray-500 flex items-center gap-3 group transition"><i class="fa-solid fa-plus text-gray-600 text-xs group-hover:text-green-500"></i><span class="text-xs text-gray-300 font-bold truncate">${t.name}</span></div>`
+            ).join(''); 
+            document.getElementById('availCount').innerText = query ? `${filteredPool.length}/${stagePool.length}` : stagePool.length; 
+            document.getElementById('selectedList').innerHTML = stageSelected.map((t, idx) => 
+                `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'selected', ${idx})" ondragend="handleDragEnd(event)" ondragover="handleItemDragOver(event)" ondragleave="handleItemDragLeave(event)" ondrop="handleItemDrop(event, ${idx})" onclick="removeTeamFromStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`
+            ).join(''); 
+            document.getElementById('selCount').innerText = stageSelected.length; 
         }
-        function renderStageLists() { document.getElementById('poolList').innerHTML = stagePool.map(t => `<div onclick="selectTeamForStage('${t._id}')" class="cursor-pointer p-2 rounded bg-[#1a1d21] border border-[#333] hover:border-gray-500 flex items-center gap-3 group transition"><i class="fa-solid fa-plus text-gray-600 text-xs group-hover:text-green-500"></i><span class="text-xs text-gray-300 font-bold truncate">${t.name}</span></div>`).join(''); document.getElementById('availCount').innerText = stagePool.length; document.getElementById('selectedList').innerHTML = stageSelected.map((t, idx) => `<div onclick="removeTeamFromStage('${t._id}')" class="cursor-pointer p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`).join(''); document.getElementById('selCount').innerText = stageSelected.length; }
         function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); } }
         function removeTeamFromStage(tid) { const idx = stageSelected.findIndex(t => t._id === tid); if(idx > -1) { stagePool.push(stageSelected[idx]); stageSelected.splice(idx, 1); stagePool.sort((a,b) => a.name.localeCompare(b.name)); renderStageLists(); } }
         function clearStageSelection() { stagePool = [...stagePool, ...stageSelected].sort((a,b)=>a.name.localeCompare(b.name)); stageSelected = []; renderStageLists(); }
@@ -909,7 +1130,20 @@
             const count = format === 'BO1' ? 1 : (format === 'BO3' ? 3 : 5);
             const nameA = m.teamA ? m.teamA.shortName : 'TEAM A'; const nameB = m.teamB ? m.teamB.shortName : 'TEAM B';
             let html = `<div class="grid grid-cols-12 gap-2 mb-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest text-center"><div class="col-span-4 text-left pl-2">Map Name</div><div class="col-span-3 text-[#ff4655]">${nameA} Score</div><div class="col-span-2">VS</div><div class="col-span-3 text-[#ff4655]">${nameB} Score</div></div>`;
-            for(let i=0; i<count; i++) { const s = m.scores[i] || { mapName: `Map ${i+1}`, teamAScore: 0, teamBScore: 0 }; html += `<div class="grid grid-cols-12 gap-2 mb-2 items-center bg-[#15171a] p-2 rounded border border-[#333]"><div class="col-span-4"><input id="ms_m_${i}" value="${s.mapName}" class="w-full bg-black/30 border border-[#444] px-2 py-1.5 rounded text-gray-300 text-xs focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Map Name"></div><div class="col-span-3"><input type="number" id="ms_a_${i}" value="${s.teamAScore}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div><div class="col-span-2 text-center text-gray-600 font-bold">:</div><div class="col-span-3"><input type="number" id="ms_b_${i}" value="${s.teamBScore}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div></div>`; }
+            for(let i=0; i<count; i++) { 
+                let mapName = `Map ${i+1}`;
+                let sA = 0, sB = 0;
+                
+                if(m.scores && m.scores[i]) {
+                    mapName = m.scores[i].mapName;
+                    sA = m.scores[i].teamAScore;
+                    sB = m.scores[i].teamBScore;
+                } else if (m.vetoData && m.vetoData.pickedMaps && m.vetoData.pickedMaps[i]) {
+                    mapName = m.vetoData.pickedMaps[i].map;
+                }
+
+                html += `<div class="grid grid-cols-12 gap-2 mb-2 items-center bg-[#15171a] p-2 rounded border border-[#333]"><div class="col-span-4"><input id="ms_m_${i}" value="${mapName}" class="w-full bg-black/30 border border-[#444] px-2 py-1.5 rounded text-gray-300 text-xs focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Map Name"></div><div class="col-span-3"><input type="number" id="ms_a_${i}" value="${sA}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div><div class="col-span-2 text-center text-gray-600 font-bold">:</div><div class="col-span-3"><input type="number" id="ms_b_${i}" value="${sB}" class="w-full bg-black/30 border border-[#444] px-1 py-1.5 rounded text-center text-white font-bold text-sm focus:border-[#ff4655] outline-none"></div></div>`; 
+            }
             document.getElementById('manualScoreInputs').innerHTML = html; 
         }
         async function saveMatchEdit() { 
@@ -1033,13 +1267,24 @@
         async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
         async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
         async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
-        function editTeam(id, name, short) { document.getElementById('teId').value = id; document.getElementById('teName').value = name; document.getElementById('teShort').value = short; openModal('teamEditModal'); }
+        function editTeam(id) { 
+            const t = allTeams.find(x => x._id === id);
+            if(!t) return;
+            document.getElementById('teId').value = id; 
+            document.getElementById('teName').value = t.name; 
+            document.getElementById('teShort').value = t.shortName; 
+            document.getElementById('teWins').value = t.wins || 0;
+            document.getElementById('teLosses').value = t.losses || 0;
+            openModal('teamEditModal'); 
+        }
         async function saveTeamEdit() { 
             const id = document.getElementById('teId').value;
             const name = document.getElementById('teName').value;
             const shortName = document.getElementById('teShort').value;
+            const wins = document.getElementById('teWins').value;
+            const losses = document.getElementById('teLosses').value;
             if(!name || !shortName) return showToast('Please fill all fields', 'error');
-            const res = await fetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName }) });
+            const res = await fetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, wins, losses }) });
             const data = await res.json();
             if (res.ok && data.success) { showToast('Team Updated Successfully'); closeModal(); init(); } else { showToast(data.msg || 'Update Failed', 'error'); }
         }
@@ -1052,10 +1297,49 @@
             const data = await res.json();
             if (res.ok) { showToast(`Password for ${name} changed!`); } else { showToast(data.msg || 'Error', 'error'); }
         }
+        async function resetTeamStats() {
+            if(!confirm("⚠️ RESET ALL TEAM WINS/LOSSES?\nThis will set Wins and Losses to 0 for ALL teams.\nThis cannot be undone.")) return;
+            const res = await fetch('/api/teams/reset-stats', { method: 'POST', headers: { 'Authorization': token } });
+            if(res.ok) { showToast('Stats Reset Successfully'); init(); }
+            else showToast('Error Resetting Stats', 'error');
+        }
+        async function importTeamsCSV(input) {
+            if (!input.files[0]) return;
+            if (!confirm("Import Teams from CSV?\nFormat: Team Name, Short Name, Username, Password, M1 Name, M1 Tag, M2 Name, M2 Tag...")) { input.value = ''; return; }
+            const fd = new FormData(); fd.append('file', input.files[0]);
+            try {
+                const res = await fetch('/api/teams/import', { method: 'POST', headers: { 'Authorization': token }, body: fd });
+                const data = await res.json();
+                if (res.ok) { showToast(data.msg); init(); } else { showToast(data.msg || 'Import Failed', 'error'); }
+            } catch (e) { showToast('Error uploading file', 'error'); }
+            input.value = '';
+        }
+        function downloadCsvTemplate() {
+            const headers = [
+                "Team Name", "Short Name", "Username", "Password",
+                "Member 1 Name", "Member 1 Tag",
+                "Member 2 Name", "Member 2 Tag",
+                "Member 3 Name", "Member 3 Tag",
+                "Member 4 Name", "Member 4 Tag",
+                "Member 5 Name", "Member 5 Tag",
+                "Sub 1 Name", "Sub 1 Tag",
+                "Sub 2 Name", "Sub 2 Tag",
+                "Coach Name", "Coach Tag"
+            ];
+            const exampleRow = [
+                "Example Team", "EXT", "example_user", "pass123",
+                "PlayerOne", "1111", "PlayerTwo", "2222", "PlayerThree", "3333", "PlayerFour", "4444", "PlayerFive", "5555",
+                "SubOne", "6666", "SubTwo", "7777", "CoachName", "8888"
+            ];
+            const csvContent = "\uFEFF" + headers.join(",") + "\n" + exampleRow.join(",");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a"); link.href = url; link.download = "team_import_template.csv";
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
         function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
         async function generateStage() { 
-            const sourceIdx = parseInt(document.getElementById('stSourceSelect').value);
             const body = { 
                 name: document.getElementById('stName').value, 
                 type: document.getElementById('stType').value, 
@@ -1065,9 +1349,8 @@
                     roundCount: parseInt(document.getElementById('stRoundCount').value) || 1, 
                     randomize: document.getElementById('stRandom').checked,
                     hasThirdPlace: document.getElementById('stThirdPlace').checked,
-                    sourceStageIndex: sourceIdx,
-                    advanceCount: parseInt(document.getElementById('stAdvanceCount').value) || 4,
-                    advanceMethod: document.getElementById('stAdvanceMethod').value
+                    groupSize: parseInt(document.getElementById('stGroupSize').value) || 0,
+                    sourceStageIndex: -1 // Always manual mode now
                 } 
             }; 
             await fetch(`/api/tournaments/${activeTourneyData._id}/stages/generate`, {
@@ -1076,6 +1359,47 @@
                 body:JSON.stringify(body)
             }); 
             closeModal(); init(); 
+        }
+
+        // Drag & Drop Logic
+        let draggedItem = null;
+        function handleDragStart(e, id, source, index) { draggedItem = { id, source, index }; e.dataTransfer.effectAllowed = "move"; e.target.classList.add('dragging'); }
+        function handleDragEnd(e) { 
+            e.target.classList.remove('dragging'); 
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); 
+            document.querySelectorAll('.drag-over-item').forEach(el => el.classList.remove('drag-over-item'));
+        }
+        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add('drag-over'); }
+        function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+        function handleDrop(e, target) { 
+            e.preventDefault(); e.currentTarget.classList.remove('drag-over'); 
+            if (!draggedItem) return; 
+            if (target === 'selected') {
+                if (draggedItem.source === 'pool') selectTeamForStage(draggedItem.id);
+                else {
+                    const item = stageSelected.splice(draggedItem.index, 1)[0];
+                    stageSelected.push(item);
+                    renderStageLists();
+                }
+            } else {
+                if (draggedItem.source === 'selected') removeTeamFromStage(draggedItem.id);
+            }
+            draggedItem = null; 
+        }
+
+        function handleItemDragOver(e) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add('drag-over-item'); }
+        function handleItemDragLeave(e) { e.currentTarget.classList.remove('drag-over-item'); }
+        function handleItemDrop(e, targetIndex) {
+            e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('drag-over-item');
+            if (!draggedItem) return;
+            if (draggedItem.source === 'selected') {
+                const item = stageSelected.splice(draggedItem.index, 1)[0];
+                stageSelected.splice(targetIndex, 0, item);
+            } else {
+                const poolIndex = stagePool.findIndex(t => t._id === draggedItem.id);
+                if (poolIndex > -1) { const item = stagePool.splice(poolIndex, 1)[0]; stageSelected.splice(targetIndex, 0, item); }
+            }
+            renderStageLists(); draggedItem = null;
         }
 
         // Initialize

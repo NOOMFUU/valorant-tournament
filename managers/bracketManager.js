@@ -2,6 +2,14 @@ const Match = require('../models/Match');
 
 class BracketManager {
     
+    constructor() {
+        this.io = null;
+    }
+
+    setIO(io) {
+        this.io = io;
+    }
+
     // เติมทีมให้ครบจำนวน Power of 2 (เช่น 4, 8, 16, 32) ด้วย null (Bye)
     padTeams(teams) {
         if (!teams || teams.length === 0) return [];

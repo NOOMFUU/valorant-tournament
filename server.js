@@ -22,6 +22,7 @@ const User = require('./models/User');
 const Team = require('./models/Team');
 const Match = require('./models/Match');
 const Tournament = require('./models/Tournament');
+const AdminLog = require('./models/AdminLog');
 
 // Import Managers
 const VetoManager = require('./managers/vetoManager');
@@ -31,13 +32,12 @@ const app = express();
 const server = http.createServer(app);
 
 // [UPDATED] CORS Setup (Allow dynamic origins for dev/prod)
-const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:3000', 'https://your-app.onrender.com'];
+const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:4000', 'https://your-app.onrender.com'];
 const io = new Server(server, { 
     cors: { 
         origin: "*" // หรือใส่ allowedOrigins ถ้าต้องการความเข้มงวด
     } 
 });
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK || '';
 
 // --- CONFIGURATION ---
 const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s";
@@ -116,7 +116,6 @@ const vetoMgr = new VetoManager(io);
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
     .then(async () => {
         console.log('✅ MongoDB Connected');
-        await seedAdmin(); // สร้าง Admin
         
         // [ADDED] กู้คืน Timer ของ Veto กรณี Server รีสตาร์ท
         if (vetoMgr.restoreTimers) {
@@ -126,34 +125,6 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-to
     })
     .catch(err => console.error('❌ MongoDB Error:', err));
 
-// --- FUNCTIONS ---
-
-// [UPDATED] ฟังก์ชัน Force Reset Admin (ปลอดภัยขึ้น)
-async function seedAdmin() {
-    try {
-        // เช็คก่อนว่ามี Admin หรือยัง ถ้ามีแล้วจะไม่ Reset (ป้องกันรหัสเปลี่ยนเอง)
-        const adminExists = await User.findOne({ username: 'NoomfuuAdmin' });
-        if (!adminExists) {
-            const hashedPassword = bcrypt.hashSync('Noomfuu4869', 10);
-            const newAdmin = new User({
-                username: 'noomfuuadmin',
-                password: hashedPassword,
-                role: 'admin'
-            });
-            await newAdmin.save();
-            console.log('🔐 Admin Account Created: NoomfuuAdmin / Noomfuu4869');
-        } else {
-            console.log('🔐 Admin Account Exists (Skipping Reset)');
-        }
-    } catch (err) {
-        console.error('Seed Admin Error:', err);
-    }
-}
-
-async function sendDiscord(msg) {
-    if(!DISCORD_WEBHOOK_URL) return;
-    try { await axios.post(DISCORD_WEBHOOK_URL, { content: msg }); } catch(e) {}
-}
 
 // --- CRON JOB: AUTO CHECK-IN & FORFEIT ---
 // Run check every 1 minute
@@ -247,6 +218,21 @@ const auth = (roles = []) => async (req, res, next) => {
     } catch { res.status(401).json({ msg: 'Invalid Token' }); }
 };
 
+// --- LOGGING HELPER ---
+async function logAdminAction(req, action, target, details) {
+    try {
+        const u = await User.findById(req.user.id);
+        await AdminLog.create({
+            adminId: req.user.id,
+            adminUsername: u ? u.username : 'Unknown',
+            action,
+            target,
+            details,
+            ip: req.ip
+        });
+    } catch(e) { console.error("Log Error:", e); }
+}
+
 // --- AUTH & TEAMS ROUTES ---
 app.post('/api/login', async (req,res) => {
     try {
@@ -306,6 +292,99 @@ app.delete('/api/teams/:id', auth(['admin']), async(req,res)=>{ await Team.findB
 app.get('/api/teams', async(_,res)=>res.json(await Team.find()));
 app.get('/api/teams/me', auth(['team']), async(req,res)=>res.json(await Team.findById(req.user.id)));
 
+// [NEW] Reset Team Stats (Wins/Losses)
+app.post('/api/teams/reset-stats', auth(['admin']), async (req, res) => {
+    try {
+        await Team.updateMany({}, { wins: 0, losses: 0 });
+        await logAdminAction(req, 'RESET_STATS', 'All Teams', { msg: 'Wins/Losses reset to 0' });
+        io.emit('teams_update');
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Import Teams from CSV
+const csvUpload = multer({ storage: multer.memoryStorage() });
+app.post('/api/teams/import', auth(['admin']), csvUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
+
+        const fileContent = req.file.buffer.toString('utf8');
+        const lines = fileContent.split(/\r?\n/);
+        let updated = 0, created = 0, errors = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            // Skip header or empty lines
+            if (!line || (i === 0 && (line.toLowerCase().startsWith('team name') || line.toLowerCase().includes('username')))) continue;
+
+            // Format: Team Name, Short Name, Username, Password, M1_Name, M1_Tag, M2_Name, M2_Tag...
+            const cols = line.split(',').map(s => s.trim());
+            
+            if (cols.length < 4) { errors++; continue; }
+
+            const name = cols[0];
+            const shortName = cols[1];
+            const username = cols[2];
+            const password = cols[3];
+
+            if (!username || !password) {
+                if (line) errors++;
+                continue;
+            }
+
+            // Parse Roster
+            const members = [];
+            const addMember = (nameCol, tagCol, role) => {
+                if(!nameCol) return;
+                let mName = nameCol.trim();
+                let mTag = tagCol ? tagCol.trim().replace('#','') : '0000';
+                
+                // Fallback: Support Name#Tag in name column if tag column is empty
+                if (mName.includes('#') && mTag === '0000') {
+                    const parts = mName.split('#');
+                    mName = parts[0].trim();
+                    mTag = parts[1].trim();
+                }
+
+                if(mName) members.push({ role, name: mName, tag: mTag, status: 'approved' });
+            };
+
+            // Mains (5 players): Cols 4,5 | 6,7 | 8,9 | 10,11 | 12,13
+            for(let i=0; i<5; i++) { const idx = 4 + (i*2); addMember(cols[idx], cols[idx+1], 'Main'); }
+            // Subs (2 players): Cols 14,15 | 16,17
+            for(let i=0; i<2; i++) { const idx = 14 + (i*2); addMember(cols[idx], cols[idx+1], 'Sub'); }
+            // Coach: Cols 18,19
+            addMember(cols[18], cols[19], 'Coach');
+
+            const cleanUser = username.toLowerCase();
+            const existing = await Team.findOne({ username: cleanUser });
+
+            if (existing) {
+                existing.password = bcrypt.hashSync(password, 10);
+                if (name) existing.name = name;
+                if (shortName) existing.shortName = shortName.toUpperCase();
+                if (members.length > 0) existing.members = members;
+                await existing.save();
+                updated++;
+            } else if (name && shortName) {
+                await new Team({ 
+                    username: cleanUser, 
+                    password: bcrypt.hashSync(password, 10), 
+                    name, 
+                    shortName: shortName.toUpperCase(), 
+                    status: 'approved',
+                    members: members
+                }).save();
+                created++;
+            } else { errors++; }
+        }
+
+        await logAdminAction(req, 'IMPORT_TEAMS', 'CSV Import', { created, updated, errors });
+        io.emit('teams_update');
+        res.json({ success: true, msg: `Imported: ${created} created, ${updated} updated.` });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 // Roster Management
 app.put('/api/teams/roster', auth(['team']), async(req,res)=>{ 
     try {
@@ -345,7 +424,7 @@ app.put('/api/teams/roster', auth(['team']), async(req,res)=>{
 
 app.put('/api/teams/:id', auth(['admin']), async (req, res) => {
     try {
-        const { name, shortName } = req.body;
+        const { name, shortName, wins, losses } = req.body;
         
         // Validations
         if (!name || !shortName) return res.status(400).json({ msg: 'Name and Short Name are required' });
@@ -354,13 +433,21 @@ app.put('/api/teams/:id', auth(['admin']), async (req, res) => {
         const existingName = await Team.findOne({ name: name, _id: { $ne: req.params.id } });
         if (existingName) return res.status(400).json({ msg: 'Team Name is already taken' });
 
-        // Update
-        const updatedTeam = await Team.findByIdAndUpdate(req.params.id, {
+        const updateData = {
             name: name,
-            shortName: shortName.toUpperCase() // Force Uppercase for Tag
-        }, { new: true });
+            shortName: shortName.toUpperCase()
+        };
+        if (wins !== undefined) updateData.wins = parseInt(wins);
+        if (losses !== undefined) updateData.losses = parseInt(losses);
+
+        // Update
+        const updatedTeam = await Team.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
         if (!updatedTeam) return res.status(404).json({ msg: 'Team not found' });
+
+        if (wins !== undefined || losses !== undefined) {
+            await logAdminAction(req, 'UPDATE_TEAM', `Team ${updatedTeam.name}`, { wins, losses });
+        }
 
         io.emit('teams_update'); // แจ้ง Client ให้รีเฟรชข้อมูล
         res.json({ success: true, team: updatedTeam });
@@ -437,6 +524,14 @@ app.put('/api/teams/logo', auth(['team']), upload.single('logo'), async (req, re
     } catch (e) { res.status(500).json({ msg: 'Error' }); }
 });
 
+// [NEW] Get Admin Logs
+app.get('/api/admin/logs', auth(['admin']), async (req, res) => {
+    try {
+        const logs = await AdminLog.find().sort({ createdAt: -1 }).limit(100);
+        res.json(logs);
+    } catch(e) { res.status(500).json({ msg: e.message }); }
+});
+
 // --- MATCH ROUTES ---
 
 app.get('/api/matches', async (_, res) => {
@@ -502,6 +597,8 @@ app.post('/api/matches/:id/force-winner', auth(['admin']), async (req, res) => {
         await Team.findByIdAndUpdate(loser._id, { $inc: { losses: 1 } });
 
         await BracketManager.propagateMatchResult(match, winner, loser);
+
+        await logAdminAction(req, 'FORCE_WINNER', `Match ${match.matchNumber} (${match.name})`, { winner: winner.name });
 
         io.emit('match_update', match);
         io.emit('bracket_update');
@@ -601,6 +698,8 @@ app.post('/api/matches/:id/approve-score', auth(['admin']), async (req, res) => 
 
         await BracketManager.propagateMatchResult(match, winner, loser);
 
+        await logAdminAction(req, 'APPROVE_SCORE', `Match ${match.matchNumber} (${match.name})`, { winner: winner.name });
+
         io.emit('match_update', match);
         io.emit('bracket_update');
         res.json({ success: true });
@@ -616,6 +715,7 @@ app.post('/api/matches/:id/reject-score', auth(['admin']), async (req, res) => {
         match.scoreSubmission.rejectReason = reason || 'Rejected';
         match.scoreSubmission.tempScores = []; 
         await match.save();
+        await logAdminAction(req, 'REJECT_SCORE', `Match ${match.matchNumber} (${match.name})`, { reason });
         io.emit('match_update', match);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: 'Server error' }); }
@@ -624,12 +724,52 @@ app.post('/api/matches/:id/reject-score', auth(['admin']), async (req, res) => {
 app.put('/api/matches/:id/manual-score', auth(['admin']), async (req, res) => {
     try {
         const { scores } = req.body;
-        const match = await Match.findById(req.params.id);
+        const match = await Match.findById(req.params.id).populate('teamA teamB');
+        if(!match) return res.status(404).json({msg:'Match not found'});
+
         match.scores = scores;
+        
+        // Auto-calculate winner
+        let wA = 0, wB = 0;
+        scores.forEach(s => {
+            const sA = parseInt(s.teamAScore) || 0;
+            const sB = parseInt(s.teamBScore) || 0;
+            if (sA > sB) wA++;
+            else if (sB > sA) wB++;
+        });
+
+        const mapsNeeded = match.format === 'BO1' ? 1 : (match.format === 'BO3' ? 2 : 3);
+        const wasFinished = match.status === 'finished';
+
+        if (wA >= mapsNeeded || wB >= mapsNeeded) {
+            const winner = wA > wB ? match.teamA : match.teamB;
+            const loser = wA > wB ? match.teamB : match.teamA;
+
+            if (winner && loser) {
+                match.winner = winner;
+                match.status = 'finished';
+                match.scoreSubmission.status = 'approved';
+                match.scoreSubmission.rejectReason = 'Admin Manual Entry';
+
+                if (!wasFinished) {
+                    await Team.findByIdAndUpdate(winner._id, { $inc: { wins: 1 } });
+                    await Team.findByIdAndUpdate(loser._id, { $inc: { losses: 1 } });
+                }
+
+                await BracketManager.propagateMatchResult(match, winner, loser);
+                io.emit('bracket_update');
+            }
+        }
+
         await match.save();
+        await logAdminAction(req, 'MANUAL_SCORE', `Match ${match.matchNumber} (${match.name})`, { scores });
+
         io.emit('match_update', match);
         res.json({ success: true });
-    } catch(e) { res.status(500).json(e); }
+    } catch(e) { 
+        console.error(e);
+        res.status(500).json({ msg: e.message }); 
+    }
 });
 
 app.post('/api/matches/:id/reset-veto', auth(['admin']), async (req, res) => {
@@ -670,6 +810,7 @@ app.post('/api/matches/:id/reset', auth(['admin']), async (req, res) => {
         };
 
         await match.save();
+        await logAdminAction(req, 'RESET_MATCH', `Match ${match.matchNumber} (${match.name})`, {});
         io.emit('match_update', match);
         io.emit('bracket_update'); 
         res.json({ success: true, msg: 'Match has been reset for rematch.' });
@@ -716,6 +857,44 @@ app.post('/api/matches/:id/checkin', auth(['team']), async (req, res) => {
 app.get('/api/tournaments', async (_, res) => {
     const t = await Tournament.find().populate('participants').sort({ createdAt: -1 });
     res.json(t);
+});
+
+// [NEW] Public Tournament Data (Optimized for Frontend Bracket/Schedule View)
+app.get('/api/tournaments/:id/public', async (req, res) => {
+    try {
+        const tournament = await Tournament.findById(req.params.id)
+            .select('-stages.matches.roomPassword -stages.matches.chat') // Exclude sensitive match data
+            .populate({
+                path: 'participants',
+                select: 'name shortName logo wins losses'
+            })
+            .populate({
+                path: 'stages.matches',
+                populate: { 
+                    path: 'teamA teamB winner',
+                    select: 'name shortName logo'
+                },
+                select: '-roomPassword -chat -vetoData.history' // Exclude heavy/private data
+            });
+
+        if (!tournament) return res.status(404).json({ msg: 'Tournament not found' });
+        res.json(tournament);
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Get Upcoming Matches for Logged-in Team (Dashboard UX)
+app.get('/api/matches/upcoming', auth(['team']), async (req, res) => {
+    try {
+        const teamId = req.user.id;
+        const matches = await Match.find({
+            $or: [{ teamA: teamId }, { teamB: teamId }],
+            status: { $in: ['scheduled', 'live', 'pending_approval'] }
+        })
+        .populate('teamA teamB tournament')
+        .sort({ scheduledTime: 1 }); // Soonest first
+        
+        res.json(matches);
+    } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
 app.post('/api/tournaments', auth(['admin']), async (req, res) => {
@@ -867,81 +1046,24 @@ app.post('/api/tournaments/:id/stages/:stageIndex/matches', auth(['admin']), asy
 
 app.post('/api/tournaments/:id/stages/:stageIndex/swiss-next', auth(['admin']), async (req, res) => {
     try {
-        const { stageIndex } = req.params;
-        const tournament = await Tournament.findById(req.params.id).populate('stages.matches');
-        const stage = tournament.stages[stageIndex];
-        
-        const teamStats = {};
-        stage.stageParticipants.forEach(tid => { teamStats[tid] = { id: tid, wins: 0, played: new Set() }; });
-        let currentRound = 0;
-        stage.matches.forEach(m => {
-            if(m.round > currentRound) currentRound = m.round;
-            if (m.teamA && m.teamB) {
-                if (teamStats[m.teamA]) teamStats[m.teamA].played.add(m.teamB.toString());
-                if (teamStats[m.teamB]) teamStats[m.teamB].played.add(m.teamA.toString());
-                if (m.status === 'finished' && m.winner) { if (teamStats[m.winner]) teamStats[m.winner].wins++; }
-            }
-        });
-        const nextRound = currentRound + 1;
-        const scoreGroups = {};
-        Object.values(teamStats).forEach(t => { if (!scoreGroups[t.wins]) scoreGroups[t.wins] = []; scoreGroups[t.wins].push(t); });
-
-        const lastMatch = await Match.findOne({ tournament: tournament._id }).sort({ matchNumber: -1 });
-        let nextMatchNum = (lastMatch && lastMatch.matchNumber) ? lastMatch.matchNumber + 1 : 1;
-
-        const newMatches = [];
-        const scores = Object.keys(scoreGroups).sort((a,b) => b-a);
-        let floaters = [];
-
-        for (const score of scores) {
-            let pool = [...floaters, ...scoreGroups[score]];
-            floaters = []; 
-            pool.sort(() => 0.5 - Math.random()); 
-
-            while (pool.length >= 2) {
-                const t1 = pool.shift();
-                let paired = false;
-                for (let i = 0; i < pool.length; i++) {
-                    const t2 = pool[i];
-                    if (!t1.played.has(t2.id.toString())) {
-                        pool.splice(i, 1);
-                        const match = new Match({
-                             tournament: tournament._id, 
-                             name: `${stage.name} - R${nextRound} (${score} wins)`,
-                             matchNumber: nextMatchNum++, 
-                             teamA: t1.id, teamB: t2.id, 
-                             format: stage.settings.defaultFormat, 
-                             round: nextRound,
-                             vetoData: { status: 'pending' }
-                        });
-                        await match.save();
-                        newMatches.push(match._id);
-                        stage.matches.push(match._id);
-                        paired = true;
-                        break;
-                    }
-                }
-                if (!paired) floaters.push(t1); 
-            }
-            if (pool.length === 1) floaters.push(pool[0]);
-        }
-
-        if (floaters.length > 0) {
-             const byeTeam = floaters[0];
-             const match = new Match({
-                 tournament: tournament._id, name: `${stage.name} - R${nextRound} Bye`,
-                 matchNumber: nextMatchNum++, 
-                 teamA: byeTeam.id, teamB: null, round: nextRound,
-                 status: 'finished', winner: byeTeam.id, note: 'BYE'
-             });
-             await match.save();
-             newMatches.push(match._id);
-             stage.matches.push(match._id);
-        }
-
-        await tournament.save();
+        const { id, stageIndex } = req.params;
+        const newMatches = await BracketManager.generateNextSwissRound(id, stageIndex);
+        io.emit('bracket_update');
         res.json({ success: true, matchesCreated: newMatches.length });
-    } catch (e) { console.error(e); res.status(500).json({ msg: e.message }); }
+    } catch (e) { 
+        console.error(e); 
+        res.status(500).json({ msg: e.message }); 
+    }
+});
+
+// [NEW] Get Stage Standings (Round Robin / Swiss)
+app.get('/api/tournaments/:id/stages/:stageIndex/standings', async (req, res) => {
+    try {
+        const standings = await BracketManager.getStageStandings(req.params.id, req.params.stageIndex);
+        res.json(standings);
+    } catch (e) {
+        res.status(500).json({ msg: e.message });
+    }
 });
 
 app.delete('/api/tournaments/:id/stages/:stageIndex', auth(['admin']), async (req, res) => {
