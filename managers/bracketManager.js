@@ -393,9 +393,11 @@ class BracketManager {
         if (!winner) return;
         if (match.nextMatchId) {
             await this.updateMatchSlot(match.nextMatchId, match.nextMatchSlot, winner);
+            if(this.io) this.io.emit('notification', { msg: `Bracket: ${winner.shortName} advanced to next round!` });
         }
         if (match.loserMatchId && loser) {
             await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loser);
+            if(this.io) this.io.emit('notification', { msg: `Bracket: ${loser.shortName} dropped to lower bracket.` });
         }
     }
 

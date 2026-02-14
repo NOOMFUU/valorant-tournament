@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VCT Veto Protocol // OMEGA UI</title>
     
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -349,7 +349,8 @@
     </div>
 
     <script>
-        const socket = io();
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const socket = io(API_BASE || undefined);
         const matchId = new URLSearchParams(location.search).get('match');
         const teamId = localStorage.getItem('id');
         let timerInt;
@@ -368,7 +369,8 @@
             'Haven': 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png',
             'Split': 'https://media.valorant-api.com/maps/d960549e-485c-e861-8d71-aa9d1aed12a2/splash.png',
             'Ascent': 'https://media.valorant-api.com/maps/7eaecc1b-4337-bbf6-6ab9-04b8f06b3319/splash.png',  
-            'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg'
+            'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg',
+            'Kasbah': 'https://media.valorant-api.com/maps/5d6b454a-44d7-0632-0b97-469915b94805/splash.png'
         };
         const defaultBg = 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png';
 

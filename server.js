@@ -20,8 +20,8 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 // Import Models
 const User = require('./models/User');
 const Team = require('./models/Team');
-const Match = require('./models/Match');
 const Tournament = require('./models/Tournament');
+const Match = require('./models/Match');
 const AdminLog = require('./models/AdminLog');
 
 // Import Managers
@@ -111,6 +111,7 @@ if (process.env.CLOUDINARY_URL) {
 // --- MANAGERS INITIALIZATION ---
 // สร้าง Manager ก่อน Connect DB เพื่อให้พร้อมเรียกใช้ restoreTimers
 const vetoMgr = new VetoManager(io);
+BracketManager.setIO(io);
 
 // --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
@@ -545,6 +546,43 @@ app.get('/api/matches', async (_, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// [NEW] Get Upcoming Matches for Logged-in Team (Dashboard UX)
+app.get('/api/matches/upcoming', auth(['team']), async (req, res) => {
+    try {
+        const teamId = req.user.id;
+        if (!mongoose.Types.ObjectId.isValid(teamId)) return res.status(400).json({ msg: 'Invalid Team ID' });
+
+        const matches = await Match.find({
+            $or: [{ teamA: teamId }, { teamB: teamId }],
+            status: { $in: ['scheduled', 'live', 'pending_approval'] }
+        })
+        .populate('teamA')
+        .populate('teamB')
+        .populate('tournament')
+        .sort({ scheduledTime: 1 }); // Soonest first
+        
+        res.json(matches);
+    } catch (e) { 
+        console.error("Error in /api/matches/upcoming:", e);
+        res.status(500).json({ msg: e.message }); 
+    }
+});
+
+// [NEW] Get Match History for Logged-in Team
+app.get('/api/matches/history', auth(['team']), async (req, res) => {
+    try {
+        const teamId = req.user.id;
+        const matches = await Match.find({
+            $or: [{ teamA: teamId }, { teamB: teamId }],
+            status: 'finished'
+        })
+        .populate('teamA teamB tournament')
+        .sort({ updatedAt: -1 }); // Most recent first
+        
+        res.json(matches);
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 app.get('/api/matches/:id', async (req, res) => {
     try {
         const match = await Match.findById(req.params.id)
@@ -575,6 +613,36 @@ app.put('/api/matches/:id', auth(['admin']), async(req, res) => {
         io.emit('match_update', match);
         res.json({ success: true, match });
     } catch(e) { res.status(500).json(e); }
+});
+
+// [NEW] Swap Teams Endpoint (Drag & Drop)
+app.post('/api/matches/swap-teams', auth(['admin']), async (req, res) => {
+    try {
+        const { match1Id, slot1, match2Id, slot2 } = req.body;
+        
+        const m1 = await Match.findById(match1Id);
+        const m2 = await Match.findById(match2Id);
+
+        if (!m1 || !m2) return res.status(404).json({ msg: 'Match not found' });
+
+        const team1 = m1[slot1];
+        const team2 = m2[slot2];
+        
+        // Swap Teams
+        m1[slot1] = team2;
+        m2[slot2] = team1;
+
+        await m1.save();
+        await m2.save();
+
+        await logAdminAction(req, 'SWAP_TEAMS', `Swapped ${slot1} of Match ${m1.matchNumber} with ${slot2} of Match ${m2.matchNumber}`, {});
+
+        io.emit('match_update', m1);
+        io.emit('match_update', m2);
+        io.emit('bracket_update');
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
 // Force Winner (Admin)
@@ -853,6 +921,62 @@ app.post('/api/matches/:id/checkin', auth(['team']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// [NEW] Reschedule Request
+app.post('/api/matches/:id/reschedule', auth(['team']), async (req, res) => {
+    try {
+        const { proposedTime } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        
+        if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Unauthorized' });
+        }
+        if (match.status !== 'scheduled') return res.status(400).json({ msg: 'Match not scheduled' });
+
+        match.rescheduleRequest = {
+            requestedBy: req.user.id,
+            proposedTime: new Date(proposedTime),
+            status: 'pending'
+        };
+        await match.save();
+        io.emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Reschedule Response
+app.post('/api/matches/:id/reschedule/respond', auth(['team']), async (req, res) => {
+    try {
+        const { action } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        
+        if (match.rescheduleRequest.status !== 'pending') return res.status(400).json({ msg: 'No pending request' });
+        if (match.rescheduleRequest.requestedBy.toString() === req.user.id) return res.status(400).json({ msg: 'Cannot respond to own request' });
+        if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) return res.status(403).json({ msg: 'Unauthorized' });
+
+        if (action === 'accept') {
+            match.scheduledTime = match.rescheduleRequest.proposedTime;
+            match.checkIn = { teamA: false, teamB: false, windowOpen: false }; // Reset check-in
+        }
+        match.rescheduleRequest = { status: 'none' }; // Clear request
+        await match.save();
+        io.emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Admin Broadcast Message
+app.post('/api/admin/broadcast', auth(['admin']), async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ msg: 'Message required' });
+        io.emit('notification', { msg: `📢 ADMIN: ${message}` });
+        await logAdminAction(req, 'BROADCAST', 'All Users', { message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 // --- TOURNAMENT ROUTES ---
 app.get('/api/tournaments', async (_, res) => {
     const t = await Tournament.find().populate('participants').sort({ createdAt: -1 });
@@ -879,21 +1003,6 @@ app.get('/api/tournaments/:id/public', async (req, res) => {
 
         if (!tournament) return res.status(404).json({ msg: 'Tournament not found' });
         res.json(tournament);
-    } catch (e) { res.status(500).json({ msg: e.message }); }
-});
-
-// [NEW] Get Upcoming Matches for Logged-in Team (Dashboard UX)
-app.get('/api/matches/upcoming', auth(['team']), async (req, res) => {
-    try {
-        const teamId = req.user.id;
-        const matches = await Match.find({
-            $or: [{ teamA: teamId }, { teamB: teamId }],
-            status: { $in: ['scheduled', 'live', 'pending_approval'] }
-        })
-        .populate('teamA teamB tournament')
-        .sort({ scheduledTime: 1 }); // Soonest first
-        
-        res.json(matches);
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 

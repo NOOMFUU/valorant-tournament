@@ -6,7 +6,7 @@
     <title>VALORANT // ADMIN PROTOCOL V8.0 (MISSION CONTROL)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -180,6 +180,9 @@
             </button>
             <button onclick="nav('logs')" id="nav-logs" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-clipboard-list w-5 text-center"></i> LOGS
+            </button>
+            <button onclick="openBroadcastModal()" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base text-yellow-500 hover:text-yellow-400">
+                <i class="fa-solid fa-bullhorn w-5 text-center"></i> BROADCAST
             </button>
         </nav>
 
@@ -385,6 +388,16 @@
         </div>
     </main>
 
+    <!-- QUICK ACTION CONTEXT MENU -->
+    <div id="matchCtxMenu" class="fixed z-[500] bg-[#1a1d21] border border-[#333] rounded shadow-2xl hidden flex-col w-48 py-1 transform scale-95 opacity-0 transition-all duration-100 origin-top-right">
+        <div class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-[#333] mb-1">Quick Actions</div>
+        <button onclick="quickAction('winA')" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameA" class="truncate">A</span></button>
+        <button onclick="quickAction('winB')" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameB" class="truncate">B</span></button>
+        <div class="h-[1px] bg-[#333] my-1"></div>
+        <button onclick="quickAction('copyPass')" class="text-left px-4 py-2.5 text-xs text-blue-400 hover:bg-blue-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-key w-4"></i> Copy Password</button>
+        <button onclick="quickAction('reset')" class="text-left px-4 py-2.5 text-xs text-yellow-500 hover:bg-yellow-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-rotate-left w-4"></i> Reset Match</button>
+    </div>
+
     <div id="modalBackdrop" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm transition-opacity duration-300">
         <div id="roundSchedulerModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
             <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]">
@@ -572,9 +585,10 @@
     </div>
 
     <script>
-        const socket = io();
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const socket = io(API_BASE || undefined);
         const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s"; 
-        const ALL_MAPS = ['Abyss', 'Ascent', 'Bind', 'Corrode', 'Haven', 'Icebox', 'Lotus', 'Sunset', 'Pearl', 'Split', 'Fracture', 'Breeze'];
+        const ALL_MAPS = ['Abyss', 'Ascent', 'Bind', 'Corrode', 'Haven', 'Icebox', 'Lotus', 'Sunset', 'Pearl', 'Split', 'Fracture', 'Breeze', 'Kasbah'];
         const COMPETITIVE_POOL = ['Abyss', 'Ascent', 'Bind', 'Corrode', 'Haven', 'Lotus', 'Sunset'];
         
         // --- MAP PREVIEW IMAGES ---
@@ -590,7 +604,8 @@
             'Pearl': 'https://media.valorant-api.com/maps/fd267378-4d1d-484f-ff52-77821ed10dc2/splash.png',
             'Split': 'https://media.valorant-api.com/maps/d960549e-485c-e861-8d71-aa9d1aed12a2/splash.png',
             'Fracture': 'https://media.valorant-api.com/maps/b529448b-4d60-346e-e89e-00a4c527a405/splash.png',
-            'Breeze': 'https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png'
+            'Breeze': 'https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png',
+            'Kasbah': 'https://media.valorant-api.com/maps/5d6b454a-44d7-0632-0b97-469915b94805/splash.png'
         };
 
         const token = localStorage.getItem('token');
@@ -634,10 +649,10 @@
             try {
                 const ts = Date.now();
                 const [rT, rM, rTr, rL] = await Promise.all([
-                    fetch(`/api/teams?t=${ts}`), 
-                    fetch(`/api/matches?t=${ts}`), 
-                    fetch(`/api/tournaments?t=${ts}`),
-                    fetch(`/api/admin/logs?t=${ts}`, { headers: { 'Authorization': token } })
+                    fetch(`${API_BASE}/api/teams?t=${ts}`), 
+                    fetch(`${API_BASE}/api/matches?t=${ts}`), 
+                    fetch(`${API_BASE}/api/tournaments?t=${ts}`),
+                    fetch(`${API_BASE}/api/admin/logs?t=${ts}`, { headers: { 'Authorization': token } })
                 ]);
                 
                 if(rT.status === 401) { logout(); return; }
@@ -679,21 +694,60 @@
             return 'TBD';
         }
 
+        // --- DRAG & DROP TEAMS LOGIC ---
+        let teamDragSource = null;
+        function handleTeamDragStart(e, matchId, slot) {
+            if(bulkMode) { e.preventDefault(); return; }
+            teamDragSource = { matchId, slot };
+            e.dataTransfer.effectAllowed = "move";
+            e.target.classList.add('opacity-50');
+        }
+        function handleTeamDragLeave(e) { e.currentTarget.classList.remove('bg-white/10'); }
+        function allowDrop(e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add('bg-white/10'); }
+        async function handleTeamDrop(e, targetMatchId, targetSlot) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('bg-white/10');
+            document.querySelectorAll('.opacity-50').forEach(el => el.classList.remove('opacity-50'));
+            
+            if (!teamDragSource) return;
+            if (teamDragSource.matchId === targetMatchId && teamDragSource.slot === targetSlot) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/matches/swap-teams`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                    body: JSON.stringify({
+                        match1Id: teamDragSource.matchId, slot1: teamDragSource.slot,
+                        match2Id: targetMatchId, slot2: targetSlot
+                    })
+                });
+                if (!res.ok) { const d = await res.json(); showToast(d.msg || 'Swap Failed', 'error'); }
+                else { showToast('Teams Swapped'); }
+            } catch (err) { showToast('Connection Error', 'error'); }
+            teamDragSource = null;
+        }
+
         function renderMatchCard(m) {
             const [sA, sB] = calculateMatchScore(m.scores);
             const isSel = selectedMatches.has(m._id);
-            const check = bulkMode ? `<div class="absolute top-3 left-3 z-20"><input type="checkbox" class="chk-match w-4 h-4 accent-[#ff4655] cursor-pointer" onchange="toggleMatchSelect('${m._id}')" ${isSel?'checked':''}></div>` : '';
+            const check = bulkMode ? `<div class="absolute top-3 left-3 z-20" onclick="event.stopPropagation()"><input type="checkbox" class="chk-match w-4 h-4 accent-[#ff4655] cursor-pointer" onchange="toggleMatchSelect('${m._id}')" ${isSel?'checked':''}></div>` : '';
             const dateObj = m.scheduledTime ? new Date(m.scheduledTime) : null;
             const timeStr = dateObj ? dateObj.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : 'TBA';
             const dateStr = dateObj ? dateObj.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'}) : '';
             const isLive = m.status === 'live';
+            
+            let statusText = isLive ? 'LIVE' : m.status.substring(0,3);
+            if (isLive && m.scores && m.scores.length > 0) {
+                const lastMap = m.scores[m.scores.length-1].mapName;
+                if(lastMap) statusText = `LIVE <span class="text-gray-600 mx-1">•</span> ${lastMap}`;
+            }
 
             if (compactMode) {
                 return `
                 <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-2 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655]':'border-[#2d3139] hover:border-gray-400')} relative transition group cursor-pointer w-full shadow-sm text-xs">
                     ${check}
                     <div class="flex justify-between items-center mb-1">
-                        <span class="text-[9px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${isLive ? 'LIVE' : m.status.substring(0,3)}</span>
+                        <span class="text-[9px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
                         <span class="text-[9px] font-mono text-gray-500">${timeStr}</span>
                     </div>
                     <div class="flex flex-col gap-0.5">
@@ -709,9 +763,6 @@
                 </div>`;
             }
 
-            const nameA = m.teamA ? `<span class="${sA>sB?'text-[#ff4655]':'text-gray-200'}">${m.teamA.shortName}</span>` : getSmartTBD(m._id, 'teamA');
-            const nameB = m.teamB ? `<span class="${sB>sA?'text-[#ff4655]':'text-gray-200'}">${m.teamB.shortName}</span>` : getSmartTBD(m._id, 'teamB');
-
             const matchNumStr = m.matchNumber ? `#${String(m.matchNumber).padStart(3, '0')}` : '';
             
             // Progression
@@ -722,28 +773,52 @@
             const nextWin = m.nextMatchId ? getShortName(m.nextMatchId) : null;
             const nextLose = m.loserMatchId ? getShortName(m.loserMatchId) : null;
 
+            const renderTeamRow = (team, slot, score, isWinner) => {
+                const logo = team ? `<img src="${team.logo || DEFAULT_LOGO}" class="w-5 h-5 rounded object-cover bg-black/50 shrink-0 border border-white/10">` : '<div class="w-5 h-5 rounded bg-white/5 shrink-0 border border-white/5 flex items-center justify-center"><i class="fa-solid fa-question text-[8px] text-gray-600"></i></div>';
+                const nameHtml = team ? `<span class="truncate">${team.shortName}</span>` : getSmartTBD(m._id, slot);
+                const scoreColor = isWinner ? 'text-[#ff4655]' : '';
+                const textColor = isWinner ? 'text-white' : 'text-gray-400';
+                
+                return `
+                <div draggable="true" 
+                    ondragstart="handleTeamDragStart(event, '${m._id}', '${slot}')" 
+                    ondragover="allowDrop(event)" 
+                    ondragleave="handleTeamDragLeave(event)"
+                    ondrop="handleTeamDrop(event, '${m._id}', '${slot}')" 
+                    onclick="event.stopPropagation()"
+                    class="flex justify-between items-center text-sm font-medium ${textColor} transition-colors p-1.5 -mx-1.5 rounded hover:bg-white/5 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10">
+                    <div class="flex items-center gap-2 overflow-hidden pointer-events-none">
+                        ${logo}
+                        ${nameHtml}
+                    </div>
+                    <span class="font-mono ${scoreColor} pointer-events-none">${score}</span>
+                </div>`;
+            };
+
+            const menuBtn = !bulkMode ? `
+            <div class="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                <button onclick="event.stopPropagation(); openMatchContextMenu(event, '${m._id}')" class="w-6 h-6 bg-[#1a1d21] border border-[#333] hover:border-gray-400 text-gray-400 hover:text-white rounded flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
+                </button>
+            </div>` : '';
+
             return `
-            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-3 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655]':'border-[#2d3139] hover:border-gray-400')} relative transition group cursor-pointer w-full shadow-sm">
+            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-3 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655] shadow-[0_0_10px_rgba(255,70,85,0.2)]':'border-[#2d3139] hover:border-gray-400')} relative transition-all duration-200 group cursor-pointer w-full shadow-sm hover:shadow-lg hover:-translate-y-0.5">
                 ${check}
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${isLive ? 'LIVE' : m.status}</span>
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
                     <span class="text-[10px] font-mono text-gray-500">${timeStr}</span>
                 </div>
+                ${menuBtn}
                 <div class="flex flex-col gap-1">
-                    <div class="flex justify-between items-center text-sm font-medium ${sA>sB?'text-white':'text-gray-400'}">
-                        <span>${m.teamA ? m.teamA.shortName : 'TBD'}</span>
-                        <span class="font-mono ${sA>sB?'text-[#ff4655]':''}">${sA}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm font-medium ${sB>sA?'text-white':'text-gray-400'}">
-                        <span>${m.teamB ? m.teamB.shortName : 'TBD'}</span>
-                        <span class="font-mono ${sB>sA?'text-[#ff4655]':''}">${sB}</span>
-                    </div>
+                    ${renderTeamRow(m.teamA, 'teamA', sA, sA > sB)}
+                    ${renderTeamRow(m.teamB, 'teamB', sB, sB > sA)}
                 </div>
-                <div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-600 truncate">
-                    ${m.name}
-                    ${(nextWin||nextLose) ? `<div class="flex justify-between mt-1 font-mono text-[9px]">
-                        ${nextWin ? `<span class="text-green-500/70" title="Winner to ${nextWin}">W: ${nextWin}</span>` : '<span></span>'}
-                        ${nextLose ? `<span class="text-red-500/70" title="Loser to ${nextLose}">L: ${nextLose}</span>` : ''}
+                <div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-600 truncate flex justify-between items-center">
+                    <span class="truncate max-w-[120px]" title="${m.name}">${m.name}</span>
+                    ${(nextWin||nextLose) ? `<div class="flex gap-2 font-mono text-[9px]">
+                        ${nextWin ? `<span class="text-green-500/70" title="Winner to ${nextWin}">W<i class="fa-solid fa-arrow-right ml-0.5"></i></span>` : ''}
+                        ${nextLose ? `<span class="text-red-500/70" title="Loser to ${nextLose}">L<i class="fa-solid fa-arrow-right ml-0.5"></i></span>` : ''}
                     </div>` : ''}
                 </div>
             </div>`;
@@ -761,6 +836,9 @@
             const t = tourneys[0]; 
             activeTourneyData = t; 
             
+            // Safety check for activeStageIndex
+            if (activeStageIndex >= t.stages.length) activeStageIndex = Math.max(0, t.stages.length - 1);
+
             // 1. Render Header & Tab Bar
             let tabsHtml = t.stages.map((s, idx) => {
                 const isActive = idx === activeStageIndex;
@@ -806,6 +884,7 @@
                         <div class="flex items-center gap-4">
                             <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Type: <span class="text-white">${s.type.replace('_',' ')}</span></span>
                             ${swissBtn}
+                            <button onclick="exportStageCSV('${t._id}', ${activeStageIndex})" class="text-green-500 hover:text-green-400 text-xs font-bold uppercase ml-4"><i class="fa-solid fa-file-csv mr-2"></i> Export CSV</button>
                         </div>
                         <button onclick="deleteStage('${t._id}', ${activeStageIndex})" class="text-red-500 hover:text-red-400 text-xs font-bold uppercase"><i class="fa-solid fa-trash mr-2"></i> Delete Stage</button>
                     </div>
@@ -864,7 +943,7 @@
         async function submitRoundSchedule() {
             const time = document.getElementById('rsTime').value;
             if(!time || pendingRoundScheduleMatches.length === 0) return;
-            const promises = pendingRoundScheduleMatches.map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) }));
+            const promises = pendingRoundScheduleMatches.map(id => fetch(`${API_BASE}/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) }));
             await Promise.all(promises); closeModal(); init(true); showToast("Round Schedule Updated");
         }
 
@@ -903,9 +982,11 @@
             document.getElementById('teamGrid').innerHTML = filtered.map(x => {
                 const isPending = x.status === 'pending'; 
                 const hasNameChange = x.members.some(m => m.pendingUpdate);
+                const totalMatches = (x.wins || 0) + (x.losses || 0);
+                const winRate = totalMatches > 0 ? Math.round((x.wins / totalMatches) * 100) : 0;
                 
                 return `
-                <div class="bg-[#15171a] p-0 border border-[#2d3139] rounded-lg relative overflow-hidden group team-card-hover transition duration-200">
+                <div class="bg-[#15171a] p-0 border border-[#2d3139] rounded-lg relative overflow-hidden group team-card-hover transition duration-200 hover:border-[#ff4655]/50">
                     ${isPending ? '<div class="status-indicator bg-yellow-500 animate-pulse"></div>' : ''}
                     ${hasNameChange && !isPending ? '<div class="status-indicator bg-orange-500"></div>' : ''}
                     
@@ -921,6 +1002,10 @@
                                     <span>•</span>
                                     <span>${x.members.length} Players</span>
                                 </div>
+                                <div class="mt-3 w-32 h-1 bg-[#222] rounded-full overflow-hidden flex">
+                                    <div class="h-full bg-[#ff4655]" style="width: ${winRate}%"></div>
+                                </div>
+                                <div class="text-[9px] text-gray-500 mt-1 font-mono">${x.wins}W - ${x.losses}L (${winRate}%)</div>
                             </div>
                         </div>
                         
@@ -981,19 +1066,33 @@
         }
         function renderMemberRow(tid, m) { if (m.status === 'pending' && m.pendingUpdate) return `<div class="bg-[#1a1d21] border border-orange-500/50 rounded p-4 mb-3 relative group shadow-lg shadow-orange-900/10"><div class="flex justify-between items-center mb-3"><span class="text-[9px] font-bold bg-orange-500 text-black px-2 py-0.5 rounded uppercase tracking-widest">Name Change Request</span><div class="text-[10px] text-gray-500 font-mono">ID: ${m.pendingUpdate.riotId || 'N/A'}</div></div><div class="flex items-center gap-4 mb-4 bg-black/20 p-2 rounded"><div class="flex-1 text-right opacity-60"><div class="text-[8px] text-gray-500 uppercase font-bold mb-0.5">Current</div><div class="font-bold text-white text-sm line-through decoration-red-500">${m.name}</div><div class="font-mono text-[10px] text-gray-500">#${m.tag}</div></div><div class="text-orange-500 text-sm"><i class="fa-solid fa-arrow-right"></i></div><div class="flex-1 text-left"><div class="text-[8px] text-orange-500 uppercase font-bold mb-0.5">New Name</div><div class="font-bold text-white text-sm text-shadow-glow">${m.pendingUpdate.name}</div><div class="font-mono text-[10px] text-orange-200">#${m.pendingUpdate.tag}</div></div></div><div class="flex gap-2 border-t border-white/5 pt-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="flex-1 bg-green-600/20 hover:bg-green-600 hover:text-white text-green-400 border border-green-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-check mr-1"></i> Approve Change</button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="flex-1 bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 border border-red-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-xmark mr-1"></i> Reject</button></div></div>`; else if (m.status === 'pending') return `<div class="bg-[#1a1d21] border border-blue-500/30 rounded p-3 mb-2 flex justify-between items-center relative overflow-hidden"><div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div><div class="pl-4"><div class="flex items-center gap-2"><span class="text-white font-bold text-base leading-none">${m.name}</span><span class="bg-blue-500/20 text-blue-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-500/20">NEW</span></div><div class="text-xs font-mono text-gray-500 mt-1">#${m.tag} • ${m.role}</div></div><div class="flex gap-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-green-500 hover:bg-green-600 hover:text-white hover:border-green-600 transition"><i class="fa-solid fa-check text-sm"></i></button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 transition"><i class="fa-solid fa-xmark text-sm"></i></button></div></div>`; return `<div class="group flex justify-between items-center p-3 rounded hover:bg-[#15171a] border border-transparent hover:border-[#333] transition mb-1"><div class="flex items-center gap-4"><div class="w-2 h-2 rounded-full ${m.status==='rejected'?'bg-red-500':'bg-[#1fa474]'}"></div><div><div class="text-sm font-bold text-gray-300 group-hover:text-white transition">${m.name}</div><div class="text-[10px] font-mono text-gray-600">#${m.tag} <span class="text-gray-700">|</span> ${m.role}</div></div></div><button onclick="deleteMember('${tid}', '${m._id}')" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition px-2"><i class="fa-solid fa-trash-can text-sm"></i></button></div>`; }
         function openRosterModal(teamId) { const team = allTeams.find(t => t._id === teamId); if(!team) return; document.getElementById('rosterModalContent').innerHTML = `<div class="mb-6 flex items-center gap-5 border-b border-[#333] pb-6 bg-[#21252b] p-6 -m-8 rounded-t-lg"><img src="${team.logo || DEFAULT_LOGO}" class="w-20 h-20 rounded bg-black object-cover border border-[#333]"><div><h2 class="text-3xl font-header text-white leading-none mb-1">${team.name}</h2><div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><span class="text-[#ff4655]">[${team.shortName}]</span> ROSTER MANAGEMENT</div></div></div><div class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scroll mt-6">${team.members.map(m => renderMemberRow(team._id, m)).join('')}</div>`; openModal('rosterModal'); }
-        async function updateMemberStatus(tid, mid, status) { await fetch(`/api/teams/${tid}/members/${mid}/status`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); await init(true); openRosterModal(tid); showToast(status === 'approved' ? 'Action Completed' : 'Rejected / Reverted'); }
-        async function deleteMember(tid, mid) { if(!confirm("Kick Member?")) return; await fetch(`/api/teams/${tid}/members/${mid}`, { method: 'DELETE', headers: { 'Authorization': token } }); await init(true); openRosterModal(tid); showToast('Member Removed'); }
+        async function updateMemberStatus(tid, mid, status) { await fetch(`${API_BASE}/api/teams/${tid}/members/${mid}/status`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); await init(true); openRosterModal(tid); showToast(status === 'approved' ? 'Action Completed' : 'Rejected / Reverted'); }
+        async function deleteMember(tid, mid) { if(!confirm("Kick Member?")) return; await fetch(`${API_BASE}/api/teams/${tid}/members/${mid}`, { method: 'DELETE', headers: { 'Authorization': token } }); await init(true); openRosterModal(tid); showToast('Member Removed'); }
         
         function toggleBulkMode() { bulkMode = !bulkMode; const btn = document.getElementById('btnBulkMode'); if(bulkMode) { btn.classList.add('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.remove('text-gray-400'); } else { btn.classList.remove('bg-[#ff4655]', 'text-white', 'border-[#ff4655]'); btn.classList.add('text-gray-400'); selectedMatches.clear(); updateBulkUI(); } init(true); }
         function toggleCompactMode() { compactMode = !compactMode; init(true); }
         function toggleMatchSelect(id) { if(selectedMatches.has(id)) selectedMatches.delete(id); else selectedMatches.add(id); updateBulkUI(); }
         function updateBulkUI() { const bar = document.getElementById('bulkActionBar'); document.getElementById('bulkCount').innerText = selectedMatches.size; if(selectedMatches.size > 0) bar.classList.remove('translate-y-full'); else bar.classList.add('translate-y-full'); }
-        async function applyBulkTime() { const time = document.getElementById('bulkTime').value; if(!time || selectedMatches.size===0) return; const promises = Array.from(selectedMatches).map(id => fetch(`/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) })); await Promise.all(promises); selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); showToast("Schedule Updated"); }
+        async function applyBulkTime() { const time = document.getElementById('bulkTime').value; if(!time || selectedMatches.size===0) return; const promises = Array.from(selectedMatches).map(id => fetch(`${API_BASE}/api/matches/${id}`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ scheduledTime: time }) })); await Promise.all(promises); selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); showToast("Schedule Updated"); }
         function clearSelection() { selectedMatches.clear(); updateBulkUI(); toggleBulkMode(); }
         function viewImage(url) { const fullUrl = url.startsWith('http') ? url : `${url}`; document.getElementById('imageViewerSrc').src = fullUrl; document.getElementById('imageViewerModal').classList.remove('hidden'); document.getElementById('imageViewerModal').classList.add('flex'); }
         function openStageModal() { 
-            stageSelected = []; 
-            stagePool = allTeams.filter(t => t.status === 'approved'); 
+            // [UPDATED] Auto-Save Restore
+            const saved = localStorage.getItem('stage_autosave');
+            if (saved) {
+                try {
+                    const savedIds = JSON.parse(saved);
+                    stageSelected = savedIds.map(id => allTeams.find(t => t._id === id)).filter(t => t);
+                    stagePool = allTeams.filter(t => t.status === 'approved' && !stageSelected.some(s => s._id === t._id));
+                    if(stageSelected.length > 0) showToast('Restored Auto-Saved Bracket');
+                } catch (e) {
+                    stageSelected = []; 
+                    stagePool = allTeams.filter(t => t.status === 'approved'); 
+                }
+            } else {
+                stageSelected = []; 
+                stagePool = allTeams.filter(t => t.status === 'approved'); 
+            }
             if(document.getElementById('poolSearch')) document.getElementById('poolSearch').value = '';
             
             // Populate Import Dropdown
@@ -1059,6 +1158,12 @@
             
             renderStageLists();
             showToast(`Imported ${movedCount} teams`);
+            saveStageState();
+        }
+
+        function saveStageState() {
+            const ids = stageSelected.map(t => t._id);
+            localStorage.setItem('stage_autosave', JSON.stringify(ids));
         }
 
         function toggleStageOptions() {
@@ -1086,9 +1191,9 @@
             ).join(''); 
             document.getElementById('selCount').innerText = stageSelected.length; 
         }
-        function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); } }
-        function removeTeamFromStage(tid) { const idx = stageSelected.findIndex(t => t._id === tid); if(idx > -1) { stagePool.push(stageSelected[idx]); stageSelected.splice(idx, 1); stagePool.sort((a,b) => a.name.localeCompare(b.name)); renderStageLists(); } }
-        function clearStageSelection() { stagePool = [...stagePool, ...stageSelected].sort((a,b)=>a.name.localeCompare(b.name)); stageSelected = []; renderStageLists(); }
+        function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); saveStageState(); } }
+        function removeTeamFromStage(tid) { const idx = stageSelected.findIndex(t => t._id === tid); if(idx > -1) { stagePool.push(stageSelected[idx]); stageSelected.splice(idx, 1); stagePool.sort((a,b) => a.name.localeCompare(b.name)); renderStageLists(); saveStageState(); } }
+        function clearStageSelection() { stagePool = [...stagePool, ...stageSelected].sort((a,b)=>a.name.localeCompare(b.name)); stageSelected = []; renderStageLists(); saveStageState(); }
         function toggleRoundCount() { const type = document.getElementById('stType').value; const div = document.getElementById('stRoundCountContainer'); if(type==='round_robin') div.classList.remove('hidden'); else div.classList.add('hidden'); }
         function calculateMatchScore(scores) { if (!scores) return [0,0]; let a=0,b=0; scores.forEach(s=>{ if(parseInt(s.teamAScore)>parseInt(s.teamBScore)) a++; else if(parseInt(s.teamBScore)>parseInt(s.teamAScore)) b++; }); return [a,b]; }
         function updateStats(teams, matches) { document.getElementById('stat-live').innerText=matches.filter(m=>m.status==='live').length; document.getElementById('stat-pending').innerText=matches.filter(m=>m.status==='pending_approval').length; document.getElementById('stat-teams').innerText=teams.length; document.getElementById('stat-finished').innerText=matches.filter(m=>m.status==='finished').length; }
@@ -1148,10 +1253,10 @@
         }
         async function saveMatchEdit() { 
             const body = { name:document.getElementById('emName').value, status:document.getElementById('emStatus').value, scheduledTime:document.getElementById('emTime').value, format:document.getElementById('emFormat').value };
-            await fetch(`/api/matches/${activeMatchId}`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify(body)});
+            await fetch(`${API_BASE}/api/matches/${activeMatchId}`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify(body)});
             const c = document.getElementById('emFormat').value==='BO1'?1:(document.getElementById('emFormat').value==='BO3'?3:5);
             const scores = []; for(let i=0; i<c; i++) scores.push({ mapName:document.getElementById(`ms_m_${i}`).value, teamAScore: parseInt(document.getElementById(`ms_a_${i}`).value)||0, teamBScore: parseInt(document.getElementById(`ms_b_${i}`).value)||0 });
-            await fetch(`/api/matches/${activeMatchId}/manual-score`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({scores})});
+            await fetch(`${API_BASE}/api/matches/${activeMatchId}/manual-score`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({scores})});
             closeModal(); init(); showToast('Match Saved');
         }
 
@@ -1230,7 +1335,7 @@
             if(approvedTeams.length < 2) return showToast("Need at least 2 approved teams!", 'error');
             const selectedMaps = Array.from(document.querySelectorAll('.chk-map-create:checked')).map(c => c.value);
             if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
-            await fetch('/api/tournaments', {
+            await fetch(`${API_BASE}/api/tournaments`, {
                 method:'POST', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
                 body:JSON.stringify({name, teamIds: approvedTeams.map(t=>t._id), mapPool: selectedMaps})
@@ -1243,7 +1348,7 @@
             const name = document.getElementById('tsName').value; 
             const selectedMaps = Array.from(document.querySelectorAll('.chk-map-edit:checked')).map(c => c.value);
             if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
-            await fetch(`/api/tournaments/${id}`, {
+            await fetch(`${API_BASE}/api/tournaments/${id}`, {
                 method:'PUT', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
                 body:JSON.stringify({name, mapPool: selectedMaps})
@@ -1259,14 +1364,14 @@
             openModal('tourneySettingsModal'); 
         }
         
-        async function deleteTourney() { const id=document.getElementById('tsId').value; if(confirm("DELETE SYSTEM?")) { await fetch(`/api/tournaments/${id}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); showToast('Deleted'); } }
-        async function approveScore(id) { if(confirm('Approve Result?')) await fetch(`/api/matches/${id}/approve-score`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Score Approved'); }
-        async function rejectScore(id) { const r=prompt('Reason for rejection:'); if(r) await fetch(`/api/matches/${id}/reject-score`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({reason:r})}); init(); showToast('Score Rejected'); }
-        async function forceWinner(side) { const m=allMatches.find(x=>x._id===activeMatchId); if(confirm('Force Win?')) await fetch(`/api/matches/${activeMatchId}/force-winner`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({winnerId: side==='teamA'?m.teamA._id:m.teamB._id})}); closeModal(); init(); }
-        async function deleteMatch() { if(confirm('Delete Match?')) await fetch(`/api/matches/${activeMatchId}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); }
-        async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
-        async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
-        async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
+        async function deleteTourney() { const id=document.getElementById('tsId').value; if(confirm("DELETE SYSTEM?")) { await fetch(`${API_BASE}/api/tournaments/${id}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); showToast('Deleted'); } }
+        async function approveScore(id) { if(confirm('Approve Result?')) await fetch(`${API_BASE}/api/matches/${id}/approve-score`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Score Approved'); }
+        async function rejectScore(id) { const r=prompt('Reason for rejection:'); if(r) await fetch(`${API_BASE}/api/matches/${id}/reject-score`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({reason:r})}); init(); showToast('Score Rejected'); }
+        async function forceWinner(side) { const m=allMatches.find(x=>x._id===activeMatchId); if(confirm('Force Win?')) await fetch(`${API_BASE}/api/matches/${activeMatchId}/force-winner`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({winnerId: side==='teamA'?m.teamA._id:m.teamB._id})}); closeModal(); init(); }
+        async function deleteMatch() { if(confirm('Delete Match?')) await fetch(`${API_BASE}/api/matches/${activeMatchId}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); }
+        async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
+        async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`${API_BASE}/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
+        async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`${API_BASE}/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
         function editTeam(id) { 
             const t = allTeams.find(x => x._id === id);
             if(!t) return;
@@ -1284,22 +1389,22 @@
             const wins = document.getElementById('teWins').value;
             const losses = document.getElementById('teLosses').value;
             if(!name || !shortName) return showToast('Please fill all fields', 'error');
-            const res = await fetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, wins, losses }) });
+            const res = await fetch(`${API_BASE}/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, wins, losses }) });
             const data = await res.json();
             if (res.ok && data.success) { showToast('Team Updated Successfully'); closeModal(); init(); } else { showToast(data.msg || 'Update Failed', 'error'); }
         }
-        async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
-        async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
+        async function generateSwissNext(tid, sIdx) { if(!confirm("Generate Next Swiss Round?\nEnsure all current matches are finished.")) return; const res = await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${sIdx}/swiss-next`, { method: 'POST', headers: {'Authorization': token} }); const d = await res.json(); if(res.ok) { showToast(`Round Generated: ${d.matchesCreated} Matches`); init(); } else { alert(d.msg || 'Error'); } }
+        async function deleteTeam(id){ if(confirm('Delete Team?')) await fetch(`${API_BASE}/api/teams/${id}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
         async function resetTeamPassword(id, name) {
             const newPass = prompt(`Enter NEW Password for team: ${name}`);
             if (!newPass) return;
-            const res = await fetch(`/api/teams/${id}/reset-password`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: newPass }) });
+            const res = await fetch(`${API_BASE}/api/teams/${id}/reset-password`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: newPass }) });
             const data = await res.json();
             if (res.ok) { showToast(`Password for ${name} changed!`); } else { showToast(data.msg || 'Error', 'error'); }
         }
         async function resetTeamStats() {
             if(!confirm("⚠️ RESET ALL TEAM WINS/LOSSES?\nThis will set Wins and Losses to 0 for ALL teams.\nThis cannot be undone.")) return;
-            const res = await fetch('/api/teams/reset-stats', { method: 'POST', headers: { 'Authorization': token } });
+            const res = await fetch(`${API_BASE}/api/teams/reset-stats`, { method: 'POST', headers: { 'Authorization': token } });
             if(res.ok) { showToast('Stats Reset Successfully'); init(); }
             else showToast('Error Resetting Stats', 'error');
         }
@@ -1308,7 +1413,7 @@
             if (!confirm("Import Teams from CSV?\nFormat: Team Name, Short Name, Username, Password, M1 Name, M1 Tag, M2 Name, M2 Tag...")) { input.value = ''; return; }
             const fd = new FormData(); fd.append('file', input.files[0]);
             try {
-                const res = await fetch('/api/teams/import', { method: 'POST', headers: { 'Authorization': token }, body: fd });
+                const res = await fetch(`${API_BASE}/api/teams/import`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
                 const data = await res.json();
                 if (res.ok) { showToast(data.msg); init(); } else { showToast(data.msg || 'Import Failed', 'error'); }
             } catch (e) { showToast('Error uploading file', 'error'); }
@@ -1338,6 +1443,35 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
+        function exportStageCSV(tourneyId, stageIndex) {
+            const t = activeTourneyData;
+            if (!t || t._id !== tourneyId) return showToast('Tournament data mismatch', 'error');
+            
+            const stage = t.stages[stageIndex];
+            if (!stage) return showToast('Stage not found', 'error');
+
+            const ms = stage.matches.map(mid => allMatches.find(m => m._id === mid)).filter(m => m);
+            if (ms.length === 0) return showToast('No matches to export', 'error');
+
+            const headers = ['Round', 'Match Name', 'Status', 'Scheduled Time', 'Team A', 'Score A', 'Score B', 'Team B', 'Winner'];
+            const rows = ms.map(m => {
+                const teamA = m.teamA ? m.teamA.name : 'TBD';
+                const teamB = m.teamB ? m.teamB.name : 'TBD';
+                const [sA, sB] = calculateMatchScore(m.scores);
+                const winner = m.winner ? (m.winner.name || (m.winner === m.teamA?._id ? teamA : teamB)) : '-';
+                const time = m.scheduledTime ? new Date(m.scheduledTime).toLocaleString() : 'TBD';
+
+                return [m.round, `"${m.name||''}"`, m.status, `"${time}"`, `"${teamA}"`, sA, sB, `"${teamB}"`, `"${winner}"`].join(',');
+            });
+
+            const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${t.name.replace(/[^a-z0-9]/gi, '_')}_Stage_${stageIndex+1}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
         function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
         async function generateStage() { 
             const body = { 
@@ -1353,12 +1487,13 @@
                     sourceStageIndex: -1 // Always manual mode now
                 } 
             }; 
-            await fetch(`/api/tournaments/${activeTourneyData._id}/stages/generate`, {
+            await fetch(`${API_BASE}/api/tournaments/${activeTourneyData._id}/stages/generate`, {
                 method:'POST', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
                 body:JSON.stringify(body)
             }); 
-            closeModal(); init(); 
+            closeModal(); init();
+            localStorage.removeItem('stage_autosave');
         }
 
         // Drag & Drop Logic
@@ -1380,6 +1515,7 @@
                     const item = stageSelected.splice(draggedItem.index, 1)[0];
                     stageSelected.push(item);
                     renderStageLists();
+                    saveStageState();
                 }
             } else {
                 if (draggedItem.source === 'selected') removeTeamFromStage(draggedItem.id);
@@ -1399,8 +1535,65 @@
                 const poolIndex = stagePool.findIndex(t => t._id === draggedItem.id);
                 if (poolIndex > -1) { const item = stagePool.splice(poolIndex, 1)[0]; stageSelected.splice(targetIndex, 0, item); }
             }
-            renderStageLists(); draggedItem = null;
+            renderStageLists(); draggedItem = null; saveStageState();
         }
+
+        // --- QUICK ACTIONS & BROADCAST ---
+        let ctxMatchId = null;
+        function openMatchContextMenu(e, id) {
+            e.preventDefault();
+            ctxMatchId = id;
+            const m = allMatches.find(x => x._id === id);
+            if(!m) return;
+
+            const menu = document.getElementById('matchCtxMenu');
+            const rect = e.target.getBoundingClientRect();
+            
+            document.getElementById('ctxNameA').innerText = m.teamA ? m.teamA.shortName : 'Team A';
+            document.getElementById('ctxNameB').innerText = m.teamB ? m.teamB.shortName : 'Team B';
+            
+            menu.style.top = `${rect.bottom + 5}px`;
+            menu.style.left = `${rect.right - 190}px`; // Align right
+            menu.classList.remove('hidden');
+            
+            // Small delay for animation
+            requestAnimationFrame(() => {
+                menu.classList.remove('opacity-0', 'scale-95');
+                menu.classList.add('opacity-100', 'scale-100');
+            });
+        }
+
+        async function quickAction(action) {
+            const menu = document.getElementById('matchCtxMenu');
+            menu.classList.add('hidden');
+            if(!ctxMatchId) return;
+            
+            const m = allMatches.find(x => x._id === ctxMatchId);
+            if(action === 'winA') { activeMatchId = ctxMatchId; forceWinner('teamA'); }
+            else if(action === 'winB') { activeMatchId = ctxMatchId; forceWinner('teamB'); }
+            else if(action === 'reset') { activeMatchId = ctxMatchId; rematchMatch(); }
+            else if(action === 'copyPass') {
+                if(m.roomPassword) { navigator.clipboard.writeText(m.roomPassword); showToast('Password Copied'); }
+                else showToast('No Password Set', 'error');
+            }
+        }
+
+        async function openBroadcastModal() {
+            const msg = prompt("📢 ENTER GLOBAL ANNOUNCEMENT MESSAGE:\n(This will be shown to all connected users)");
+            if(msg && msg.trim()) {
+                await fetch(`${API_BASE}/api/admin/broadcast`, { method: 'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({message: msg}) });
+                showToast('Announcement Sent');
+            }
+        }
+
+        // Close context menu on click outside
+        window.addEventListener('click', () => {
+            const menu = document.getElementById('matchCtxMenu');
+            if (menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden', 'opacity-0', 'scale-95');
+                menu.classList.remove('opacity-100', 'scale-100');
+            }
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => { renderMapCheckboxes('create'); });

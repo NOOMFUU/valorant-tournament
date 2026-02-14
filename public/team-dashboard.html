@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Oswald:wght@400;500;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <style>
         /* --- VALORANT DESIGN SYSTEM --- */
@@ -17,6 +18,7 @@
             --val-black: #000000;
             --val-white: #ece8e1;
             --val-gray: #768079;
+            --bg-card: #15171a;
         }
 
         body {
@@ -153,6 +155,13 @@
             background: #0f1923;
             z-index: 9999;
         }
+
+        /* New Card Styles */
+        .match-card-hover:hover { border-color: var(--val-red); box-shadow: 0 10px 30px -10px rgba(255, 70, 85, 0.15); }
+        .roster-card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.3); }
+        .text-shadow-glow { text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+        .input-underline { background: transparent; border: none; border-bottom: 1px solid #333; transition: 0.3s; }
+        .input-underline:focus { border-bottom-color: var(--val-red); outline: none; }
     </style>
 </head>
 <body class="bg-vct min-h-screen flex flex-col">
@@ -166,12 +175,12 @@
     </div>
 
     <header class="h-20 border-b border-white/10 bg-[#0f1923]/90 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto h-full px-6 flex justify-between items-center">
+        <div class="max-w-[1600px] mx-auto h-full px-6 flex justify-between items-center">
             
             <div class="flex items-center gap-6">
                 <div class="relative group cursor-pointer w-12 h-12" onclick="document.getElementById('logoInput').click()">
                     <div class="w-full h-full bg-black/50 border border-white/20 flex items-center justify-center overflow-hidden transition group-hover:border-[#ff4655]">
-                        <img id="teamLogo" src="https://via.placeholder.com/100" class="w-full h-full object-cover group-hover:opacity-50 transition">
+                        <img id="teamLogo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23333'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='12' fill='%23666' text-anchor='middle' dy='.3em'%3ELOGO%3C/text%3E%3C/svg%3E" class="w-full h-full object-cover group-hover:opacity-50 transition">
                         <i class="fa-solid fa-camera absolute text-white opacity-0 group-hover:opacity-100 transition"></i>
                     </div>
                     <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="uploadLogo(this)">
@@ -188,10 +197,15 @@
             <nav class="hidden md:flex gap-12 h-full">
                 <button onclick="nav('dashboard')" id="nav-dashboard" class="nav-link h-full flex items-center font-header text-xl tracking-wider active">DASHBOARD</button>
                 <button onclick="nav('roster')" id="nav-roster" class="nav-link h-full flex items-center font-header text-xl tracking-wider">ROSTER</button>
+                <button onclick="nav('history')" id="nav-history" class="nav-link h-full flex items-center font-header text-xl tracking-wider">HISTORY</button>
                 <a href="/scoreboard.html" target="_blank" class="nav-link h-full flex items-center font-header text-xl tracking-wider opacity-60 hover:opacity-100">
                     PUBLIC <i class="fa-solid fa-external-link-alt ml-2 text-xs"></i>
                 </a>
             </nav>
+
+            <button onclick="toggleMobileMenu()" class="md:hidden text-white hover:text-[#ff4655] transition p-2">
+                <i class="fa-solid fa-bars text-2xl"></i>
+            </button>
 
             <button onclick="logout()" class="text-xs font-bold text-gray-500 hover:text-[#ff4655] uppercase tracking-widest transition-colors flex items-center gap-2">
                 <i class="fa-solid fa-power-off"></i> Disconnect
@@ -199,7 +213,7 @@
         </div>
     </header>
 
-    <main class="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full relative z-10">
+    <main class="flex-1 p-6 md:p-10 max-w-[1600px] mx-auto w-full relative z-10">
 
         <div id="toast" class="fixed top-24 right-5 z-[100] translate-x-[200%] transition-transform duration-500 ease-out">
             <div class="bg-[#ece8e1] text-[#0f1923] pl-4 pr-8 py-3 border-l-4 border-[#ff4655] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] clipped-box-r flex items-center gap-4">
@@ -211,31 +225,27 @@
             </div>
         </div>
 
+        <!-- MOBILE MENU OVERLAY -->
+        <div id="mobileMenu" class="fixed inset-0 z-[200] bg-[#0f1923]/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center gap-8">
+            <button onclick="toggleMobileMenu()" class="absolute top-6 right-6 text-gray-500 hover:text-white text-3xl transition"><i class="fa-solid fa-xmark"></i></button>
+            <button onclick="nav('dashboard'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">DASHBOARD</button>
+            <button onclick="nav('roster'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">ROSTER</button>
+            <button onclick="nav('history'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">HISTORY</button>
+            <a href="/scoreboard.html" target="_blank" class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i class="fa-solid fa-external-link-alt ml-2 text-sm"></i></a>
+            <button onclick="logout()" class="mt-8 px-8 py-3 border border-red-500/50 text-red-500 font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition">DISCONNECT</button>
+        </div>
+
         <section id="view-dashboard" class="animate-slide-up space-y-10">
             
-            <div id="heroSection" class="hidden relative group overflow-hidden border border-white/10 bg-gradient-to-r from-[#ff4655]/20 to-transparent p-1 clipped-box">
-                <div class="absolute inset-0 bg-[url('https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png')] bg-cover opacity-20 mix-blend-overlay"></div>
-                
-                <div class="relative bg-[#0f1923]/80 backdrop-blur-sm p-8 md:p-12 flex flex-col md:flex-row justify-between items-center gap-8 h-full clipped-box">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-4">
-                            <span class="bg-[#ff4655] text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-widest">High Priority</span>
-                            <div class="h-[1px] w-12 bg-[#ff4655]"></div>
-                        </div>
-                        <h1 class="text-7xl md:text-8xl font-header text-white tracking-tight leading-[0.8] italic mb-2" id="heroMatchTitle">VS TBD</h1>
-                        <p class="text-[#ff4655] text-xl font-tech tracking-widest" id="heroMatchTime">--:--</p>
-                    </div>
-                    
-                    <div id="heroActionBtn" class="flex-shrink-0 z-10"></div>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="flex items-end justify-between border-b border-white/10 pb-2">
-                        <h3 class="text-3xl font-header text-white"><i class="fa-solid fa-crosshairs text-[#ff4655] mr-2"></i> Deployments</h3>
-                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Active Operations</span>
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                        <div class="flex items-center gap-4">
+                            <h3 class="text-3xl font-header text-white"><i class="fa-solid fa-crosshairs text-[#ff4655] mr-2"></i> Deployments</h3>
+                            <input id="matchSearch" oninput="renderMatchList()" placeholder="Search match / team..." class="bg-black/30 border border-white/10 text-xs px-3 py-1.5 rounded text-white focus:border-[#ff4655] outline-none w-48 placeholder-gray-600 font-mono transition-colors">
+                        </div>
+                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest hidden md:block">Active Operations</span>
                     </div>
                     <div id="matchList" class="space-y-3">
                         </div>
@@ -252,6 +262,17 @@
                         <div class="flex justify-between items-center py-3">
                             <span class="text-sm text-gray-300 font-bold uppercase">Region</span>
                             <span class="text-xs font-bold text-gray-500">TH-BKK</span>
+                        </div>
+                        
+                        <div class="py-4 border-t border-white/5 mt-2">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Season Performance</span>
+                                <span class="text-xs font-mono text-white" id="statsText">0W - 0L</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-[#1a1d21] rounded-full overflow-hidden flex">
+                                <div id="statsBarWin" class="h-full bg-[#1fa474]" style="width: 50%"></div>
+                                <div id="statsBarLoss" class="h-full bg-[#ff4655]" style="width: 50%"></div>
+                            </div>
                         </div>
 
                         <button onclick="copyRosterToClipboard()" class="w-full mt-6 btn-secondary py-3 text-sm flex items-center justify-center gap-2 group hover:border-[#5865F2] hover:text-[#5865F2]">
@@ -285,7 +306,7 @@
             <form id="rosterForm" onsubmit="saveRoster(event)"> 
                 <div class="mb-12">
                     <div class="flex items-center gap-4 mb-6">
-                        <span class="text-[#ff4655] font-header text-4xl">01</span>
+                        <span class="text-[#ff4655] font-header text-5xl opacity-50">01</span>
                         <h3 class="text-2xl font-header text-white tracking-wide">STARTING FIVE</h3>
                         <div class="h-[1px] bg-white/10 flex-1"></div>
                     </div>
@@ -294,8 +315,8 @@
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div class="lg:col-span-2">
-                         <div class="flex items-center gap-4 mb-6">
-                            <span class="text-gray-600 font-header text-4xl">02</span>
+                         <div class="flex items-center gap-4 mb-6 opacity-60">
+                            <span class="text-gray-600 font-header text-5xl opacity-50">02</span>
                             <h3 class="text-2xl font-header text-gray-300 tracking-wide">RESERVES</h3>
                             <div class="h-[1px] bg-white/10 flex-1"></div>
                         </div>
@@ -303,8 +324,8 @@
                     </div>
                     
                     <div>
-                         <div class="flex items-center gap-4 mb-6">
-                            <span class="text-gray-600 font-header text-4xl">03</span>
+                         <div class="flex items-center gap-4 mb-6 opacity-60">
+                            <span class="text-gray-600 font-header text-5xl opacity-50">03</span>
                             <h3 class="text-2xl font-header text-gray-300 tracking-wide">TACTICAL</h3>
                             <div class="h-[1px] bg-white/10 flex-1"></div>
                         </div>
@@ -322,6 +343,23 @@
                     </button>
                 </div>
             </form>
+        </section>
+
+        <section id="view-history" class="hidden animate-slide-up pb-32">
+            <div class="flex items-end justify-between border-b border-white/10 pb-6 mb-10">
+                <div>
+                    <h2 class="text-6xl font-header text-white mb-1">MATCH HISTORY</h2>
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 bg-gray-500"></div>
+                        <p class="text-gray-400 text-sm font-mono tracking-widest">PAST OPERATIONS LOG</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-4xl font-header text-white" id="historyWinLoss">0W - 0L</div>
+                    <div class="text-xs text-gray-500 font-mono uppercase tracking-widest">Season Record</div>
+                </div>
+            </div>
+            <div id="historyList" class="space-y-4"></div>
         </section>
 
     </main>
@@ -374,15 +412,36 @@
         </div>
     </div>
 
+    <div id="rescheduleModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
+        <div class="bg-[#1a1d21] w-full max-w-md border border-white/10 relative animate-slide-up shadow-2xl clipped-box">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#0f1923]">
+                <h3 class="text-2xl font-header text-white">REQUEST RESCHEDULE</h3>
+                <button onclick="closeModal('rescheduleModal')" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-8 space-y-6">
+                <p class="text-sm text-gray-400">Propose a new time for this match. The opponent must accept.</p>
+                <input type="datetime-local" id="rescheduleTime" class="w-full bg-black/30 border border-white/10 text-white p-3 rounded focus:border-[#ff4655] outline-none [color-scheme:dark]">
+                <button onclick="submitReschedule()" class="btn-primary w-full py-3">SEND REQUEST</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const token = localStorage.getItem('token');
         if(!token) location.href = '/login.html';
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const socket = io(API_BASE || undefined);
 
         let myTeamId = null;
         let isRosterLocked = true;
         let teamMembers = []; 
         let matchData = null;
         let currentMatchId = null;
+        let allMyMatches = [];
+
+        // --- SOCKET LISTENERS ---
+        socket.on('match_update', () => loadDashboardData());
+        socket.on('notification', (d) => showToast(d.msg));
 
         // --- INITIALIZATION ---
         (async () => {
@@ -391,7 +450,7 @@
                 const savedTab = localStorage.getItem('activeTab') || 'dashboard';
                 nav(savedTab);
 
-                const team = await fetch('/api/teams/me', { headers: {'Authorization': token} }).then(r=>r.json());
+                const team = await fetch(`${API_BASE}/api/teams/me`, { headers: {'Authorization': token} }).then(r=>r.json());
                 myTeamId = team._id;
                 document.getElementById('teamHeader').innerText = team.name;
                 if(team.logo) document.getElementById('teamLogo').src = team.logo;
@@ -399,6 +458,15 @@
                 isRosterLocked = team.rosterLocked;
                 teamMembers = team.members || [];
                 renderRoster(teamMembers);
+                
+                // Render Stats
+                const wins = team.wins || 0;
+                const losses = team.losses || 0;
+                const total = wins + losses;
+                document.getElementById('statsText').innerHTML = `<span class="text-[#1fa474]">${wins}W</span> - <span class="text-[#ff4655]">${losses}L</span>`;
+                document.getElementById('statsBarWin').style.width = total > 0 ? `${(wins/total)*100}%` : '50%';
+                document.getElementById('statsBarLoss').style.width = total > 0 ? `${(losses/total)*100}%` : '50%';
+
                 loadDashboardData();
                 
                 // Hide Loader
@@ -412,41 +480,43 @@
             } catch(e) { console.error(e); showToast('Connection Failed', 'error'); }
         })();
 
+        function toggleMobileMenu() {
+            const m = document.getElementById('mobileMenu');
+            m.classList.toggle('translate-x-full');
+        }
+
         // --- DASHBOARD LOGIC ---
         async function loadDashboardData() {
-            const matches = await fetch('/api/matches').then(r=>r.json());
-            const myMatches = matches.filter(m => (m.teamA?._id === myTeamId || m.teamB?._id === myTeamId) && m.status !== 'finished');
-            
-            const liveMatch = myMatches.find(m => m.status === 'live');
-            const nextMatch = myMatches.find(m => m.status === 'scheduled') || myMatches[0];
-            const heroMatch = liveMatch || nextMatch;
-
-            if (heroMatch) {
-                const isLive = heroMatch.status === 'live';
-                const opp = heroMatch.teamA._id === myTeamId ? heroMatch.teamB : heroMatch.teamA;
-                document.getElementById('heroSection').classList.remove('hidden');
-                document.getElementById('heroMatchTitle').innerText = `VS ${opp?.name || 'TBD'}`;
-                
-                if (isLive) {
-                    document.getElementById('heroMatchTime').innerHTML = `<span class="text-[#ff4655] animate-pulse"><i class="fa-solid fa-circle text-[8px] mr-2"></i>LIVE COMBAT</span>`;
-                    document.getElementById('heroActionBtn').innerHTML = `<a href="/veto.html?match=${heroMatch._id}" class="btn-primary px-10 py-4 text-2xl shadow-[0_0_20px_rgba(255,70,85,0.4)] block">ENTER VETO</a>`;
-                } else {
-                    const time = heroMatch.scheduledTime ? new Date(heroMatch.scheduledTime) : null;
-                    const timeStr = time ? `${time.toLocaleDateString()} @ ${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'TIME TBD';
-                    document.getElementById('heroMatchTime').innerText = `SCHEDULED: ${timeStr}`;
-                    document.getElementById('heroActionBtn').innerHTML = `<a href="/veto.html?match=${heroMatch._id}" class="btn-secondary px-8 py-3 text-xl block">VIEW LOBBY</a>`;
-                }
+            if(!myTeamId) return;
+            const res = await fetch(`${API_BASE}/api/matches/upcoming`, { headers: {'Authorization': token} });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                console.error("Failed to fetch matches:", res.status, err);
+                showToast(err.msg || "Failed to load matches", 'error');
+                return;
             }
+            const myMatches = await res.json();
+            allMyMatches = myMatches;
+            
+            renderMatchList();
+        }
+
+        function renderMatchList() {
+            const query = document.getElementById('matchSearch')?.value.toLowerCase() || '';
+            const filtered = allMyMatches.filter(m => {
+                const oppName = (m.teamA._id === myTeamId ? m.teamB?.name : m.teamA?.name) || 'TBD';
+                return (m.name && m.name.toLowerCase().includes(query)) || oppName.toLowerCase().includes(query);
+            });
 
             const listContainer = document.getElementById('matchList');
-            if(myMatches.length === 0) {
+            if(filtered.length === 0) {
                 listContainer.innerHTML = `
                 <div class="p-8 border border-dashed border-white/10 bg-white/5 text-center">
                     <i class="fa-solid fa-coffee text-3xl text-gray-600 mb-2"></i>
-                    <div class="text-gray-500 font-mono uppercase tracking-widest text-sm">No Active Operations</div>
+                    <div class="text-gray-500 font-mono uppercase tracking-widest text-sm">No Matches Found</div>
                 </div>`;
             } else {
-                listContainer.innerHTML = myMatches.map(m => createMatchCard(m)).join('');
+                listContainer.innerHTML = filtered.map(m => createMatchCard(m)).join('');
             }
         }
 
@@ -454,47 +524,96 @@
             const isMeA = m.teamA?._id === myTeamId;
             const oppName = isMeA ? m.teamB?.name : m.teamA?.name;
             const oppLogo = isMeA ? m.teamB?.logo : m.teamA?.logo;
+            const myCheckIn = isMeA ? m.checkIn?.teamA : m.checkIn?.teamB;
+            const oppCheckIn = isMeA ? m.checkIn?.teamB : m.checkIn?.teamA;
             let statusBadge = '', actionBtn = '', rejectMsg = '';
 
             if (m.status === 'live') {
-                statusBadge = `<span class="text-[#ff4655] bg-[#ff4655]/10 px-2 py-0.5 text-[10px] font-bold border border-[#ff4655]/30 animate-pulse tracking-widest">LIVE</span>`;
-                actionBtn = `<a href="/veto.html?match=${m._id}" class="btn-secondary text-center py-2 text-sm flex-1">JOIN VETO</a><button onclick="openScoreModal('${m._id}')" class="btn-primary py-2 text-sm flex-1">REPORT SCORE</button>`;
+                statusBadge = `<span class="text-[#ff4655] bg-[#ff4655]/10 px-3 py-1 text-[10px] font-bold border border-[#ff4655]/30 animate-pulse tracking-widest rounded-sm">LIVE</span>`;
+                actionBtn = `<a href="/veto.html?match=${m._id}" class="btn-secondary text-center py-3 text-sm flex-1 hover:bg-white hover:text-black font-bold">JOIN VETO</a><button onclick="openScoreModal('${m._id}')" class="btn-primary py-3 text-sm flex-1 shadow-lg">REPORT SCORE</button>`;
             } else if (m.status === 'pending_approval') {
-                statusBadge = `<span class="text-yellow-500 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-bold border border-yellow-500/30 tracking-widest">VERIFYING</span>`;
+                statusBadge = `<span class="text-yellow-500 bg-yellow-500/10 px-3 py-1 text-[10px] font-bold border border-yellow-500/30 tracking-widest rounded-sm">VERIFYING</span>`;
                 if(m.scoreSubmission.status === 'rejected') {
                     rejectMsg = `<div class="mt-3 p-2 bg-red-500/10 border-l-2 border-red-500 text-[10px] text-gray-300 font-mono"><strong>REJECTED:</strong> ${m.scoreSubmission.rejectReason || 'Check details'}</div>`;
                     actionBtn = `<button onclick="openScoreModal('${m._id}')" class="w-full mt-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs font-bold font-header tracking-wide transition">FIX & RESUBMIT</button>`;
                 } else actionBtn = `<div class="w-full mt-2 text-center text-[10px] text-gray-500 font-mono py-2 border border-dashed border-gray-700 uppercase">Awaiting Admin Verification</div>`;
             } else {
-                statusBadge = `<span class="text-gray-400 bg-gray-800 px-2 py-0.5 text-[10px] font-bold tracking-widest">UPCOMING</span>`;
+                statusBadge = `<span class="text-gray-400 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest border border-white/5 rounded-sm">UPCOMING</span>`;
+                
+                let checkInBtn = '';
                 let forfeitBtn = '';
-                if (m.scheduledTime) {
-                    const diff = (new Date() - new Date(m.scheduledTime)) / 1000 / 60;
-                    if (diff >= 15) forfeitBtn = `<button onclick="openForfeitModal('${m._id}')" class="w-full bg-yellow-900/10 hover:bg-yellow-600 text-yellow-600 hover:text-white border border-yellow-600/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition mt-2">CLAIM WIN (NO SHOW)</button>`;
+                let rescheduleUI = '';
+
+                // Reschedule Logic
+                if (m.rescheduleRequest && m.rescheduleRequest.status === 'pending') {
+                    const reqTime = new Date(m.rescheduleRequest.proposedTime).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+                    if (m.rescheduleRequest.requestedBy === myTeamId) {
+                        rescheduleUI = `<div class="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wider text-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Reschedule Pending (${reqTime})</div>`;
+                    } else {
+                        rescheduleUI = `
+                        <div class="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 text-center">
+                            <div class="text-yellow-500 text-[10px] font-bold uppercase tracking-wider mb-2">Opponent Proposed: ${reqTime}</div>
+                            <div class="flex gap-2">
+                                <button onclick="respondReschedule('${m._id}', 'accept')" class="flex-1 bg-green-500/20 hover:bg-green-500 text-green-500 hover:text-white py-1 text-[10px] font-bold uppercase transition border border-green-500/30">Accept</button>
+                                <button onclick="respondReschedule('${m._id}', 'reject')" class="flex-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white py-1 text-[10px] font-bold uppercase transition border border-red-500/30">Reject</button>
+                            </div>
+                        </div>`;
+                    }
+                } else {
+                     rescheduleUI = `<button onclick="openRescheduleModal('${m._id}')" class="w-full mt-1 text-[10px] text-gray-500 hover:text-white uppercase font-bold tracking-wider py-1 border border-transparent hover:border-white/10 transition">Request Reschedule</button>`;
                 }
-                actionBtn = `<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a>${forfeitBtn}`;
+                
+                if (m.scheduledTime) {
+                    const now = new Date();
+                    const matchTime = new Date(m.scheduledTime);
+                    const diffMinutes = (matchTime - now) / 1000 / 60; // Negative if match hasn't started
+
+                    // Check-in Logic (30 mins before to 10 mins after)
+                    if (myCheckIn) {
+                        checkInBtn = `<div class="w-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 text-sm font-bold font-header tracking-wider text-center mb-1 flex items-center justify-center gap-2"><i class="fa-solid fa-check"></i> CHECKED IN</div>`;
+                    } else if (diffMinutes <= 30 && diffMinutes >= -10) {
+                        checkInBtn = `<button onclick="checkInMatch('${m._id}')" class="w-full bg-[#ff4655] hover:bg-white hover:text-[#ff4655] text-white border border-[#ff4655] px-4 py-3 text-sm font-bold font-header tracking-wider transition text-center mb-1 shadow-[0_0_15px_rgba(255,70,85,0.4)] animate-pulse">CHECK IN NOW</button>`;
+                    } else {
+                        checkInBtn = `<div class="w-full bg-white/5 border border-white/10 text-gray-500 px-4 py-3 text-sm font-bold font-header tracking-wider text-center mb-1 cursor-not-allowed opacity-50">CHECK-IN LOCKED</div>`;
+                    }
+
+                    // Forfeit Logic (15 mins after start)
+                    if (diffMinutes < -15) {
+                        forfeitBtn = `<button onclick="openForfeitModal('${m._id}')" class="w-full bg-yellow-900/10 hover:bg-yellow-600 text-yellow-600 hover:text-white border border-yellow-600/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition mt-2">CLAIM WIN (NO SHOW)</button>`;
+                    }
+                }
+                actionBtn = `${checkInBtn}<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a>${forfeitBtn}${rescheduleUI}`;
             }
-            const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('th-TH', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'TBD';
+            const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12: false}) : 'TBD';
             
             return `
-            <div class="glass-panel p-5 transition hover:bg-[#1a1e24] group border-l-4 ${m.status==='live'?'border-l-[#ff4655]':'border-l-gray-700'}">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 bg-black border border-white/20">
-                            <img src="${oppLogo||'https://via.placeholder.com/40'}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition">
-                        </div>
-                        <div>
-                            <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-widest leading-none mb-1">Versus</div>
-                            <div class="text-white font-header text-3xl leading-none tracking-wide">${oppName||'TBD'}</div>
+            <div class="relative overflow-hidden bg-[#15171a] border border-white/10 match-card-hover transition-all duration-300 group rounded-sm">
+                <div class="absolute top-0 left-0 w-1 h-full ${m.status==='live'?'bg-[#ff4655]':'bg-gray-700 group-hover:bg-white'} transition-colors"></div>
+                <div class="p-6 flex flex-col md:flex-row items-center gap-6">
+                    
+                    <div class="flex flex-col items-center md:items-start min-w-[120px]">
+                        ${statusBadge}
+                        <span class="text-2xl font-header text-white mt-2 tracking-wide">${timeDisplay}</span>
+                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Match #${String(m.matchNumber).padStart(3,'0')}</span>
+                    </div>
+
+                    <div class="flex-1 flex items-center justify-center gap-8 w-full bg-black/20 p-4 rounded border border-white/5">
+                        <div class="text-right hidden md:block"><div class="font-header text-xl text-gray-500">US</div></div>
+                        <div class="text-2xl font-header text-[#ff4655] italic">VS</div>
+                        <div class="flex items-center gap-4">
+                            <img src="${oppLogo||'https://via.placeholder.com/40'}" class="w-14 h-14 object-contain drop-shadow-lg">
+                            <div class="text-left">
+                                <div class="font-header text-3xl text-white leading-none tracking-wide">${oppName||'TBD'}</div>
+                                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Opponent ${oppCheckIn ? '<span class="text-[#1fa474] ml-1"><i class="fa-solid fa-check-circle"></i> READY</span>' : ''}</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="text-right">
-                        ${statusBadge}
-                        <div class="text-[10px] text-gray-500 font-mono mt-1 font-bold">${timeDisplay}</div>
+                    
+                    <div class="flex flex-col gap-2 min-w-[160px] w-full md:w-auto">
+                        ${actionBtn}
                     </div>
                 </div>
                 ${rejectMsg}
-                <div class="flex gap-2 mt-4">${actionBtn}</div>
             </div>`;
         }
 
@@ -519,27 +638,33 @@
                 const tagInputName = `${role.toLowerCase()}_tag_${role === 'Coach' ? 0 : index}`;
 
                 return `
-                <div class="relative bg-gradient-to-b from-[#ffffff05] to-[#00000040] p-4 border ${borderColor} hover:border-white/30 transition group overflow-hidden">
-                    <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-white/10"></div>
-                    <div class="absolute bottom-0 left-0 w-3 h-3 bg-white/5"></div>
-                    
-                    <div class="flex justify-between items-center mb-4 relative z-10">
-                        <span class="text-[9px] font-bold tracking-[0.2em] text-gray-500 uppercase">${label}</span>
-                        <div class="w-1.5 h-1.5 rounded-full ${statusColor}"></div>
-                    </div>
-
-                    <div class="space-y-3 relative z-10">
-                        <div>
-                            <label class="text-[9px] text-[#ff4655] uppercase font-bold tracking-wider mb-1 block">Riot ID</label>
-                            <input name="${nameInputName}" value="${displayName}" placeholder="EMPTY" autocomplete="off" 
-                                class="input-vct w-full p-2 text-sm uppercase tracking-wider" ${isLocked ? 'disabled' : ''}>
+                <div class="relative bg-[#15171a] border ${borderColor} p-1 transition-all duration-300 roster-card-hover group">
+                    <div class="bg-[#0f1113] p-5 h-full relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition pointer-events-none">
+                            <i class="fa-solid fa-user-astronaut text-7xl"></i>
                         </div>
-                        <div>
-                            <label class="text-[9px] text-[#ff4655] uppercase font-bold tracking-wider mb-1 block">Tag</label>
-                            <div class="flex items-center">
-                                <span class="text-gray-500 text-sm mr-2 font-mono">#</span>
-                                <input name="${tagInputName}" value="${displayTag}" placeholder="0000" maxlength="5" 
-                                    class="input-vct w-20 p-2 text-sm font-mono text-center" ${isLocked ? 'disabled' : ''}>
+                        
+                        <div class="flex justify-between items-start mb-6 relative z-10">
+                            <div>
+                                <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-widest mb-1">${label}</div>
+                                <div class="w-8 h-1 bg-[#ff4655]"></div>
+                            </div>
+                            <div class="w-2 h-2 rounded-full ${statusColor} shadow-[0_0_10px_currentColor]"></div>
+                        </div>
+
+                        <div class="space-y-5 relative z-10">
+                            <div class="group/input">
+                                <label class="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1 block group-focus-within/input:text-white transition">Riot ID</label>
+                                <input name="${nameInputName}" value="${displayName}" placeholder="EMPTY" autocomplete="off" 
+                                    class="w-full input-underline text-white font-header text-3xl tracking-wide py-1 placeholder-gray-800" ${isLocked ? 'disabled' : ''}>
+                            </div>
+                            <div class="group/input">
+                                <label class="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1 block group-focus-within/input:text-white transition">Tagline</label>
+                                <div class="flex items-center">
+                                    <span class="text-gray-600 text-lg mr-1">#</span>
+                                    <input name="${tagInputName}" value="${displayTag}" placeholder="0000" maxlength="5" 
+                                        class="w-full input-underline text-gray-300 font-mono text-sm py-1 focus:text-white placeholder-gray-800" ${isLocked ? 'disabled' : ''}>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -610,7 +735,7 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch('/api/teams/roster', {
+                const res = await fetch(`${API_BASE}/api/teams/roster`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': token },
                     body: JSON.stringify({ members: updatedMembers })
@@ -619,7 +744,7 @@
                 const data = await res.json();
                 if (res.ok) {
                     showToast('Roster Database Updated');
-                    const team = await fetch('/api/teams/me', { headers: {'Authorization': token} }).then(r=>r.json());
+                    const team = await fetch(`${API_BASE}/api/teams/me`, { headers: {'Authorization': token} }).then(r=>r.json());
                     teamMembers = team.members;
                     isRosterLocked = true;
                     renderRoster(teamMembers);
@@ -635,6 +760,104 @@
             }
         }
         
+        async function checkInMatch(mid) {
+            const res = await fetch(`${API_BASE}/api/matches/${mid}/checkin`, { method: 'POST', headers: { 'Authorization': token } });
+            const d = await res.json();
+            if(res.ok) { showToast('Check-in Confirmed'); loadDashboardData(); }
+            else showToast(d.msg, 'error');
+        }
+
+        async function loadHistoryData() {
+            if(!myTeamId) return;
+            const history = await fetch(`${API_BASE}/api/matches/history`, { headers: {'Authorization': token} }).then(r=>r.json());
+            
+            const container = document.getElementById('historyList');
+            if(history.length === 0) {
+                container.innerHTML = `<div class="p-12 border border-dashed border-white/10 text-center text-gray-500 font-mono">NO COMBAT RECORDS FOUND</div>`;
+                document.getElementById('historyWinLoss').innerText = `0W - 0L`;
+                return;
+            }
+
+            let wins = 0, losses = 0;
+
+            container.innerHTML = history.map(m => {
+                const isMeA = m.teamA._id === myTeamId;
+                const myScore = isMeA ? calculateTotalScore(m, 'A') : calculateTotalScore(m, 'B');
+                const oppScore = isMeA ? calculateTotalScore(m, 'B') : calculateTotalScore(m, 'A');
+                const opp = isMeA ? m.teamB : m.teamA;
+                const myTeamName = isMeA ? (m.teamA?.name || 'My Team') : (m.teamB?.name || 'My Team');
+                const oppName = opp ? opp.name : 'Unknown';
+                const isWin = (m.winner && (m.winner === myTeamId || m.winner._id === myTeamId));
+                
+                if(isWin) wins++; else losses++;
+
+                const resultColor = isWin ? 'text-emerald-400' : 'text-red-500';
+                const borderClass = isWin ? 'border-l-4 border-emerald-500' : 'border-l-4 border-red-500';
+                const bgClass = isWin ? 'bg-emerald-500/5' : 'bg-red-500/5';
+                const dateDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : 'TBD';
+
+                // Map Scores
+                const mapScoresHtml = m.scores && m.scores.length > 0 ? 
+                    `<div class="mt-3 pt-3 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        ${m.scores.map(s => {
+                            const sA = parseInt(s.teamAScore)||0;
+                            const sB = parseInt(s.teamBScore)||0;
+                            const myS = isMeA ? sA : sB;
+                            const oppS = isMeA ? sB : sA;
+                            const color = myS > oppS ? 'text-green-400' : (myS < oppS ? 'text-red-400' : 'text-gray-500');
+                            return `<div class="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px] font-mono">
+                                <span class="text-gray-400">${s.mapName}</span>
+                                <span class="${color} font-bold">${myS} - ${oppS}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>` : '';
+
+                return `
+                <div class="relative bg-[#15171a] border border-white/5 p-5 flex flex-col group hover:bg-[#1a1d21] transition ${borderClass} ${bgClass} rounded-sm">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-5 w-full md:w-auto">
+                            <div class="flex flex-col items-center min-w-[60px]">
+                                <span class="font-header text-3xl ${resultColor} tracking-wide">${isWin ? 'VICTORY' : 'DEFEAT'}</span>
+                                <span class="text-[9px] text-gray-500 font-mono uppercase tracking-widest">${dateDisplay}</span>
+                            </div>
+                            <div class="h-10 w-[1px] bg-white/10 hidden md:block"></div>
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-3 text-xl font-header text-white tracking-wide">
+                                    <span class="${isWin ? 'text-white' : 'text-gray-400'}">${myTeamName}</span>
+                                    <span class="text-gray-600 text-sm font-mono">vs</span>
+                                    <span class="${!isWin ? 'text-white' : 'text-gray-400'}">${oppName}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 font-mono flex items-center gap-2">
+                                    <span>Match Score:</span>
+                                    <span class="text-white font-bold">${myScore} - ${oppScore}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 w-full md:w-auto justify-end">
+                            <img src="${opp ? (opp.logo || 'https://via.placeholder.com/40') : 'https://via.placeholder.com/40'}" class="w-10 h-10 object-contain opacity-60 grayscale group-hover:grayscale-0 transition">
+                            <button onclick="openScoreModal('${m._id}')" class="btn-secondary px-4 py-2 text-[10px] border-white/20 hover:bg-white hover:text-black">DETAILS</button>
+                        </div>
+                    </div>
+                    ${mapScoresHtml}
+                </div>`;
+            }).join('');
+
+            document.getElementById('historyWinLoss').innerText = `${wins}W - ${losses}L`;
+        }
+
+        function calculateTotalScore(m, side) {
+            if(!m.scores) return 0;
+            let wins = 0;
+            m.scores.forEach(s => {
+                const sA = parseInt(s.teamAScore)||0;
+                const sB = parseInt(s.teamBScore)||0;
+                if(side === 'A' && sA > sB) wins++;
+                if(side === 'B' && sB > sA) wins++;
+            });
+            return wins;
+        }
+
         // --- UTILS ---
         function copyRosterToClipboard() {
             let text = `**${document.getElementById('teamHeader').innerText} Roster:**\n`;
@@ -646,8 +869,9 @@
 
         function openScoreModal(mid) {
             currentMatchId = mid;
-            fetch(`/api/matches/${mid}`).then(r=>r.json()).then(m => {
+            fetch(`${API_BASE}/api/matches/${mid}`).then(r=>r.json()).then(m => {
                 matchData = m;
+                const isFinished = m.status === 'finished';
                 const alertBox = document.getElementById('rejectAlert');
                 if(m.scoreSubmission.status === 'rejected') {
                     document.getElementById('rejectReasonText').innerText = m.scoreSubmission.rejectReason || 'No reason details provided.';
@@ -656,8 +880,14 @@
                     alertBox.classList.add('hidden');
                 }
 
-                // --- จุดที่แก้ไข: เพิ่ม HTML ส่วน Preview Image ---
-                document.getElementById('mapInputs').innerHTML = m.vetoData.pickedMaps.map((map, i) => `
+                document.getElementById('mapInputs').innerHTML = m.vetoData.pickedMaps.map((map, i) => {
+                    // Pre-fill logic
+                    const existing = m.scores.find(s => s.mapName === map.map) || {};
+                    const valA = existing.teamAScore !== undefined ? existing.teamAScore : '';
+                    const valB = existing.teamBScore !== undefined ? existing.teamBScore : '';
+                    const disabled = isFinished ? 'disabled' : '';
+
+                    return `
                     <div class="bg-black/40 p-5 border border-white/10 relative clipped-box mb-4">
                         <div class="flex justify-between mb-3">
                             <span class="text-[#ff4655] font-header text-2xl tracking-wide uppercase">${map.map}</span>
@@ -666,15 +896,16 @@
                         <div class="flex items-center gap-4 mb-4">
                             <div class="flex-1 bg-[#0f1923] p-2 border border-gray-700 flex items-center justify-between">
                                 <span class="text-[10px] text-gray-500 font-bold uppercase mr-2 tracking-wider">${m.teamA?.shortName}</span>
-                                <input type="number" id="scoreA_${i}" class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
+                                <input type="number" id="scoreA_${i}" value="${valA}" ${disabled} class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
                             </div>
                             <span class="text-gray-600 font-header text-2xl">VS</span>
                             <div class="flex-1 bg-[#0f1923] p-2 border border-gray-700 flex items-center justify-between">
-                                <input type="number" id="scoreB_${i}" class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
+                                <input type="number" id="scoreB_${i}" value="${valB}" ${disabled} class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
                                 <span class="text-[10px] text-gray-500 font-bold uppercase ml-2 tracking-wider">${m.teamB?.shortName}</span>
                             </div>
                         </div>
 
+                        ${!isFinished ? `
                         <div class="space-y-3">
                             <div class="relative group">
                                 <input type="file" id="proofImg_${i}" class="hidden" accept="image/*" onchange="handleScoreProof(this, ${i})">
@@ -689,10 +920,25 @@
                                     <span class="text-xs text-white font-bold uppercase tracking-widest"><i class="fa-solid fa-pen mr-2"></i>Change Image</span>
                                 </div>
                             </div>
-                        </div>
+                        </div>` : ''}
 
-                    </div>`).join('');
+                    </div>`;
+                }).join('');
                 
+                const submitBtn = document.querySelector('#scoreForm button[type="submit"]');
+                const title = document.querySelector('#scoreModal h3');
+                const sub = document.querySelector('#scoreModal p');
+
+                if(isFinished) {
+                    submitBtn.classList.add('hidden');
+                    title.innerText = "MATCH REPORT";
+                    sub.innerText = "Final Results (Read Only)";
+                } else {
+                    submitBtn.classList.remove('hidden');
+                    title.innerText = "MISSION REPORT";
+                    sub.innerText = "Enter Match Results";
+                }
+
                 document.getElementById('scoreModal').classList.remove('hidden'); 
                 document.getElementById('scoreModal').classList.add('flex');
             });
@@ -708,7 +954,7 @@
                 if(f) fd.append(`proof_${i}`, f);
             });
             fd.append('scores', JSON.stringify(scores));
-            const res = await fetch(`/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
+            const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
             if(res.ok) { closeModal('scoreModal'); showToast('Score Data Transmitted'); loadDashboardData(); }
         }
 
@@ -718,7 +964,7 @@
             const file = document.getElementById('forfeitProofImg').files[0];
             if(!file) return alert('Proof required.');
             const fd = new FormData(); fd.append('proof', file);
-            const res = await fetch(`/api/matches/${currentMatchId}/claim-forfeit`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
+            const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/claim-forfeit`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
             const d = await res.json();
             if(res.ok) { closeModal('forfeitModal'); showToast('Claim Submitted'); loadDashboardData(); } else { alert(d.msg); }
         }
@@ -726,9 +972,28 @@
         async function uploadLogo(input) {
             if (!input.files[0]) return;
             const fd = new FormData(); fd.append('logo', input.files[0]);
-            const res = await fetch('/api/teams/logo', { method: 'PUT', headers: { 'Authorization': token }, body: fd });
+            const res = await fetch(`${API_BASE}/api/teams/logo`, { method: 'PUT', headers: { 'Authorization': token }, body: fd });
             const d = await res.json();
             if(res.ok) { document.getElementById('teamLogo').src = d.logo; showToast('Identity Updated'); }
+        }
+
+        function openRescheduleModal(mid) {
+            currentMatchId = mid;
+            document.getElementById('rescheduleModal').classList.remove('hidden');
+            document.getElementById('rescheduleModal').classList.add('flex');
+        }
+
+        async function submitReschedule() {
+            const time = document.getElementById('rescheduleTime').value;
+            if(!time) return showToast('Select a time', 'error');
+            const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/reschedule`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ proposedTime: time }) });
+            const d = await res.json();
+            if(res.ok) { closeModal('rescheduleModal'); showToast('Request Sent'); } else showToast(d.msg, 'error');
+        }
+
+        async function respondReschedule(mid, action) {
+            const res = await fetch(`${API_BASE}/api/matches/${mid}/reschedule/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ action }) });
+            if(res.ok) showToast(action === 'accept' ? 'Reschedule Accepted' : 'Request Rejected');
         }
 
         function nav(id) {
@@ -737,6 +1002,8 @@
             document.getElementById(`view-${id}`).classList.remove('hidden');
             document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
             document.getElementById(`nav-${id}`).classList.add('active');
+            
+            if(id === 'history') loadHistoryData();
         }
 
         function closeModal(id) { document.getElementById(id).classList.remove('flex'); document.getElementById(id).classList.add('hidden'); }

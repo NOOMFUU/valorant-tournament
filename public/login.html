@@ -173,6 +173,8 @@
     </div>
 
     <script>
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+
         function togglePass(id) {
             const el = document.getElementById(id);
             const icon = el.nextElementSibling.querySelector('i');
@@ -286,7 +288,7 @@
             const password = document.getElementById('lPass').value;
 
             try {
-                const res = await fetch('/api/login', {
+                const res = await fetch(`${API_BASE}/api/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ role, username, password })
@@ -333,7 +335,7 @@
             if (logo) fd.append('logo', logo);
 
             try {
-                const res = await fetch('/api/register', { method: 'POST', body: fd });
+                const res = await fetch(`${API_BASE}/api/register`, { method: 'POST', body: fd });
                 const d = await res.json();
                 if (res.ok) {
                     showMessage('Success! Now sign in.', 'success');

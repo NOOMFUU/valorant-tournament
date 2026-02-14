@@ -46,6 +46,13 @@ const MatchSchema = new mongoose.Schema({
         lastChecked: { type: Date } // For log
     },
 
+    // [NEW] Reschedule System
+    rescheduleRequest: {
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        proposedTime: Date,
+        status: { type: String, enum: ['none', 'pending', 'rejected'], default: 'none' }
+    },
+
     // VETO SYSTEM DATA
     vetoData: {
         status: { type: String, default: 'pending' },
