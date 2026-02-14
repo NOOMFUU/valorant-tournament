@@ -11,6 +11,7 @@ const multer = require('multer');
 const fs = require('fs');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
+const os = require('os');
 // [ADDED] Libraries for Production
 const helmet = require('helmet');
 const compression = require('compression');
@@ -190,6 +191,34 @@ setInterval(async () => {
         }
     } catch (e) { console.error("Auto Check-in Error", e); }
 }, 60 * 1000);
+
+// --- SYSTEM STATS MONITOR ---
+let lastCpuUsage = process.cpuUsage();
+let lastHrTime = process.hrtime();
+
+setInterval(() => {
+    try {
+        const diffCpu = process.cpuUsage(lastCpuUsage);
+        const diffTime = process.hrtime(lastHrTime);
+        
+        lastCpuUsage = process.cpuUsage();
+        lastHrTime = process.hrtime();
+
+        const elapTimeMS = (diffTime[0] * 1000) + (diffTime[1] / 1e6);
+        const elapCpuMS = (diffCpu.user + diffCpu.system) / 1000;
+        
+        // Calculate % (Normalized by core count)
+        const numCpus = os.cpus().length;
+        const cpuPercent = Math.round((100 * elapCpuMS / elapTimeMS) / numCpus);
+
+        io.emit('system_stats', {
+            cpu: cpuPercent,
+            mem: { used: process.memoryUsage().rss, total: os.totalmem() },
+            concurrent: io.engine.clientsCount,
+            uptime: process.uptime()
+        });
+    } catch (e) { console.error("Stats Error:", e); }
+}, 3000);
 
 const getFileUrl = (file) => {
     if (!file) return null;

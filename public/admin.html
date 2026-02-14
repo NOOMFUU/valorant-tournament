@@ -242,7 +242,7 @@
                 <!-- SYSTEM VITALS -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
-                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">CPU Load</span>
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">App CPU</span>
                         <div class="flex items-end gap-2 mt-1 z-10">
                             <span class="text-3xl text-white font-header" id="sys-cpu">0%</span>
                             <div class="w-full bg-[#333] h-1.5 rounded-full mb-2"><div id="sys-cpu-bar" class="bg-[#ff4655] h-full rounded-full transition-all duration-500" style="width: 0%"></div></div>
@@ -250,9 +250,9 @@
                         <i class="fa-solid fa-microchip absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
                     </div>
                     <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
-                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">Memory Usage</span>
-                        <span class="text-3xl text-white font-header mt-1 z-10" id="sys-ram">0 GB</span>
-                        <span class="text-[9px] text-gray-500 z-10">System Free: <span id="sys-ram-free" class="text-gray-300">0 GB</span></span>
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">App Memory</span>
+                        <span class="text-3xl text-white font-header mt-1 z-10" id="sys-ram">0 MB</span>
+                        <span class="text-[9px] text-gray-500 z-10">Host Total: <span id="sys-ram-total" class="text-gray-300">0 GB</span></span>
                         <i class="fa-solid fa-memory absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
                     </div>
                     <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
@@ -262,7 +262,7 @@
                         <i class="fa-solid fa-users absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
                     </div>
                     <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
-                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">System Uptime</span>
+                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest z-10">App Uptime</span>
                         <span class="text-3xl text-white font-header mt-1 z-10" id="sys-uptime">0h 0m</span>
                         <span class="text-[9px] text-gray-500 z-10">Server Status: <span class="text-green-500 font-bold">ONLINE</span></span>
                         <i class="fa-solid fa-clock absolute -right-2 -bottom-2 text-6xl text-white/5"></i>
@@ -629,10 +629,10 @@
             document.getElementById('sys-cpu').innerText = d.cpu + '%';
             document.getElementById('sys-cpu-bar').style.width = d.cpu + '%';
             // RAM
-            const usedGB = ((d.mem.sysTotal - d.mem.sysFree) / 1024 / 1024 / 1024).toFixed(1);
-            const freeGB = (d.mem.sysFree / 1024 / 1024 / 1024).toFixed(1);
-            document.getElementById('sys-ram').innerText = usedGB + ' GB';
-            document.getElementById('sys-ram-free').innerText = freeGB + ' GB';
+            const usedMB = (d.mem.used / 1024 / 1024).toFixed(0);
+            const totalGB = (d.mem.total / 1024 / 1024 / 1024).toFixed(1);
+            document.getElementById('sys-ram').innerText = usedMB + ' MB';
+            document.getElementById('sys-ram-total').innerText = totalGB + ' GB';
             // Users & Uptime
             document.getElementById('sys-con').innerText = d.concurrent;
             const h = Math.floor(d.uptime / 3600); const m = Math.floor((d.uptime % 3600) / 60);
