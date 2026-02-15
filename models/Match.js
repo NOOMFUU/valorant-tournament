@@ -53,6 +53,14 @@ const MatchSchema = new mongoose.Schema({
         status: { type: String, enum: ['none', 'pending', 'rejected'], default: 'none' }
     },
 
+    // [NEW] Pause System
+    pauseRequest: {
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        reason: String,
+        status: { type: String, enum: ['none', 'pending', 'resolved'], default: 'none' },
+        timestamp: Date
+    },
+
     // VETO SYSTEM DATA
     vetoData: {
         status: { type: String, default: 'pending' },
@@ -72,6 +80,11 @@ const MatchSchema = new mongoose.Schema({
         
         currentTurnStartTime: Date,
         currentTurnDeadline: Date,
+        pausedRemainingTime: { type: Number, default: 0 },
+        pauseStartTime: Date,
+        pausedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        teamAPauses: { type: Number, default: 0 },
+        teamBPauses: { type: Number, default: 0 },
         turnTimeLimit: { type: Number, default: 45 },
         
         coinTossWinner: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },

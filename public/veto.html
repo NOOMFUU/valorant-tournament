@@ -53,7 +53,7 @@
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
             gap: 1rem;
             width: 100%; max-width: 1800px;
-            padding: 1rem 3rem 5rem 3rem; /* Added bottom padding for timeline */
+            padding: 1rem 3rem 8rem 3rem; /* Added bottom padding for timeline */
             align-content: center;
         }
         
@@ -165,9 +165,23 @@
         .coin-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 50%; border: 5px solid white; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: #0f1923; }
         .face-heads { color: #1fa474; } .face-tails { color: #ff4655; transform: rotateY(180deg); }
         .spin-to-heads { transform: rotateY(1800deg); }
+
+        /* YOUR TURN INDICATOR */
+        .your-turn-pulse {
+            box-shadow: inset 0 0 50px rgba(255, 70, 85, 0.3);
+            animation: pulse-border 2s infinite;
+        }
+        
+        /* PAUSE OVERLAY */
+        #pauseOverlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes pulse-border { 0% { box-shadow: inset 0 0 30px rgba(255, 70, 85, 0.1); } 50% { box-shadow: inset 0 0 80px rgba(255, 70, 85, 0.4); } 100% { box-shadow: inset 0 0 30px rgba(255, 70, 85, 0.1); } }
     </style>
 </head>
-<body>
+<body id="appBody">
 
     <div class="scanlines"></div>
     <div id="bgLayer" class="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000 opacity-20 scale-105" style="background-image: url('https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png');"></div>
@@ -176,6 +190,16 @@
     <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 opacity-0 -translate-y-8 pointer-events-none">
         <div class="bg-[#ff4655] text-white px-8 py-3 text-xl font-ui font-bold tracking-widest clip-val shadow-xl flex items-center gap-3">
             <i class="fa-solid fa-bell"></i> <span id="toastMsg">NOTIFICATION</span>
+        </div>
+    </div>
+
+    <div id="pauseOverlay" class="hidden fixed inset-0 z-[200] flex items-center justify-center">
+        <div class="text-center animate-pulse">
+            <i class="fa-solid fa-pause text-6xl text-yellow-500 mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]"></i>
+            <h2 class="text-5xl font-header text-white tracking-[0.2em] mb-2">MATCH PAUSED</h2>
+            <p class="text-gray-400 font-mono text-sm tracking-widest uppercase">Waiting for Admin Resolution</p>
+            <div id="pauseTimerDisplay" class="text-4xl font-mono font-bold text-white mt-4"></div>
+            <button id="resumeBtn" onclick="resumeMatch()" class="hidden mt-6 bg-[#1fa474] hover:bg-white hover:text-[#1fa474] text-white px-8 py-3 font-ui font-bold text-xl clip-val transition shadow-[0_0_20px_rgba(31,164,116,0.4)]">RESUME MATCH</button>
         </div>
     </div>
 
@@ -217,7 +241,7 @@
                 </div>
                 <div id="view-chat" class="absolute inset-0 hidden flex flex-col">
                     <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll"></div>
-                    <div class="p-3 bg-[#0f1923] border-t border-white/10">
+                    <div id="chatInputContainer" class="p-3 bg-[#0f1923] border-t border-white/10">
                         <div class="flex gap-2">
                             <input id="chatInput" class="flex-1 bg-black/50 border border-white/20 px-3 py-2 text-xs text-white focus:border-[#ff4655] outline-none font-mono placeholder-gray-600" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendChat('chatInput')">
                             <button onclick="sendChat('chatInput')" class="px-3 bg-white/10 hover:bg-[#ff4655] text-white transition border border-white/10"><i class="fa-solid fa-paper-plane text-xs"></i></button>
@@ -231,9 +255,10 @@
         <main class="main-stage">
             <div class="w-full h-[6px] bg-[#1f2731] relative z-20">
                 <div id="timerBar" class="h-full bg-[#ff4655] shadow-[0_0_20px_#ff4655] w-0 transition-all duration-75 ease-linear"></div>
+                <div id="timerText" class="absolute top-4 right-6 text-6xl font-header text-white/5 font-bold pointer-events-none transition-colors duration-300 select-none"></div>
             </div>
             
-            <div class="flex justify-center mt-2 opacity-0 absolute top-6 left-0 right-0 z-30 pointer-events-none" id="topInfo">
+            <div class="flex justify-center mt-2 opacity-0 absolute top-6 left-0 right-0 z-50 pointer-events-none" id="topInfo">
                 <div class="bg-black/60 backdrop-blur px-8 py-1 clip-val border-b border-white/10 text-center inline-block">
                     <div id="phaseText" class="text-[10px] text-[#ff4655] tracking-[0.4em] font-bold uppercase animate-pulse">CONNECTING...</div>
                 </div>
@@ -242,9 +267,19 @@
             <header class="flex flex-col shrink-0 relative z-30 min-h-[160px] pt-12 pb-2">
                 <div class="flex justify-between items-end px-12">
                     <div class="w-1/3 text-left opacity-0 -translate-x-10 transition-all duration-700" id="headerTA">
-                        <div class="flex items-center gap-2 mb-1">
-                            <div id="sA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
-                            <div id="sA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
+                        <div class="flex items-center gap-4 mb-1">
+                            <div class="flex items-center gap-2" title="Connection Status">
+                                <div id="cA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                                <div id="cA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
+                            </div>
+                            <div class="flex items-center gap-2 opacity-50" id="rA_box">
+                                <div id="sA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                                <div id="sA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
+                            </div>
+                            <div class="flex items-center gap-2 opacity-70" title="Pauses Remaining">
+                                <i class="fa-solid fa-pause text-[10px] text-gray-500"></i>
+                                <div id="pA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">3/3</div>
+                            </div>
                         </div>
                         <h1 id="tA" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM A</h1>
                     </div>
@@ -254,9 +289,19 @@
                     </div>
 
                     <div class="w-1/3 text-right opacity-0 translate-x-10 transition-all duration-700" id="headerTB">
-                        <div class="flex items-center justify-end gap-2 mb-1">
-                            <div id="sB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">WAITING</div>
-                            <div id="sB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                        <div class="flex items-center justify-end gap-4 mb-1">
+                            <div class="flex items-center gap-2 opacity-70" title="Pauses Remaining">
+                                <div id="pB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">3/3</div>
+                                <i class="fa-solid fa-pause text-[10px] text-gray-500"></i>
+                            </div>
+                            <div class="flex items-center gap-2 opacity-50" id="rB_box">
+                                <div id="sB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
+                                <div id="sB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                            </div>
+                            <div class="flex items-center gap-2" title="Connection Status">
+                                <div id="cB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
+                                <div id="cB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                            </div>
                         </div>
                         <h1 id="tB" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM B</h1>
                     </div>
@@ -272,8 +317,9 @@
             <div class="flex-1 flex items-center justify-center w-full overflow-hidden relative">
                 <div id="grid" class="map-grid-container opacity-0 scale-95 transition-all duration-700"></div>
                 
-                <div id="sequencerContainer" class="timeline-container opacity-0 transition-opacity duration-1000">
+                <div id="sequencerContainer" class="timeline-container opacity-0 transition-opacity duration-1000 flex-col gap-3">
                     <div id="sequencerBar" class="flex items-center bg-black/40 px-4 py-2 rounded-lg border border-white/5 backdrop-blur-md"></div>
+                    <button id="pauseBtn" onclick="requestPause()" class="pointer-events-auto bg-yellow-500/10 hover:bg-yellow-500 hover:text-black text-yellow-500 border border-yellow-500/50 px-6 py-2 text-[10px] font-bold uppercase tracking-widest transition clip-val"><i class="fa-solid fa-pause mr-2"></i> PAUSE MATCH</button>
                 </div>
             </div>
         </main>
@@ -294,7 +340,7 @@
                     <h2 class="text-[#1fa474] font-mono tracking-[0.5em] text-xs mb-1 uppercase">Match Protocol Complete</h2>
                     <h1 class="text-6xl font-header leading-none text-white drop-shadow-2xl">VETO SUMMARY</h1>
                 </div>
-                <div class="flex gap-4 items-center">
+                <div class="flex gap-4 items-center" id="endButtons">
                     <button onclick="toggleEndDrawer()" class="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-ui tracking-widest text-sm clip-val border border-white/10 transition flex items-center gap-2">
                         <i class="fa-regular fa-comments"></i> COMMS / LOGS
                     </button>
@@ -314,6 +360,7 @@
                 </div>
                 <div class="col-span-6 flex flex-col h-full animate-scale-up delay-100 relative">
                     <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#1fa474]/5 to-transparent pointer-events-none"></div>
+                    
                     <h3 class="font-ui text-xl tracking-[0.5em] text-center text-gray-500 mb-4 uppercase">Map Selection Series</h3>
                     <div id="endMaps" class="flex-1 flex flex-col gap-2 justify-center mb-4 overflow-y-auto custom-scroll px-2"></div>
                 </div>
@@ -353,8 +400,14 @@
         const socket = io(API_BASE || undefined);
         const matchId = new URLSearchParams(location.search).get('match');
         const teamId = localStorage.getItem('id');
+        const userRole = localStorage.getItem('role');
         let timerInt;
+        let pauseInt;
         let coinFlipDone = false; 
+        let lastSeqIndex = -1;
+        let lastStatus = '';
+        let currentVetoState = null;
+        let currentMatchData = null;
 
         // Map Assets
         const maps = {
@@ -374,6 +427,15 @@
         };
         const defaultBg = 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png';
 
+        // Audio Context
+        const SFX = {
+            turn: new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'),
+            action: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
+            tick: new Audio('https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'),
+            ready: new Audio('https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3')
+        };
+        Object.values(SFX).forEach(a => a.volume = 0.4);
+
         window.addEventListener('DOMContentLoaded', () => {
             const tl = gsap.timeline();
             tl.to("#headerTA", { opacity: 1, x: 0, duration: 0.8, ease: "power3.out" })
@@ -384,9 +446,32 @@
               .to("#sequencerContainer", { opacity: 1, duration: 0.5 }, "-=0.2");
         });
 
+        // Enable Audio on interaction
+        window.addEventListener('click', () => { Object.values(SFX).forEach(a => { if(a.context && a.context.state === 'suspended') a.context.resume(); }); }, {once:true});
+
         const areIdsEqual = (id1, id2) => String(id1?._id || id1) === String(id2?._id || id2);
 
-        if(matchId) socket.emit('join_match', matchId);
+        if(matchId) socket.emit('join_match', { matchId, teamId });
+        
+        document.addEventListener('visibilitychange', () => {
+            const status = document.hidden ? 'away' : 'online';
+            if (teamId) socket.emit('update_status', status);
+
+            if (document.hidden && teamId && userRole === 'team' && lastStatus === 'in_progress') {
+                requestPause('Auto-Pause: Team Away');
+            }
+            
+            if (!document.hidden && teamId && userRole === 'team' && lastStatus === 'paused' && currentVetoState && currentVetoState.pausedBy === teamId) {
+                resumeMatch();
+            }
+        });
+
+        socket.on('play_audio', (data) => {
+            if(data && data.sound && SFX[data.sound]) {
+                SFX[data.sound].currentTime = 0;
+                SFX[data.sound].play().catch(()=>{});
+            }
+        });
         
         function switchSidebarTab(tab) {
             document.getElementById('view-logs').classList.toggle('hidden', tab !== 'logs');
@@ -465,8 +550,25 @@
         socket.on('veto_update', (m) => {
             const v = m.vetoData;
             const isA = areIdsEqual(teamId, m.teamA._id);
+            const isB = areIdsEqual(teamId, m.teamB._id);
+            const isSpectator = !isA && !isB;
+            currentVetoState = v;
+            currentMatchData = m;
             
+            handleAudioCues(v, m);
             updateHeader(m, v, isA);
+
+            // Handle Pause State
+            const isPaused = (m.pauseRequest && m.pauseRequest.status === 'pending') || v.status === 'paused';
+            const pauseOverlay = document.getElementById('pauseOverlay');
+            if (isPaused) {
+                pauseOverlay.classList.remove('hidden');
+                if (v.status === 'paused') handlePauseTimer(v);
+                else document.getElementById('pauseTimerDisplay').innerText = "";
+            } else {
+                pauseOverlay.classList.add('hidden');
+            }
+
             renderTimeline(v); 
             renderGrid(v, teamId, m.teamA, m.teamB);
             renderMiniSummary(v, m.teamA, m.teamB); 
@@ -475,7 +577,11 @@
             const lobbyCont = document.getElementById('lobbyActionArea');
             lobbyCont.removeAttribute('onclick'); 
             
-            if(m.roomPassword) {
+            if (isSpectator) {
+                passEl.innerText = "LOBBY ID HIDDEN";
+                passEl.classList.add('text-gray-500');
+                passEl.classList.remove('text-[#ff4655]', 'text-white');
+            } else if(m.roomPassword) {
                 passEl.innerText = m.roomPassword;
                 passEl.classList.add('text-white');
                 passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
@@ -494,13 +600,25 @@
 
             const amIReady = isA ? v.teamAReady : v.teamBReady;
             const rBtn = document.getElementById('readyBtn');
-            if(m.roomPassword && !amIReady && v.status === 'pending') {
+            if(!isSpectator && m.roomPassword && !amIReady && v.status === 'pending') {
                 rBtn.classList.remove('hidden');
             } else {
                 rBtn.classList.add('hidden');
             }
 
-            if(v.status === 'in_progress') runTimer(v.currentTurnStartTime, v.turnTimeLimit);
+            // Spectator Controls Visibility
+            const pauseBtn = document.getElementById('pauseBtn');
+            if(pauseBtn) {
+                if(isSpectator) pauseBtn.classList.add('hidden');
+                else pauseBtn.classList.remove('hidden');
+            }
+            const chatInput = document.getElementById('chatInputContainer');
+            if(chatInput) {
+                if(isSpectator) chatInput.classList.add('hidden');
+                else chatInput.classList.remove('hidden');
+            }
+
+            if(v.status === 'in_progress' && !isPaused) runTimer(v.currentTurnStartTime, v.turnTimeLimit);
             else { document.getElementById('timerBar').style.width = '0%'; clearInterval(timerInt); }
 
             const logHtml = v.history.slice().reverse().map(l => `<div class="border-b border-white/5 pb-1"><span class="text-[#ff4655] font-bold mr-2">>></span>${l.text}</div>`).join('');
@@ -511,6 +629,21 @@
 
             if(v.status === 'completed' || m.status === 'live') showEndScreen(m);
         });
+
+        function handleAudioCues(v, m) {
+            // Status Change
+            if (v.status !== lastStatus) {
+                if (v.status === 'in_progress') SFX.ready.play().catch(()=>{});
+                lastStatus = v.status;
+            }
+            // Turn Change
+            if (v.sequenceIndex !== lastSeqIndex && v.status === 'in_progress') {
+                SFX.action.play().catch(()=>{});
+                const step = v.sequence[v.sequenceIndex];
+                if (step && areIdsEqual(step.team, teamId)) SFX.turn.play().catch(()=>{});
+                lastSeqIndex = v.sequenceIndex;
+            }
+        }
 
         // --- TIMELINE SEQUENCER ---
         function renderTimeline(v) {
@@ -539,8 +672,31 @@
         function updateHeader(m, v, isA) {
             document.getElementById('tA').innerText = m.teamA.name;
             document.getElementById('tB').innerText = m.teamB.name;
-            const setSt = (id, r) => { const el=document.getElementById(id), d=document.getElementById(id+'_dot'); if(r){ el.innerText="ONLINE"; el.className="text-xs font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; } else{ el.innerText="WAITING"; el.className="text-xs font-bold tracking-widest text-gray-500 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; } }
+            
+            // Ready Status
+            const setSt = (id, r) => { const el=document.getElementById(id), d=document.getElementById(id+'_dot'), box=document.getElementById(id.replace('s','r')+'_box'); if(r){ el.innerText="READY"; el.className="text-[10px] font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; box.classList.remove('opacity-50'); } else{ el.innerText="NOT READY"; el.className="text-[10px] font-bold tracking-widest text-gray-500 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; box.classList.add('opacity-50'); } }
             setSt('sA', v.teamAReady); setSt('sB', v.teamBReady);
+            
+            // Connection Status
+            const setConn = (id, tid) => {
+                const el = document.getElementById(id), d = document.getElementById(id+'_dot');
+                const p = m.presence && m.presence[tid] ? m.presence[tid] : null;
+                if (!p) { el.innerText="OFFLINE"; el.className="text-[10px] font-bold tracking-widest text-gray-600 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; }
+                else if (p.isAway) { el.innerText="AWAY"; el.className="text-[10px] font-bold tracking-widest text-yellow-500 font-mono"; d.className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_10px_#eab308]"; }
+                else { el.innerText="CONNECTED"; el.className="text-[10px] font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; }
+            };
+            setConn('cA', m.teamA._id);
+            setConn('cB', m.teamB._id);
+
+            // Pause Status
+            const MAX_PAUSES = 3;
+            const pA = MAX_PAUSES - (v.teamAPauses || 0);
+            const pB = MAX_PAUSES - (v.teamBPauses || 0);
+            document.getElementById('pA').innerText = `${pA}/${MAX_PAUSES}`;
+            document.getElementById('pB').innerText = `${pB}/${MAX_PAUSES}`;
+            document.getElementById('pA').className = `text-[10px] font-bold tracking-widest font-mono ${pA > 0 ? 'text-gray-500' : 'text-red-500'}`;
+            document.getElementById('pB').className = `text-[10px] font-bold tracking-widest font-mono ${pB > 0 ? 'text-gray-500' : 'text-red-500'}`;
+
             const st = document.getElementById('status');
             if(v.status === 'in_progress') {
                 const step = v.sequence[v.sequenceIndex];
@@ -551,10 +707,15 @@
                 document.getElementById('headerTA').style.opacity = activeA ? '1' : '0.2';
                 document.getElementById('headerTB').style.opacity = activeA ? '0.2' : '1';
                 document.getElementById('phaseText').innerText = `// ${activeA?m.teamA.name:m.teamB.name} TURN //`;
+                
+                // Visual Cue for My Turn
+                const isMyTurn = areIdsEqual(step.team, teamId);
+                document.getElementById('appBody').classList.toggle('your-turn-pulse', isMyTurn);
             } else {
                 st.innerText = v.status === 'pending' ? 'PRE-MATCH' : v.status.toUpperCase();
                 st.className = "bg-white text-black px-12 py-2 font-ui text-4xl font-bold clip-val z-20";
                 document.getElementById('headerTA').style.opacity = '1'; document.getElementById('headerTB').style.opacity = '1';
+                document.getElementById('appBody').classList.remove('your-turn-pulse');
             }
         }
 
@@ -726,9 +887,110 @@
         }
 
         function sendChat(id) { const i = document.getElementById(id); if(i.value.trim()) { socket.emit('send_chat', {matchId, teamId, message: i.value}); i.value=''; } }
-        function runTimer(s, l) { clearInterval(timerInt); const end = new Date(s).getTime() + (l * 1000); timerInt = setInterval(() => { const now = Date.now(); const p = ((end - now) / (l * 1000)) * 100; const bar = document.getElementById('timerBar'); bar.style.width = Math.max(0, p) + '%'; bar.style.backgroundColor = p < 20 ? '#ff4655' : '#1fa474'; if (p <= 0) clearInterval(timerInt); }, 50); }
-        function handleModals(v, myId) { const m = document.getElementById('modal'); const c = document.getElementById('modalContent'); if(v.status==='decision' || (v.sequence[v.sequenceIndex]?.act === 'side' && areIdsEqual(v.sequence[v.sequenceIndex].team, myId))) { m.classList.remove('hidden'); m.classList.add('flex'); if(v.status==='decision' && !coinFlipDone) { coinFlipDone=true; c.innerHTML=`<div class="coin-container"><div id="coin" class="coin"><div class="coin-face face-heads"><i class="fa-solid fa-crown"></i></div><div class="coin-face face-tails"><i class="fa-solid fa-minus"></i></div></div></div><div class="text-white font-header text-4xl mt-8 tracking-widest">COIN FLIP</div>`; setTimeout(()=>{document.getElementById('coin').className="coin spin-to-heads"; setTimeout(()=>renderCoinResult(v,myId),3000)},100); } else if(v.status==='decision') renderCoinResult(v,myId); else if(v.sequence[v.sequenceIndex].act === 'side') { const map = v.pickedMaps.find(p=>!p.selectedSide).map; c.innerHTML=`<div class="text-[#1fa474] font-mono tracking-widest text-sm mb-2">MAP SELECTED</div><h2 class="text-8xl font-header text-white mb-12 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">${map}</h2><div class="flex gap-12 justify-center"><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'atk'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#ff4655] hover:shadow-[0_0_30px_rgba(255,70,85,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#ff4655] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-crosshairs text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">ATTACK</span></button><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'def'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#1fa474] hover:shadow-[0_0_30px_rgba(31,164,116,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#1fa474] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-shield-halved text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">DEFENSE</span></button></div>`; } } else { m.classList.add('hidden'); m.classList.remove('flex'); } }
-        function renderCoinResult(v, myId) { const win = areIdsEqual(myId, v.coinTossWinner._id); const c = document.getElementById('modalContent'); if(win) { c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-8 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-8">You won the coin toss. Choose your advantage.</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-2xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-2xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; } else { c.innerHTML=`<div class="text-[#ff4655] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">DEFEAT</div><div class="text-gray-500 font-mono animate-pulse tracking-widest">OPPONENT IS DECIDING...</div>`; } }
+        
+        async function requestPause(reason = 'Team Pause') {
+            const res = await fetch(`${API_BASE}/api/matches/${matchId}/pause`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ reason }) });
+            if(res.ok) showToast('Pause Requested'); else showToast('Error sending request');
+        }
+
+        async function resumeMatch() {
+            const res = await fetch(`${API_BASE}/api/matches/${matchId}/resume`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            if(!res.ok) { const d = await res.json(); showToast(d.msg); }
+        }
+        
+        function handlePauseTimer(v) {
+            clearInterval(pauseInt);
+            const start = new Date(v.pauseStartTime).getTime();
+            const limit = 120 * 1000; // 2 minutes
+            const end = start + limit;
+            const isPauser = v.pausedBy === teamId;
+            const btn = document.getElementById('resumeBtn');
+            const display = document.getElementById('pauseTimerDisplay');
+
+            pauseInt = setInterval(() => {
+                const now = Date.now();
+                const diff = end - now;
+                
+                if (isPauser) {
+                    btn.classList.remove('hidden');
+                    display.innerText = "WAITING FOR RESUME";
+                } else {
+                    if (diff <= 0) {
+                        btn.classList.remove('hidden');
+                        display.innerText = "OPPONENT TIMEOUT - YOU CAN RESUME";
+                    } else {
+                        btn.classList.add('hidden');
+                        display.innerText = `OPPONENT PAUSE: ${Math.ceil(diff/1000)}s`;
+                    }
+                }
+            }, 100);
+        }
+
+        let lastTickSec = -1;
+        function runTimer(s, l) { 
+            clearInterval(timerInt); 
+            const end = new Date(s).getTime() + (l * 1000); 
+            const txt = document.getElementById('timerText');
+            
+            timerInt = setInterval(() => { 
+                const now = Date.now(); 
+                const diff = end - now;
+                const p = (diff / (l * 1000)) * 100; 
+                const bar = document.getElementById('timerBar'); 
+                bar.style.width = Math.max(0, p) + '%'; 
+                bar.style.backgroundColor = p < 20 ? '#ff4655' : '#1fa474'; 
+                
+                const sec = Math.ceil(diff / 1000);
+                if(txt) {
+                    txt.innerText = sec > 0 ? sec : '';
+                    if(sec <= 10 && sec > 0) {
+                        txt.classList.remove('text-white/5');
+                        txt.classList.add('text-[#ff4655]', 'animate-pulse');
+                        if(sec !== lastTickSec) { SFX.tick.play().catch(()=>{}); lastTickSec = sec; }
+                    } else {
+                        txt.classList.add('text-white/5');
+                        txt.classList.remove('text-[#ff4655]', 'animate-pulse');
+                    }
+                }
+
+                if (p <= 0) clearInterval(timerInt); 
+            }, 50); 
+        }
+        function handleModals(v, myId) { 
+            const m = document.getElementById('modal'); 
+            const c = document.getElementById('modalContent'); 
+            const isSpectator = currentMatchData && !areIdsEqual(myId, currentMatchData.teamA._id) && !areIdsEqual(myId, currentMatchData.teamB._id);
+
+            if(v.status==='decision' || (v.sequence[v.sequenceIndex]?.act === 'side' && areIdsEqual(v.sequence[v.sequenceIndex].team, myId))) { 
+                m.classList.remove('hidden'); m.classList.add('flex'); 
+                if(v.status==='decision' && !coinFlipDone) { 
+                    coinFlipDone=true; 
+                    c.innerHTML=`<div class="coin-container"><div id="coin" class="coin"><div class="coin-face face-heads"><i class="fa-solid fa-crown"></i></div><div class="coin-face face-tails"><i class="fa-solid fa-minus"></i></div></div></div><div class="text-white font-header text-4xl mt-8 tracking-widest">COIN FLIP</div>`; 
+                    setTimeout(()=>{document.getElementById('coin').className="coin spin-to-heads"; setTimeout(()=>renderCoinResult(v,myId),3000)},100); 
+                } else if(v.status==='decision') {
+                    renderCoinResult(v,myId); 
+                } else if(v.sequence[v.sequenceIndex].act === 'side' && !isSpectator) { 
+                    const map = v.pickedMaps.find(p=>!p.selectedSide).map; 
+                    c.innerHTML=`<div class="text-[#1fa474] font-mono tracking-widest text-sm mb-2">MAP SELECTED</div><h2 class="text-8xl font-header text-white mb-12 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">${map}</h2><div class="flex gap-12 justify-center"><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'atk'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#ff4655] hover:shadow-[0_0_30px_rgba(255,70,85,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#ff4655] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-crosshairs text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">ATTACK</span></button><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'def'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#1fa474] hover:shadow-[0_0_30px_rgba(31,164,116,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#1fa474] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-shield-halved text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">DEFENSE</span></button></div>`; 
+                } 
+            } else { 
+                m.classList.add('hidden'); m.classList.remove('flex'); 
+            } 
+        }
+        function renderCoinResult(v, myId) { 
+            const win = areIdsEqual(myId, v.coinTossWinner._id); 
+            const c = document.getElementById('modalContent'); 
+            const isSpectator = currentMatchData && !areIdsEqual(myId, currentMatchData.teamA._id) && !areIdsEqual(myId, currentMatchData.teamB._id);
+
+            if(win) { 
+                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-8 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-8">You won the coin toss. Choose your advantage.</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-2xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-2xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; 
+            } else if (isSpectator) {
+                const winnerName = v.coinTossWinner.name || 'TEAM';
+                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">COIN TOSS</div><div class="text-white font-mono tracking-widest mb-2">WINNER: <span class="text-[#1fa474] font-bold">${winnerName}</span></div><div class="text-gray-500 font-mono animate-pulse tracking-widest text-xs">WAITING FOR DECISION...</div>`;
+            } else { 
+                c.innerHTML=`<div class="text-[#ff4655] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">DEFEAT</div><div class="text-gray-500 font-mono animate-pulse tracking-widest">OPPONENT IS DECIDING...</div>`; 
+            } 
+        }
     </script>
 </body>
 </html>

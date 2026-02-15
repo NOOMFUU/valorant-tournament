@@ -7,6 +7,7 @@ class VetoManager {
     constructor(io) {
         this.io = io;
         this.timers = {}; 
+        this.presence = {};
     }
 
     async broadcastState(matchId) {
@@ -41,7 +42,10 @@ class VetoManager {
                     }
                 }
 
-                this.io.to(matchId).emit('veto_update', match);
+                const matchData = match.toJSON();
+                matchData.presence = this.presence[matchId] || {};
+                this.io.to(matchId).emit('veto_update', matchData);
+                this.io.to('admins').emit('veto_update', matchData);
             }
         } catch (err) { console.error(err); }
     }
@@ -55,7 +59,12 @@ class VetoManager {
     async handleChat(matchId, teamId, message) {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if(!match) return;
-        const senderName = match.teamA._id.toString() === teamId ? match.teamA.name : match.teamB.name;
+        
+        let senderName = "Unknown";
+        if (teamId === 'admin') senderName = "ADMIN";
+        else if (match.teamA && match.teamA._id.toString() === teamId) senderName = match.teamA.name;
+        else if (match.teamB && match.teamB._id.toString() === teamId) senderName = match.teamB.name;
+
         match.chat.push({ sender: senderName, senderId: teamId, message: message });
         await match.save();
         this.io.to(matchId).emit('chat_new', { sender: senderName, message, senderId: teamId });
@@ -256,6 +265,112 @@ class VetoManager {
         }
     }
 
+    async pauseTimer(match) {
+        const matchId = match._id.toString();
+        if (this.timers[matchId]) {
+            clearTimeout(this.timers[matchId]);
+            delete this.timers[matchId];
+        }
+        
+        if (match.vetoData.currentTurnDeadline) {
+            const now = new Date();
+            const deadline = new Date(match.vetoData.currentTurnDeadline);
+            const remaining = deadline.getTime() - now.getTime();
+            match.vetoData.pausedRemainingTime = Math.max(0, remaining);
+            await match.save();
+        }
+    }
+
+    async resumeTimer(match) {
+        const remaining = match.vetoData.pausedRemainingTime || 0;
+        if (remaining > 0) {
+            await this.startTimerLogic(match, remaining / 1000);
+        } else {
+            await this.handleTimeout(match._id.toString());
+        }
+        match.vetoData.pausedRemainingTime = 0;
+        await match.save();
+        await this.broadcastState(match._id.toString());
+    }
+
+    async handleTeamPause(matchId, teamId) {
+        const match = await Match.findById(matchId);
+        if (!match || match.vetoData.status !== 'in_progress') return { success: false, msg: 'Cannot pause now' };
+        
+        const isTeamA = match.teamA.toString() === teamId;
+        const isTeamB = match.teamB.toString() === teamId;
+        if (!isTeamA && !isTeamB) return { success: false, msg: 'Unauthorized' };
+
+        const MAX_PAUSES = 3;
+        const currentPauses = isTeamA ? (match.vetoData.teamAPauses || 0) : (match.vetoData.teamBPauses || 0);
+
+        if (currentPauses >= MAX_PAUSES) return { success: false, msg: `Pause limit reached (${MAX_PAUSES}/${MAX_PAUSES})` };
+
+        if (isTeamA) match.vetoData.teamAPauses = currentPauses + 1;
+        else match.vetoData.teamBPauses = currentPauses + 1;
+
+        await this.pauseTimer(match);
+        
+        match.vetoData.status = 'paused';
+        match.vetoData.pausedBy = teamId;
+        match.vetoData.pauseStartTime = new Date();
+        
+        await this.logAction(match, `PAUSE: Requested by ${isTeamA ? 'Team A' : 'Team B'} (${currentPauses + 1}/${MAX_PAUSES})`);
+        await match.save();
+        await this.broadcastState(matchId);
+        return { success: true };
+    }
+
+    async adminPause(match) {
+        await this.pauseTimer(match);
+        match.vetoData.status = 'paused';
+        match.vetoData.pausedBy = null; // Admin
+        match.vetoData.pauseStartTime = new Date();
+        await this.logAction(match, `PAUSE: Admin paused veto`);
+        await match.save();
+        await this.broadcastState(match._id.toString());
+    }
+
+    async resetTurnTimer(match) {
+        if (match.vetoData.status !== 'in_progress' && match.vetoData.status !== 'decision') return;
+        
+        let duration = match.vetoData.turnTimeLimit || 45;
+        
+        if (match.vetoData.status === 'decision') {
+            duration = 60;
+        } else if (match.vetoData.status === 'in_progress') {
+            const step = match.vetoData.sequence[match.vetoData.sequenceIndex];
+            if (step && step.act === 'decider') duration = 60;
+        }
+
+        await this.logAction(match, `ADMIN: Timer Reset`);
+        await this.startTimerLogic(match, duration);
+        await match.save();
+        await this.broadcastState(match._id.toString());
+    }
+
+    async handleTeamResume(matchId, teamId) {
+        const match = await Match.findById(matchId);
+        if (!match || match.vetoData.status !== 'paused') return { success: false, msg: 'Not paused' };
+
+        const PAUSE_LIMIT_MS = 120 * 1000; // 2 minutes
+        const elapsed = Date.now() - new Date(match.vetoData.pauseStartTime).getTime();
+        const isPauser = match.vetoData.pausedBy && match.vetoData.pausedBy.toString() === teamId;
+        
+        if (!isPauser && elapsed < PAUSE_LIMIT_MS) {
+            const remaining = Math.ceil((PAUSE_LIMIT_MS - elapsed) / 1000);
+            return { success: false, msg: `Opponent pause active. Wait ${remaining}s` };
+        }
+
+        match.vetoData.status = 'in_progress';
+        match.vetoData.pausedBy = null;
+        match.vetoData.pauseStartTime = null;
+        
+        await this.resumeTimer(match);
+        await this.logAction(match, `RESUME: Match continued`);
+        return { success: true };
+    }
+
     async handleTimeout(matchId) {
         const match = await Match.findById(matchId);
         if(!match || match.vetoData.status !== 'in_progress') return;
@@ -278,6 +393,28 @@ class VetoManager {
              const randSide = Math.random() < 0.5 ? 'atk' : 'def';
              await this.logAction(match, `TIMEOUT: Auto-side ${randSide}`);
              await this.handleAction(matchId, step.team, 'side', null, randSide);
+        }
+    }
+
+    handleConnection(matchId, teamId) {
+        if (!this.presence[matchId]) this.presence[matchId] = {};
+        if (!this.presence[matchId][teamId]) this.presence[matchId][teamId] = { count: 0, isAway: false };
+        this.presence[matchId][teamId].count++;
+        this.broadcastState(matchId);
+    }
+
+    handleDisconnection(matchId, teamId) {
+        if (this.presence[matchId] && this.presence[matchId][teamId]) {
+            this.presence[matchId][teamId].count--;
+            if (this.presence[matchId][teamId].count <= 0) delete this.presence[matchId][teamId];
+            this.broadcastState(matchId);
+        }
+    }
+
+    handleStatusUpdate(matchId, teamId, status) {
+        if (this.presence[matchId] && this.presence[matchId][teamId]) {
+            this.presence[matchId][teamId].isAway = (status === 'away');
+            this.broadcastState(matchId);
         }
     }
 

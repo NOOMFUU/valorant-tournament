@@ -146,6 +146,18 @@
         .draggable-item:active { cursor: grabbing; }
         .dragging { opacity: 0.5; }
         .drag-over-item { border-top: 2px solid #ff4655 !important; background: rgba(255, 70, 85, 0.1); }
+
+        /* Bracket Lines */
+        #bracketSvg { overflow: visible; }
+        path.connector { fill: none; stroke: #444; stroke-width: 2; opacity: 0.6; }
+        path.connector.highlight { stroke: #ff4655; opacity: 1; stroke-width: 3; }
+
+        /* Highlight Styles */
+        .bracket-node.dimmed { opacity: 0.3; }
+        .bracket-node.highlight-team { opacity: 1; z-index: 20; }
+        .bracket-node.highlight-team > div { border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.4); }
+        path.connector.dimmed { opacity: 0.1; }
+        path.connector.highlight-path { stroke: #ff4655; opacity: 1; stroke-width: 3; }
     </style>
 </head>
 <body class="flex h-screen w-full">
@@ -187,8 +199,8 @@
         </nav>
 
         <div class="p-6 border-t border-[#222]">
-            <a href="/scoreboard.html" target="_blank" class="flex items-center gap-3 text-sm text-gray-500 hover:text-white transition p-3 rounded hover:bg-[#222] mb-3">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Public View
+            <a href="/tournament_view.html" target="_blank" class="flex items-center gap-3 text-sm text-gray-500 hover:text-white transition p-3 rounded hover:bg-[#222] mb-3">
+                <i class="fa-solid fa-sitemap"></i> Open Bracket View
             </a>
             <button onclick="logout()" class="w-full py-3 border border-[#333] hover:border-[#ff4655] hover:text-[#ff4655] text-gray-400 text-xs font-bold uppercase tracking-widest transition rounded-md">
                 System Logout
@@ -283,7 +295,7 @@
                             <p class="text-gray-400 text-sm mt-2 font-mono">ACTIVE MATCHES IN PROGRESS</p>
                             <div class="mt-6 flex gap-3">
                                 <button onclick="nav('structure')" class="btn-val px-4 py-2 text-xs rounded">MANAGE MATCHES</button>
-                                <a href="/scoreboard.html" target="_blank" class="px-4 py-2 border border-[#333] hover:bg-[#333] text-gray-300 text-xs rounded transition font-bold uppercase">View Scoreboard</a>
+                                <a href="/tournament_view.html" target="_blank" class="px-4 py-2 border border-[#333] hover:bg-[#333] text-gray-300 text-xs rounded transition font-bold uppercase">View Bracket</a>
                             </div>
                         </div>
                     </div>
@@ -319,7 +331,10 @@
                         <h3 class="text-xl font-header text-white flex items-center gap-3">
                             <i class="fa-solid fa-chart-line text-[#ff4655]"></i> LIVE FEED
                         </h3>
-                        <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search active match..." class="bg-[#0f1113] border border-[#333] text-sm px-4 py-2 rounded text-white focus:border-[#ff4655] outline-none w-64 placeholder-gray-600 font-mono">
+                        <div class="flex items-center gap-2">
+                            <select id="dashStageFilter" onchange="renderDashboard(allMatches)" class="bg-[#0f1113] border border-[#333] text-xs px-3 py-2 rounded text-white focus:border-[#ff4655] outline-none font-mono max-w-[200px]"><option value="all">All Stages</option></select>
+                            <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search match..." class="bg-[#0f1113] border border-[#333] text-sm px-4 py-2 rounded text-white focus:border-[#ff4655] outline-none w-64 placeholder-gray-600 font-mono">
+                        </div>
                     </div>
                     <div id="liveMatches" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
                 </div>
@@ -419,6 +434,8 @@
             <div class="flex border-b border-[#333] bg-[#15171a]">
                 <button onclick="switchMatchTab('overview')" id="tab-overview" class="tab-btn active flex-1 py-3 text-xs font-bold uppercase">Overview</button>
                 <button onclick="switchMatchTab('scoreboard')" id="tab-scoreboard" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Scoreboard</button>
+                <button onclick="switchMatchTab('veto')" id="tab-veto" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Veto Log</button>
+                <button onclick="switchMatchTab('chat')" id="tab-chat" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Live Chat</button>
                 <button onclick="switchMatchTab('admin')" id="tab-admin" class="tab-btn flex-1 py-3 text-xs font-bold uppercase text-red-500">Danger Zone</button>
             </div>
             <div class="p-8 overflow-y-auto flex-1 custom-scroll">
@@ -428,14 +445,37 @@
                         <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Status</label><select id="emStatus" class="w-full bg-[#1a1d21] border-b-2 border-[#2d3139] text-white text-base py-2.5 outline-none"><option value="scheduled">SCHEDULED</option><option value="live">LIVE</option><option value="finished">FINISHED</option></select></div>
                     </div>
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Time</label><div class="flex gap-4"><input type="datetime-local" id="emTime" class="flex-1 input-dark [color-scheme:dark]"><button onclick="adjustTime(15)" class="px-4 bg-[#222] border border-[#333] text-gray-400 text-xs rounded hover:text-white font-bold">+15m</button></div></div>
-                    <button onclick="openVetoPage()" class="btn-val w-full py-3.5 rounded text-xs font-bold uppercase mt-4">Open Veto Interface</button>
+                    <div class="flex gap-3 mt-4">
+                        <button onclick="openVetoPage()" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase">Open Veto Interface</button>
+                        <button onclick="openOverlayPage()" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase bg-blue-600 hover:bg-blue-500">Open Overlay</button>
+                    </div>
                 </div>
                 <div id="view-tab-scoreboard" class="hidden space-y-6">
                     <div class="flex justify-between items-center"><label class="text-xs text-[#ff4655] font-bold uppercase">Manual Scores</label><select id="emFormat" onchange="updateScoreInputs()" class="bg-[#0f1113] text-white text-xs p-2 border border-[#333] rounded"><option value="BO1">BO1</option><option value="BO3">BO3</option><option value="BO5">BO5</option></select></div>
                     <div id="manualScoreInputs" class="space-y-3 bg-black/20 p-4 rounded border border-[#333]"></div>
                 </div>
+                <div id="view-tab-veto" class="hidden space-y-6">
+                    <div id="vetoSummaryContent" class="space-y-4"></div>
+                    <button onclick="resetVeto()" class="w-full py-3 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-xs font-bold uppercase">RESET VETO STATE</button>
+                </div>
+                <div id="view-tab-chat" class="hidden h-full flex flex-col">
+                    <div id="adminChatBox" class="flex-1 bg-black/20 border border-[#333] rounded p-4 overflow-y-auto custom-scroll space-y-2 mb-4 min-h-[300px]"></div>
+                    <div class="flex gap-2">
+                        <input id="adminChatInput" class="flex-1 bg-[#0f1113] border border-[#333] text-white text-sm px-4 py-2 rounded focus:border-[#ff4655] outline-none" placeholder="Type message as ADMIN..." onkeypress="if(event.key==='Enter') sendAdminChat()">
+                        <button onclick="sendAdminChat()" class="btn-val px-6 py-2 rounded text-xs font-bold">SEND</button>
+                    </div>
+                </div>
                 <div id="view-tab-admin" class="hidden space-y-6">
                     <button onclick="rematchMatch()" class="w-full py-3 mb-2 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500 hover:text-[#111] rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-rotate-left mr-2"></i> RESET & REMATCH</button>
+                    <div class="bg-blue-900/5 border border-blue-500/20 p-4 rounded">
+                        <label class="text-xs text-blue-400 font-bold uppercase mb-3 block">Audio System Test</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="testAudio('ready')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Match Ready</button>
+                            <button onclick="testAudio('turn')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Turn Change</button>
+                            <button onclick="testAudio('action')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Action</button>
+                            <button onclick="testAudio('tick')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Timer Tick</button>
+                        </div>
+                    </div>
                     <div class="bg-red-900/5 border border-red-500/20 p-4 rounded">
                         <label class="text-xs text-red-400 font-bold uppercase mb-3 block">Force Result</label>
                         <div class="flex gap-3"><button onclick="forceWinner('teamA')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameA">A</span></button><button onclick="forceWinner('teamB')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameB">B</span></button></div>
@@ -476,19 +516,49 @@
                             <label for="stRandom" class="text-xs text-gray-300 select-none">Randomize Seeding</label>
                         </div>
 
-                        <!-- Round Robin Specifics -->
-                        <div id="stRRSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
+                        <!-- Group Settings -->
+                        <div id="stGroupSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
                             <div class="flex justify-between items-center">
-                                <label class="text-xs text-gray-500 font-bold uppercase">Group Size</label>
-                                <input type="number" id="stGroupSize" value="4" min="2" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
+                                <label class="text-xs text-gray-500 font-bold uppercase">Number of Groups</label>
+                                <input type="number" id="stGroupCount" value="1" min="1" max="8" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
                             </div>
-                            <p class="text-[9px] text-gray-600 italic">Teams will be split into groups of this size.</p>
                         </div>
 
                         <!-- Elim Specifics -->
                         <div id="stThirdPlaceContainer" class="flex items-center gap-2">
                             <input type="checkbox" id="stThirdPlace" class="accent-[#ff4655] w-4 h-4">
                             <label for="stThirdPlace" class="text-xs text-gray-300 select-none">Create 3rd Place Match</label>
+                        </div>
+
+                        <!-- Double Elim Specifics -->
+                        <div id="stDESettings" class="hidden flex items-center gap-2">
+                            <input type="checkbox" id="stSplitParticipants" class="accent-[#ff4655] w-4 h-4" checked>
+                            <label for="stSplitParticipants" class="text-xs text-gray-300 select-none" title="Bottom half starts in Losers Bracket">Split Participants</label>
+                            <i class="fa-solid fa-circle-info text-gray-500 text-[10px] cursor-help" title="If enabled, the bottom half of participants will start in the Losers Bracket (Lower Bracket)."></i>
+                        </div>
+
+                        <!-- Tiebreaker Settings -->
+                        <div id="stTiebreakers" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Tiebreaker Priority</label>
+                            <div class="flex gap-2">
+                                <select id="tb1" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
+                                    <option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option>
+                                </select>
+                                <select id="tb2" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
+                                    <option value="map_diff" selected>Map Diff</option><option value="h2h">Head to Head</option><option value="round_diff">Round Diff</option>
+                                </select>
+                                <select id="tb3" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
+                                    <option value="round_diff" selected>Round Diff</option><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Swiss Specifics -->
+                        <div id="stSwissSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-gray-500 font-bold uppercase">Total Rounds</label>
+                                <input type="number" id="stSwissRounds" value="3" min="1" max="10" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -549,6 +619,9 @@
             <div class="p-8 space-y-6">
                 <input type="hidden" id="tsId"><input id="tsName" class="w-full input-dark text-lg font-bold">
                 
+                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Prize Pool</label><input id="tsPrize" class="w-full input-dark" placeholder="e.g. $10,000"></div>
+                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Format Description</label><textarea id="tsFormat" class="w-full input-dark h-40 custom-scroll bg-transparent border-b-2 border-[#2d3139] focus:border-[#ff4655] outline-none resize-none font-mono text-sm" placeholder="HTML or Text supported"></textarea></div>
+
                 <div class="space-y-3">
                     <div class="flex justify-between items-end">
                         <label class="text-xs text-gray-500 font-bold uppercase">Active Map Pool</label>
@@ -561,6 +634,22 @@
                 <div class="pt-4 flex flex-col gap-3"><button onclick="updateTourneyName()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SYSTEM</button><button onclick="deleteTourney()" class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase transition">DELETE SYSTEM</button></div>
             </div>
         </div>
+
+        <div id="stageSettingsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <h3 class="text-base font-header text-white">STAGE SETTINGS</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-8 space-y-6">
+                <input type="hidden" id="ssTourneyId"><input type="hidden" id="ssStageIndex">
+                <div class="space-y-2">
+                    <label class="text-xs text-gray-500 font-bold uppercase">Tiebreaker Priority</label>
+                    <div class="flex flex-col gap-2"><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">1.</span><select id="ssTb1" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">2.</span><select id="ssTb2" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">3.</span><select id="ssTb3" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div></div>
+                </div>
+                <button onclick="saveStageSettings()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SETTINGS</button>
+            </div>
+        </div>
+
         <div id="rosterModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
             <div class="p-5 border-b border-[#333] flex justify-between bg-[#222]"><h3 class="text-base font-header text-white">ROSTER MANAGEMENT</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div id="rosterModalContent" class="p-8"></div>
@@ -611,12 +700,14 @@
         const token = localStorage.getItem('token');
         if(!token) location.href='/login.html';
         
-        let allTeams=[], allMatches=[], allLogs=[], activeMatchId, activeTourneyData, pendingRoundScheduleMatches=[];
+        let allTeams=[], allMatches=[], allLogs=[], allTourneys=[], activeMatchId, activeTourneyData, pendingRoundScheduleMatches=[];
         let selectedMatches = new Set();
         let stagePool = [], stageSelected = [];
         let bulkMode = false;
         let compactMode = false;
         let activeStageIndex = 0; // NEW: For Tab System
+        let overviewMapPool = []; // Track map pool in overview tab
+        let vetoTimerInt = null;
 
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
 
@@ -624,6 +715,23 @@
         socket.on('bracket_update', ()=>init(true));
         socket.on('teams_update', ()=>init(true)); 
         
+        socket.on('veto_update', (m) => {
+            // Update local data for Dashboard
+            const idx = allMatches.findIndex(x => x._id === m._id);
+            if (idx !== -1) {
+                allMatches[idx] = m;
+                // Re-render dashboard only if visible (to show live status/dots)
+                if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
+                    renderDashboard(allMatches);
+                }
+            }
+
+            // Update Modal if open
+            if (activeMatchId && m._id === activeMatchId) {
+                renderVetoSummary(m);
+            }
+        });
+
         socket.on('system_stats', (d) => {
             // CPU
             document.getElementById('sys-cpu').innerText = d.cpu + '%';
@@ -645,6 +753,12 @@
             showToast(msg, type);
         });
 
+        socket.on('chat_new', (data) => {
+            if (activeMatchId && document.getElementById('view-tab-chat') && !document.getElementById('view-tab-chat').classList.contains('hidden')) {
+                renderChatMessage(data);
+            }
+        });
+
         async function init(silent=false) {
             try {
                 const ts = Date.now();
@@ -658,14 +772,15 @@
                 if(rT.status === 401) { logout(); return; }
                 allTeams = await rT.json();
                 allMatches = await rM.json();
-                const tourneys = await rTr.json();
+                allTourneys = await rTr.json();
                 allLogs = rL.ok ? await rL.json() : [];
                 
                 updateStats(allTeams, allMatches);
+                populateDashStageFilter(allTourneys);
                 renderDashboard(allMatches); 
                 renderRequests(allMatches);
                 renderTeams(allTeams); 
-                renderStructure(tourneys, allMatches);
+                renderStructure(allTourneys, allMatches);
                 filterLogs();
                 
                 if(!silent) {
@@ -736,6 +851,23 @@
             const dateStr = dateObj ? dateObj.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'}) : '';
             const isLive = m.status === 'live';
             
+            const isVetoPaused = m.vetoData && m.vetoData.status === 'paused';
+            const isMatchPaused = m.pauseRequest && m.pauseRequest.status === 'pending';
+            const isPaused = isVetoPaused || isMatchPaused;
+
+            let cardClass = `p-3 rounded border relative transition-all duration-200 group cursor-pointer w-full shadow-sm hover:shadow-lg hover:-translate-y-0.5`;
+            
+            if (isSel) cardClass += ` border-[#ff4655] bg-[#ff4655]/10`;
+            else if (isPaused) cardClass += ` border-yellow-500/50 bg-yellow-500/5 hover:border-yellow-400`;
+            else if (isLive) cardClass += ` border-[#ff4655] bg-[#15171a] shadow-[0_0_10px_rgba(255,70,85,0.2)]`;
+            else cardClass += ` border-[#2d3139] bg-[#15171a] hover:border-gray-400`;
+
+            let pauseAlert = '';
+            if (m.pauseRequest && m.pauseRequest.status === 'pending') {
+                pauseAlert = `<div class="absolute inset-0 bg-yellow-500/90 z-30 flex flex-col items-center justify-center text-black animate-pulse cursor-default" onclick="event.stopPropagation()">
+                    <i class="fa-solid fa-pause text-3xl mb-2"></i><div class="font-bold text-xs uppercase tracking-widest">PAUSE REQUESTED</div><div class="text-[10px] font-mono mb-3">"${m.pauseRequest.reason}"</div><button onclick="resolvePause('${m._id}')" class="bg-black text-white px-4 py-1 rounded text-[10px] font-bold hover:bg-gray-800">RESOLVE</button></div>`;
+            }
+
             let statusText = isLive ? 'LIVE' : m.status.substring(0,3);
             if (isLive && m.scores && m.scores.length > 0) {
                 const lastMap = m.scores[m.scores.length-1].mapName;
@@ -744,7 +876,8 @@
 
             if (compactMode) {
                 return `
-                <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-2 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655]':'border-[#2d3139] hover:border-gray-400')} relative transition group cursor-pointer w-full shadow-sm text-xs">
+                <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="${cardClass.replace('p-3', 'p-2')} text-xs">
+                    ${pauseAlert}
                     ${check}
                     <div class="flex justify-between items-center mb-1">
                         <span class="text-[9px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
@@ -774,6 +907,7 @@
             const nextLose = m.loserMatchId ? getShortName(m.loserMatchId) : null;
 
             const renderTeamRow = (team, slot, score, isWinner) => {
+                const teamId = team ? team._id : '';
                 const logo = team ? `<img src="${team.logo || DEFAULT_LOGO}" class="w-5 h-5 rounded object-cover bg-black/50 shrink-0 border border-white/10">` : '<div class="w-5 h-5 rounded bg-white/5 shrink-0 border border-white/5 flex items-center justify-center"><i class="fa-solid fa-question text-[8px] text-gray-600"></i></div>';
                 const nameHtml = team ? `<span class="truncate">${team.shortName}</span>` : getSmartTBD(m._id, slot);
                 const scoreColor = isWinner ? 'text-[#ff4655]' : '';
@@ -786,8 +920,11 @@
                     ondragleave="handleTeamDragLeave(event)"
                     ondrop="handleTeamDrop(event, '${m._id}', '${slot}')" 
                     onclick="event.stopPropagation()"
-                    class="flex justify-between items-center text-sm font-medium ${textColor} transition-colors p-1.5 -mx-1.5 rounded hover:bg-white/5 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10">
+                    onmouseenter="highlightTeam('${teamId}')" 
+                    onmouseleave="resetHighlight()"
+                    class="flex justify-between items-center text-sm font-medium ${textColor} transition-colors p-1.5 -mx-1.5 rounded hover:bg-white/5 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 group/team">
                     <div class="flex items-center gap-2 overflow-hidden pointer-events-none">
+                        <i class="fa-solid fa-grip-vertical text-gray-700 group-hover/team:text-gray-500 text-[10px] mr-1"></i>
                         ${logo}
                         ${nameHtml}
                     </div>
@@ -802,8 +939,46 @@
                 </button>
             </div>` : '';
 
+            // --- VETO STATUS & CONTROLS ---
+            const isVeto = m.status === 'scheduled' && m.vetoData && ['in_progress', 'decision', 'coin_toss', 'paused'].includes(m.vetoData.status);
+            let vetoUI = '';
+            
+            if (isVeto) {
+                const v = m.vetoData;
+                const pA = m.presence && m.presence[m.teamA._id];
+                const pB = m.presence && m.presence[m.teamB._id];
+                const getDot = (p) => p ? (p.isAway ? 'text-yellow-500' : 'text-[#1fa474]') : 'text-gray-600';
+                
+                let statusText = v.status.toUpperCase().replace('_', ' ');
+                let timerHtml = '';
+
+                if (v.status === 'in_progress') {
+                    const step = v.sequence[v.sequenceIndex];
+                    const tName = (step.team === m.teamA._id) ? m.teamA.shortName : m.teamB.shortName;
+                    statusText = `${tName} ${step.act.toUpperCase()}`;
+                } else if (v.status === 'paused') {
+                    statusText = "PAUSED";
+                }
+
+                if ((v.status === 'in_progress' || v.status === 'decision') && v.currentTurnDeadline) {
+                    const deadlineTs = new Date(v.currentTurnDeadline).getTime();
+                    timerHtml = `<span class="veto-countdown ml-1 text-[#ff4655]" data-deadline="${deadlineTs}"></span>`;
+                }
+
+                const btnAction = v.status === 'paused' 
+                    ? `<button onclick="event.stopPropagation(); resolvePause('${m._id}')" class="px-2 py-0.5 bg-green-500/20 text-green-500 border border-green-500/50 rounded text-[9px] font-bold uppercase hover:bg-green-500 hover:text-white transition">RESUME</button>`
+                    : `<button onclick="event.stopPropagation(); adminPauseMatch('${m._id}')" class="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 rounded text-[9px] font-bold uppercase hover:bg-yellow-500 hover:text-black transition">PAUSE</button>`;
+
+                vetoUI = `
+                <div class="mt-2 pt-2 border-t border-white/5 flex justify-between items-center bg-black/20 p-1.5 rounded">
+                    <div class="flex items-center gap-3"><div class="flex items-center gap-1" title="Team A Connection"><i class="fa-solid fa-circle text-[8px] ${getDot(pA)}"></i><span class="text-[9px] font-bold text-gray-400">${m.teamA.shortName}</span></div><div class="flex items-center gap-1" title="Team B Connection"><i class="fa-solid fa-circle text-[8px] ${getDot(pB)}"></i><span class="text-[9px] font-bold text-gray-400">${m.teamB.shortName}</span></div></div>
+                    <div class="flex items-center gap-2"><span class="text-[9px] font-mono text-white tracking-wider flex items-center">${statusText}${timerHtml}</span>${btnAction}</div>
+                </div>`;
+            }
+
             return `
-            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="bg-[#15171a] p-3 rounded border ${isSel?'border-[#ff4655] bg-[#ff4655]/10':(isLive?'border-[#ff4655] shadow-[0_0_10px_rgba(255,70,85,0.2)]':'border-[#2d3139] hover:border-gray-400')} relative transition-all duration-200 group cursor-pointer w-full shadow-sm hover:shadow-lg hover:-translate-y-0.5">
+            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="${cardClass}">
+                ${pauseAlert}
                 ${check}
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
@@ -814,6 +989,7 @@
                     ${renderTeamRow(m.teamA, 'teamA', sA, sA > sB)}
                     ${renderTeamRow(m.teamB, 'teamB', sB, sB > sA)}
                 </div>
+                ${vetoUI}
                 <div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-600 truncate flex justify-between items-center">
                     <span class="truncate max-w-[120px]" title="${m.name}">${m.name}</span>
                     ${(nextWin||nextLose) ? `<div class="flex gap-2 font-mono text-[9px]">
@@ -835,12 +1011,15 @@
             
             const t = tourneys[0]; 
             activeTourneyData = t; 
+            if (activeStageIndex === undefined) activeStageIndex = 'overview';
             
             // Safety check for activeStageIndex
-            if (activeStageIndex >= t.stages.length) activeStageIndex = Math.max(0, t.stages.length - 1);
+            if (activeStageIndex !== 'overview' && activeStageIndex >= t.stages.length) activeStageIndex = 'overview';
 
             // 1. Render Header & Tab Bar
-            let tabsHtml = t.stages.map((s, idx) => {
+            let tabsHtml = `<button onclick="activeStageIndex='overview'; renderStructure([activeTourneyData], allMatches)" class="px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition shrink-0 ${activeStageIndex === 'overview' ? 'border-[#ff4655] text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300'}">OVERVIEW</button>`;
+            
+            tabsHtml += t.stages.map((s, idx) => {
                 const isActive = idx === activeStageIndex;
                 return `<button onclick="activeStageIndex=${idx}; renderStructure([activeTourneyData], allMatches)" 
                 class="px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition shrink-0 ${isActive ? 'border-[#ff4655] text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300'}">
@@ -861,7 +1040,6 @@
                         <div class="flex gap-2">
                             <button onclick="toggleCompactMode()" id="btnCompactMode" class="px-4 py-2 border border-[#333] ${compactMode ? 'bg-[#ff4655] text-white border-[#ff4655]' : 'text-gray-400'} hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-compress mr-2"></i> Compact</button>
                             <button onclick="toggleBulkMode()" id="btnBulkMode" class="px-4 py-2 border border-[#333] text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-list-check mr-2"></i> Batch Mode</button>
-                            <button onclick="openTourneySettings('${t._id}', '${t.name}')" class="px-4 py-2 border border-[#333] hover:border-white text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-gear mr-2"></i> Settings</button>
                         </div>
                     </div>
                     <div class="flex border-b border-[#333] w-full overflow-x-auto custom-scroll">
@@ -871,19 +1049,53 @@
             `;
 
             // 2. Render Content (Only active stage)
-            if (t.stages.length > 0 && t.stages[activeStageIndex]) {
+            if (activeStageIndex === 'overview') {
+                const currentPool = t.mapPool && t.mapPool.length > 0 ? t.mapPool : ALL_MAPS;
+                
+                list.innerHTML = `
+                <div class="animate-slide-up grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-[#1a1d21] p-6 rounded border border-[#2d3139]">
+                            <h3 class="text-white font-header text-xl mb-4 border-l-4 border-[#ff4655] pl-3">General Information</h3>
+                            <div class="space-y-4">
+                                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tournament Name</label><input id="ovName" value="${t.name}" class="w-full input-dark text-lg font-bold"></div>
+                                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Prize Pool</label><input id="ovPrize" value="${t.prizePool || ''}" class="w-full input-dark" placeholder="e.g. $10,000"></div>
+                                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Format Description</label><textarea id="ovFormat" class="w-full input-dark h-40 custom-scroll bg-transparent border-b-2 border-[#2d3139] focus:border-[#ff4655] outline-none resize-none font-mono text-sm" placeholder="HTML or Text supported">${t.formatDescription || ''}</textarea></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end"><button onclick="saveOverview()" class="btn-val px-8 py-3 rounded font-bold text-sm tracking-widest shadow-lg">SAVE CHANGES</button></div>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="bg-[#1a1d21] p-6 rounded border border-[#2d3139]">
+                            <div class="flex justify-between items-end mb-4">
+                                <h3 class="text-white font-header text-xl border-l-4 border-[#ff4655] pl-3">Map Pool</h3>
+                                <span id="count-overview" class="text-xs font-mono font-bold text-[#ff4655]">0/7</span>
+                            </div>
+                            <div id="overviewMapPoolList" class="map-select-grid custom-scroll h-[400px]"></div>
+                        </div>
+                    </div>
+                </div>`;
+                
+                setTimeout(() => renderMapCheckboxes('overview', currentPool), 50);
+
+            } else if (t.stages.length > 0 && t.stages[activeStageIndex]) {
                 const s = t.stages[activeStageIndex];
                 const ms = s.matches.map(mid => matches.find(x=>x._id===mid)).filter(x=>x);
                 
                 let contentHtml = '';
                 let swissBtn = '';
+                let settingsBtn = '';
                 if (s.type === 'swiss') swissBtn = `<button onclick="generateSwissNext('${t._id}', ${activeStageIndex})" class="btn-val px-4 py-2 rounded text-[10px] font-bold ml-4">GENERATE ROUND</button>`;
+                if (s.type === 'round_robin' || s.type === 'swiss') {
+                     settingsBtn = `<button onclick="openStageSettings('${t._id}', ${activeStageIndex})" class="text-gray-400 hover:text-white text-xs font-bold uppercase ml-4 border border-[#333] px-3 py-1 rounded hover:bg-[#333] transition"><i class="fa-solid fa-sliders mr-2"></i> Settings</button>`;
+                }
 
                 const stageControls = `
                     <div class="flex justify-between items-center mb-6 bg-[#1a1d21] p-4 rounded border border-[#2d3139]">
                         <div class="flex items-center gap-4">
                             <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Type: <span class="text-white">${s.type.replace('_',' ')}</span></span>
                             ${swissBtn}
+                            ${settingsBtn}
                             <button onclick="exportStageCSV('${t._id}', ${activeStageIndex})" class="text-green-500 hover:text-green-400 text-xs font-bold uppercase ml-4"><i class="fa-solid fa-file-csv mr-2"></i> Export CSV</button>
                         </div>
                         <button onclick="deleteStage('${t._id}', ${activeStageIndex})" class="text-red-500 hover:text-red-400 text-xs font-bold uppercase"><i class="fa-solid fa-trash mr-2"></i> Delete Stage</button>
@@ -891,16 +1103,26 @@
                 `;
 
                 if (s.type === 'round_robin' || s.type === 'swiss') {
-                    const standings = calculateStandings(ms, s.stageParticipants);
-                    const standingsHtml = standings.map((st, i) => `<tr><td class="font-mono text-center text-gray-600 border-r border-[#222]">${i+1}</td><td class="font-bold text-white">${st.name}</td><td class="text-center">${st.played}</td><td class="text-center font-bold text-green-400">${st.wins}</td><td class="text-center text-red-400">${st.losses}</td><td class="text-center font-mono text-gray-300 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td><td class="text-center font-mono ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td><td class="text-center font-mono text-gray-500 border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td></tr>`).join('');
+                    const standings = calculateStandings(ms, s.stageParticipants, s.settings);
+                    
+                    const groupedStandings = {};
+                    standings.forEach(st => { if(!groupedStandings[st.group]) groupedStandings[st.group] = []; groupedStandings[st.group].push(st); });
+                    
+                    let tablesHtml = '';
+                    Object.keys(groupedStandings).sort().forEach(g => {
+                        const groupSt = groupedStandings[g];
+                        const rows = groupSt.map((st, i) => `<tr><td class="font-mono text-center text-gray-600 border-r border-[#222]">${i+1}</td><td class="font-bold text-white">${st.name}</td><td class="text-center">${st.played}</td><td class="text-center font-bold text-green-400">${st.wins}</td><td class="text-center text-red-400">${st.losses}</td><td class="text-center font-mono text-gray-300 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td><td class="text-center font-mono ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td><td class="text-center font-mono text-gray-500 border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td></tr>`).join('');
+                        tablesHtml += `<div class="mb-4"><div class="p-2 text-xs font-bold text-gray-500 uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Group ${g}</div><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+                    });
+
                     const rounds = {}; ms.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
                     const sortedRoundKeys = Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b));
                     const matchesListHtml = sortedRoundKeys.map(r => {
-                        const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = s.type === 'round_robin' ? `Round ${r}` : `Round ${r}`;
+                        const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
                         return `<div class="mb-6"><div class="flex justify-between items-center bg-[#1a1d21] p-2 rounded mb-3 border border-[#2d3139]"><span class="text-xs font-bold text-[#ff4655] uppercase tracking-widest pl-2">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-xs bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
                     }).join('');
                     
-                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto"><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${standingsHtml}</tbody></table></div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto max-h-[800px] custom-scroll">${tablesHtml}</div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
                 }
                 else {
                     const upper = [], middle = [], lower = [], final = [];
@@ -920,17 +1142,18 @@
                             if (r >= 200) displayRound = r - 200; else if (r >= 100) displayRound = r - 100;
                             const gapClass = compactMode ? 'gap-2' : 'gap-4';
                             const widthStyle = compactMode ? 'min-width: 200px;' : '';
-                            return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>Round ${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col ${gapClass}">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                            return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>Round ${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col ${gapClass}">${roundMatches.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m)}</div>`).join('')}</div></div>`;
                         }).join('');
-                        return `<div class="mb-8"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container custom-scroll">${columnsHtml}</div></div>`;
+                        return `<div class="mb-8 relative z-10"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container" style="overflow: visible">${columnsHtml}</div></div>`;
                     };
-                    let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333]"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => renderMatchCard(m)).join('')}</div></div>`; }
-                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto">
+                    let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333] relative z-10"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m, true)}</div>`).join('')}</div></div>`; }
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto relative"><div class="relative min-w-max"><svg id="bracketSvg" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
                         ${renderSection(upper, "Upper Bracket", "border-[#ff4655]")}
                         ${renderSection(middle, s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket", "border-[#dda828]")}
                         ${renderSection(lower, "Last Chance Bracket", "border-[#00d4ff]")}
                         ${finalHtml}
-                    </div></div>`;
+                    </div></div></div>`;
+                    setTimeout(() => drawBracketLines(ms), 50);
                 }
 
                 list.innerHTML = contentHtml;
@@ -947,12 +1170,28 @@
             await Promise.all(promises); closeModal(); init(true); showToast("Round Schedule Updated");
         }
 
-        function calculateStandings(matches, participants) {
-            let stats = {}; participants.forEach(pid => { const team = allTeams.find(t=>t._id === pid); if(team) stats[pid] = { id: pid, name: team.shortName, wins:0, losses:0, played:0, diff:0, mapsWon:0, mapsLost:0, mapDiff:0 }; });
+        function calculateStandings(matches, participants, settings) {
+            let stats = {}; 
+            participants.forEach(pid => { const team = allTeams.find(t=>t._id === pid); if(team) stats[pid] = { id: pid, name: team.shortName, wins:0, losses:0, played:0, diff:0, mapsWon:0, mapsLost:0, mapDiff:0, h2h: {}, group: 'A' }; });
+            
             matches.forEach(m => {
+                const gMatch = m.name.match(/Group\s+([A-Z])/);
+                const group = gMatch ? gMatch[1] : 'A';
+                if (m.teamA && stats[m.teamA._id || m.teamA]) stats[m.teamA._id || m.teamA].group = group;
+                if (m.teamB && stats[m.teamB._id || m.teamB]) stats[m.teamB._id || m.teamB].group = group;
+
                 if(m.status === 'finished' && m.winner) {
                     const winnerId = m.winner._id || m.winner; const loserId = (m.teamA._id === winnerId || m.teamA === winnerId) ? (m.teamB._id || m.teamB) : (m.teamA._id || m.teamA);
-                    if(stats[winnerId]) { stats[winnerId].wins++; stats[winnerId].played++; } if(stats[loserId]) { stats[loserId].losses++; stats[loserId].played++; }
+                    
+                    if(stats[winnerId]) { 
+                        stats[winnerId].wins++; stats[winnerId].played++; 
+                        stats[winnerId].h2h[loserId] = 'win';
+                    } 
+                    if(stats[loserId]) { 
+                        stats[loserId].losses++; stats[loserId].played++; 
+                        stats[loserId].h2h[winnerId] = 'loss';
+                    }
+                    
                     let sA = 0, sB = 0; let mapsA = 0, mapsB = 0;
                     if(m.scores && m.scores.length > 0) {
                         m.scores.forEach(s => { const scA = parseInt(s.teamAScore)||0; const scB = parseInt(s.teamBScore)||0; sA += scA; sB += scB; if (scA > scB) mapsA++; else if (scB > scA) mapsB++; });
@@ -962,13 +1201,85 @@
                     }
                 }
             });
-            return Object.values(stats).sort((a,b) => { if(b.wins !== a.wins) return b.wins - a.wins; if(b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff; return b.diff - a.diff; });
+            
+            const tiebreakers = settings?.tiebreakers || ['h2h', 'map_diff', 'round_diff'];
+
+            return Object.values(stats).sort((a,b) => { 
+                if(b.wins !== a.wins) return b.wins - a.wins;
+                
+                for (const rule of tiebreakers) {
+                    if (rule === 'h2h') {
+                        if (a.h2h[b.id]) return a.h2h[b.id] === 'win' ? -1 : 1;
+                    } else if (rule === 'map_diff') {
+                        if (b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff;
+                    } else if (rule === 'round_diff') {
+                        if (b.diff !== a.diff) return b.diff - a.diff;
+                    }
+                }
+                return 0;
+            });
+        }
+
+        function populateDashStageFilter(tourneys) {
+            const sel = document.getElementById('dashStageFilter');
+            if (!sel) return;
+            const current = sel.value;
+            let html = '<option value="all">All Stages</option>';
+            tourneys.forEach(t => {
+                t.stages.forEach((s, i) => {
+                    html += `<option value="${t._id}_${i}">${t.name} - ${s.name}</option>`;
+                });
+            });
+            sel.innerHTML = html;
+            if (current && sel.querySelector(`option[value="${current}"]`)) sel.value = current;
         }
 
         function renderDashboard(matches) {
             const query = document.getElementById('dashSearch')?.value.toLowerCase() || '';
-            const live = matches.filter(m => (m.status === 'live' || m.status === 'scheduled') && (m.name.toLowerCase().includes(query) || m.teamA?.name.toLowerCase().includes(query)));
-            document.getElementById('liveMatches').innerHTML = live.map(m => renderMatchCard(m)).join('') || '<div class="col-span-4 text-center text-gray-600 text-sm italic py-10 bg-[#15171a] rounded border border-[#2d3139]">No active matches found</div>';
+            const stageFilter = document.getElementById('dashStageFilter')?.value || 'all';
+            
+            let stageMatchIds = null;
+            if (stageFilter !== 'all') {
+                const [tid, sIdx] = stageFilter.split('_');
+                const t = allTourneys.find(x => x._id === tid);
+                if (t && t.stages[sIdx]) stageMatchIds = new Set(t.stages[sIdx].matches);
+            }
+
+            const filtered = matches.filter(m => {
+                if (stageMatchIds && !stageMatchIds.has(m._id)) return false;
+                return (m.name.toLowerCase().includes(query) || m.teamA?.name.toLowerCase().includes(query) || m.teamB?.name.toLowerCase().includes(query));
+            });
+
+            const vetoing = [], live = [], upcoming = [], finished = [];
+            filtered.forEach(m => {
+                if (m.status === 'live') live.push(m);
+                else if (m.status === 'scheduled') {
+                    if (m.vetoData && (m.vetoData.status === 'in_progress' || m.vetoData.status === 'decision' || m.vetoData.status === 'coin_toss' || m.vetoData.status === 'paused')) vetoing.push(m);
+                    else upcoming.push(m);
+                } else if (m.status === 'finished') finished.push(m);
+            });
+
+            upcoming.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+            finished.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+            const container = document.getElementById('liveMatches');
+            container.innerHTML = '';
+
+            const renderSection = (title, items, icon, color) => {
+                if (items.length === 0) return '';
+                return `
+                    <div class="col-span-full mb-2 mt-4 flex items-center gap-2 border-b border-white/5 pb-2">
+                        <i class="${icon} ${color}"></i><h4 class="text-sm font-bold text-white uppercase tracking-widest">${title} <span class="text-gray-500 text-xs ml-2">(${items.length})</span></h4>
+                    </div>
+                    ${items.map(m => renderMatchCard(m)).join('')}`;
+            };
+
+            let html = renderSection('Veto In Progress', vetoing, 'fa-solid fa-list-check', 'text-yellow-500') +
+                       renderSection('Live Matches', live, 'fa-solid fa-tower-broadcast', 'text-[#ff4655]') +
+                       renderSection('Upcoming / Scheduled', upcoming, 'fa-regular fa-clock', 'text-blue-400') +
+                       renderSection('Recently Finished', finished.slice(0, 8), 'fa-solid fa-flag-checkered', 'text-green-500');
+            
+            container.innerHTML = html || '<div class="col-span-full text-center text-gray-600 text-sm italic py-10 bg-[#15171a] rounded border border-[#2d3139]">No matches found</div>';
         }
         
         // --- UPDATED RENDER TEAMS WITH CARD STYLE ---
@@ -1132,6 +1443,16 @@
                 const count = parseInt(document.getElementById('impCount').value) || 4;
                 const standings = calculateStandings(ms, stage.stageParticipants);
                 importedIds = standings.slice(0, count).map(s => s.id);
+                const count = parseInt(document.getElementById('impCount').value) || 2;
+                const standings = calculateStandings(ms, stage.stageParticipants, stage.settings);
+                
+                const grouped = {};
+                standings.forEach(s => { const g = s.group || 'A'; if(!grouped[g]) grouped[g] = []; grouped[g].push(s); });
+                
+                Object.keys(grouped).sort().forEach(g => {
+                    const top = grouped[g].slice(0, count);
+                    importedIds.push(...top.map(s => s.id));
+                });
             } else if (type === 'gsl') {
                 const winners = []; const runners = [];
                 ms.forEach(m => {
@@ -1169,13 +1490,32 @@
         function toggleStageOptions() {
             const type = document.getElementById('stType').value;
             const lc = document.getElementById('stRoundCountContainer');
-            const rr = document.getElementById('stRRSettings');
             const tp = document.getElementById('stThirdPlaceContainer');
+            const de = document.getElementById('stDESettings');
+            const sw = document.getElementById('stSwissSettings');
+            const tb = document.getElementById('stTiebreakers');
+            const gr = document.getElementById('stGroupSettings');
             
-            if(type==='round_robin') lc.classList.remove('hidden'); else lc.classList.add('hidden');
-            if(type==='round_robin') rr.classList.remove('hidden'); else rr.classList.add('hidden');
-            
-            if(type==='single_elim') tp.classList.remove('hidden'); else tp.classList.add('hidden');
+            lc.classList.add('hidden');
+            tp.classList.add('hidden');
+            de.classList.add('hidden');
+            if(gr) gr.classList.add('hidden');
+            if(sw) sw.classList.add('hidden');
+            if(tb) tb.classList.add('hidden');
+
+            renderStageLists();
+            if(type==='round_robin') {
+                lc.classList.remove('hidden'); 
+                if(tb) tb.classList.remove('hidden');
+                if(gr) gr.classList.remove('hidden');
+            } else if(type==='single_elim') {
+                tp.classList.remove('hidden');
+            } else if(type==='double_elim' || type==='triple_elim') {
+                de.classList.remove('hidden');
+            } else if(type==='swiss' && sw) {
+                sw.classList.remove('hidden');
+                if(tb) tb.classList.remove('hidden');
+            }
         }
 
         function renderStageLists() { 
@@ -1186,9 +1526,17 @@
                 `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'pool')" ondragend="handleDragEnd(event)" onclick="selectTeamForStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#333] hover:border-gray-500 flex items-center gap-3 group transition"><i class="fa-solid fa-plus text-gray-600 text-xs group-hover:text-green-500"></i><span class="text-xs text-gray-300 font-bold truncate">${t.name}</span></div>`
             ).join(''); 
             document.getElementById('availCount').innerText = query ? `${filteredPool.length}/${stagePool.length}` : stagePool.length; 
-            document.getElementById('selectedList').innerHTML = stageSelected.map((t, idx) => 
-                `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'selected', ${idx})" ondragend="handleDragEnd(event)" ondragover="handleItemDragOver(event)" ondragleave="handleItemDragLeave(event)" ondrop="handleItemDrop(event, ${idx})" onclick="removeTeamFromStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`
-            ).join(''); 
+            
+            const type = document.getElementById('stType').value;
+            let html = '';
+            stageSelected.forEach((t, idx) => {
+                if (type === 'gsl' && idx % 4 === 0) {
+                    const groupChar = String.fromCharCode(65 + Math.floor(idx / 4));
+                    html += `<div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2 mb-1 pl-1 border-b border-[#333] pb-1">Group ${groupChar}</div>`;
+                }
+                html += `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'selected', ${idx})" ondragend="handleDragEnd(event)" ondragover="handleItemDragOver(event)" ondragleave="handleItemDragLeave(event)" ondrop="handleItemDrop(event, ${idx})" onclick="removeTeamFromStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`;
+            });
+            document.getElementById('selectedList').innerHTML = html;
             document.getElementById('selCount').innerText = stageSelected.length; 
         }
         function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); saveStageState(); } }
@@ -1198,7 +1546,10 @@
         function calculateMatchScore(scores) { if (!scores) return [0,0]; let a=0,b=0; scores.forEach(s=>{ if(parseInt(s.teamAScore)>parseInt(s.teamBScore)) a++; else if(parseInt(s.teamBScore)>parseInt(s.teamAScore)) b++; }); return [a,b]; }
         function updateStats(teams, matches) { document.getElementById('stat-live').innerText=matches.filter(m=>m.status==='live').length; document.getElementById('stat-pending').innerText=matches.filter(m=>m.status==='pending_approval').length; document.getElementById('stat-teams').innerText=teams.length; document.getElementById('stat-finished').innerText=matches.filter(m=>m.status==='finished').length; }
         function openModal(id) { document.getElementById('modalBackdrop').classList.remove('hidden', 'flex'); document.getElementById('modalBackdrop').classList.add('flex'); document.querySelectorAll('.modal-content').forEach(e=>e.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
-        function closeModal() { document.getElementById('modalBackdrop').classList.add('hidden'); document.getElementById('modalBackdrop').classList.remove('flex'); }
+        function closeModal() { 
+            if(vetoTimerInt) clearInterval(vetoTimerInt);
+            document.getElementById('modalBackdrop').classList.add('hidden'); document.getElementById('modalBackdrop').classList.remove('flex'); 
+        }
         
         function showToast(msg, type='success') { 
             const t=document.getElementById('toast'); 
@@ -1224,11 +1575,14 @@
             document.getElementById('emTime').value = m.scheduledTime ? new Date(new Date(m.scheduledTime).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
             document.getElementById('forceNameA').innerText = m.teamA?.shortName || 'Team A'; 
             document.getElementById('forceNameB').innerText = m.teamB?.shortName || 'Team B';
+            socket.emit('join_match', id);
             switchMatchTab('overview'); 
             updateScoreInputs(m); 
+            renderVetoSummary(m);
+            renderMatchChat(m);
             openModal('editMatchModal'); 
         }
-        function switchMatchTab(t) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); ['overview','scoreboard','admin'].forEach(x=>document.getElementById('view-tab-'+x).classList.add('hidden')); document.getElementById('view-tab-'+t).classList.remove('hidden'); }
+        function switchMatchTab(t) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); ['overview','scoreboard','admin','veto','chat'].forEach(x=>document.getElementById('view-tab-'+x).classList.add('hidden')); document.getElementById('view-tab-'+t).classList.remove('hidden'); }
         function updateScoreInputs(mIn) { 
             const m = mIn || allMatches.find(x => x._id === activeMatchId); if(!m) return;
             const format = document.getElementById('emFormat').value;
@@ -1251,6 +1605,144 @@
             }
             document.getElementById('manualScoreInputs').innerHTML = html; 
         }
+        function renderVetoSummary(m) {
+            const container = document.getElementById('vetoSummaryContent');
+            if(vetoTimerInt) clearInterval(vetoTimerInt);
+
+            if (!m.vetoData || m.vetoData.status === 'pending') {
+                container.innerHTML = '<div class="text-center text-gray-500 italic py-8">Veto process has not started.</div>';
+                return;
+            }
+            
+            let statusHtml = '';
+            const v = m.vetoData;
+
+            if (v.status === 'in_progress' || v.status === 'decision' || v.status === 'coin_toss') {
+                let isPaused = (m.pauseRequest && m.pauseRequest.status === 'pending') || (v.pausedRemainingTime > 0);
+                
+                if (isPaused) {
+                    statusHtml = `
+                    <div class="bg-yellow-500/10 border border-yellow-500/50 p-4 rounded mb-4 text-center animate-pulse">
+                        <div class="text-yellow-500 font-bold text-lg tracking-widest"><i class="fa-solid fa-pause mr-2"></i> VETO PAUSED</div>
+                        <div class="text-xs text-yellow-200/70 font-mono mt-1">Time Remaining: ${Math.ceil((v.pausedRemainingTime||0)/1000)}s</div>
+                    </div>`;
+                } else {
+                    let activeTeamName = 'System';
+                    let activeAction = v.status.toUpperCase().replace('_', ' ');
+                    
+                    if (v.status === 'decision') {
+                        activeTeamName = v.coinTossWinner ? (v.coinTossWinner.shortName || v.coinTossWinner.name) : 'Winner';
+                        activeAction = 'DECIDING SIDE/PICK';
+                    } else if (v.sequence && v.sequence[v.sequenceIndex]) {
+                        const step = v.sequence[v.sequenceIndex];
+                        const teamId = step.team;
+                        const team = (m.teamA._id === teamId || m.teamA === teamId) ? m.teamA : m.teamB;
+                        activeTeamName = team ? (team.shortName || team.name) : 'Unknown';
+                        activeAction = step.act.toUpperCase();
+                    }
+
+                    let timerHtml = '';
+                    if (v.currentTurnDeadline) {
+                        const deadline = new Date(v.currentTurnDeadline).getTime();
+                        timerHtml = `<div class="text-right">
+                            <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Time</div>
+                            <div class="flex items-center gap-2 justify-end"><button onclick="resetVetoTimer()" class="w-6 h-6 flex items-center justify-center bg-[#333] hover:bg-white hover:text-black text-gray-400 border border-gray-600 rounded transition" title="Reset Timer"><i class="fa-solid fa-rotate-right text-[10px]"></i></button><div id="adminVetoTimer" class="text-3xl font-mono font-bold text-white leading-none">--</div></div>
+                        </div>`;
+                        
+                        vetoTimerInt = setInterval(() => {
+                            const now = Date.now();
+                            const diff = deadline - now;
+                            const el = document.getElementById('adminVetoTimer');
+                            if(el) {
+                                if(diff <= 0) { el.innerText = "0.0s"; el.classList.add('text-red-500'); clearInterval(vetoTimerInt); } 
+                                else { el.innerText = (diff/1000).toFixed(1) + "s"; if(diff < 10000) el.classList.add('text-[#ff4655]'); else el.classList.remove('text-[#ff4655]'); }
+                            } else { clearInterval(vetoTimerInt); }
+                        }, 100);
+                    }
+
+                    statusHtml = `
+                    <div class="bg-[#15171a] border border-[#333] p-4 rounded mb-4 flex justify-between items-center shadow-lg">
+                        <div><div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Current Status</div><div class="text-white font-header text-2xl flex items-center gap-2"><span class="text-gray-300">${activeTeamName}</span><i class="fa-solid fa-chevron-right text-xs text-gray-600"></i><span class="text-[#ff4655]">${activeAction}</span></div></div>
+                        ${timerHtml}
+                    </div>`;
+                }
+            }
+            
+            let html = statusHtml;
+            html += `<div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-black/20 p-3 rounded border border-white/5">
+                    <div class="text-[10px] text-red-500 font-bold uppercase mb-2">Bans</div>
+                    <div class="flex flex-wrap gap-2">
+                        ${(m.vetoData.bannedMaps||[]).map(map => `<span class="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] rounded">${map}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="bg-black/20 p-3 rounded border border-white/5">
+                    <div class="text-[10px] text-green-500 font-bold uppercase mb-2">Picks</div>
+                    <div class="flex flex-col gap-1">
+                        ${(m.vetoData.pickedMaps||[]).map((p, i) => `<div class="flex justify-between text-[10px] text-gray-300"><span>${i+1}. ${p.map}</span><span class="text-gray-500">${p.teamAStartingSide||'-'}/${p.teamBStartingSide||'-'}</span></div>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+            
+            const getConnStatus = (tid) => {
+                const p = m.presence && m.presence[tid] ? m.presence[tid] : null;
+                if (!p) return '<span class="text-gray-600 font-bold text-[10px] uppercase flex items-center gap-1"><div class="w-1.5 h-1.5 rounded-full bg-gray-600"></div> OFFLINE</span>';
+                if (p.isAway) return '<span class="text-yellow-500 font-bold text-[10px] uppercase flex items-center gap-1"><div class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div> AWAY</span>';
+                return '<span class="text-[#1fa474] font-bold text-[10px] uppercase flex items-center gap-1"><div class="w-1.5 h-1.5 rounded-full bg-[#1fa474] shadow-[0_0_5px_#1fa474]"></div> ONLINE</span>';
+            };
+
+            html += `<div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-black/20 p-3 rounded border border-white/5">
+                    <div class="flex justify-between items-center mb-2 border-b border-white/5 pb-2"><div class="text-[10px] text-gray-500 font-bold uppercase">${m.teamA.name}</div>${getConnStatus(m.teamA._id)}</div>
+                    <div class="space-y-1">
+                        ${(m.teamA.members||[]).map(p => `<div class="text-[10px] text-gray-400 flex justify-between"><span>${p.name}</span><span class="text-gray-600">#${p.tag}</span></div>`).join('')}
+                    </div>
+                </div>
+                <div class="bg-black/20 p-3 rounded border border-white/5">
+                    <div class="flex justify-between items-center mb-2 border-b border-white/5 pb-2"><div class="text-[10px] text-gray-500 font-bold uppercase">${m.teamB.name}</div>${getConnStatus(m.teamB._id)}</div>
+                    <div class="space-y-1">
+                        ${(m.teamB.members||[]).map(p => `<div class="text-[10px] text-gray-400 flex justify-between"><span>${p.name}</span><span class="text-gray-600">#${p.tag}</span></div>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+            
+            html += `<div class="text-[10px] text-gray-500 font-bold uppercase mb-2">Log History</div>
+            <div class="bg-black/40 p-2 rounded border border-white/5 h-48 overflow-y-auto custom-scroll font-mono text-[10px] text-gray-400 space-y-1">
+                ${(m.vetoData.history||[]).slice().reverse().map(h => `<div><span class="text-gray-600">[${new Date(h.timestamp).toLocaleTimeString()}]</span> ${h.text}</div>`).join('')}
+            </div>`;
+            
+            container.innerHTML = html;
+        }
+        function renderMatchChat(m) {
+            const box = document.getElementById('adminChatBox');
+            box.innerHTML = '';
+            if (m.chat && m.chat.length > 0) {
+                m.chat.forEach(c => renderChatMessage(c));
+            } else {
+                box.innerHTML = '<div class="text-center text-gray-600 text-xs italic mt-4">No messages yet.</div>';
+            }
+            box.scrollTop = box.scrollHeight;
+        }
+        function renderChatMessage(data) {
+            const box = document.getElementById('adminChatBox');
+            if (box.innerHTML.includes('No messages yet')) box.innerHTML = '';
+            
+            const isAdmin = data.senderId === 'admin';
+            const bg = isAdmin ? 'bg-[#ff4655]/20 border-[#ff4655]/40' : 'bg-[#1a1d21] border-[#333]';
+            const senderColor = isAdmin ? 'text-[#ff4655]' : 'text-gray-400';
+            
+            const html = `<div class="flex flex-col ${isAdmin ? 'items-end' : 'items-start'}"><span class="text-[9px] font-bold uppercase ${senderColor} mb-0.5">${data.sender}</span><div class="${bg} border px-3 py-2 rounded text-xs text-gray-200 max-w-[80%] break-words">${data.message}</div></div>`;
+            
+            box.insertAdjacentHTML('beforeend', html);
+            box.scrollTop = box.scrollHeight;
+        }
+        function sendAdminChat() {
+            const input = document.getElementById('adminChatInput');
+            const msg = input.value.trim();
+            if (!msg || !activeMatchId) return;
+            socket.emit('send_chat', { matchId: activeMatchId, teamId: 'admin', message: msg });
+            input.value = '';
+        }
         async function saveMatchEdit() { 
             const body = { name:document.getElementById('emName').value, status:document.getElementById('emStatus').value, scheduledTime:document.getElementById('emTime').value, format:document.getElementById('emFormat').value };
             await fetch(`${API_BASE}/api/matches/${activeMatchId}`, {method:'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify(body)});
@@ -1262,8 +1754,9 @@
 
         function renderMapCheckboxes(ctx, preselected = []) {
             const id = ctx === 'create' ? 'createMapPoolList' : 'editMapPoolList';
+            const targetId = ctx === 'overview' ? 'overviewMapPoolList' : id;
             const countId = ctx === 'create' ? 'count-create' : 'count-edit';
-            const container = document.getElementById(id);
+            const container = document.getElementById(targetId);
             if(!container) return; 
             
             container.innerHTML = ALL_MAPS.map(m => {
@@ -1285,6 +1778,7 @@
         }
 
         function toggleMap(ctx, mapName, el) {
+            const countId = ctx === 'create' ? 'count-create' : (ctx === 'overview' ? 'count-overview' : 'count-edit');
             const checkbox = el.querySelector('input');
             const container = el.parentElement;
             const currentCount = container.querySelectorAll('input:checked').length;
@@ -1306,9 +1800,11 @@
 
         function updateMapSelectionUI(ctx) {
             const id = ctx === 'create' ? 'createMapPoolList' : 'editMapPoolList';
+            const targetId = ctx === 'overview' ? 'overviewMapPoolList' : id;
             const countId = ctx === 'create' ? 'count-create' : 'count-edit';
-            const container = document.getElementById(id);
-            const countEl = document.getElementById(countId);
+            const targetCountId = ctx === 'overview' ? 'count-overview' : countId;
+            const container = document.getElementById(targetId);
+            const countEl = document.getElementById(targetCountId);
             
             const checkboxes = container.querySelectorAll('input');
             const checkedCount = container.querySelectorAll('input:checked').length;
@@ -1343,25 +1839,21 @@
             closeModal(); init(); 
         }
 
-        async function updateTourneyName() { 
-            const id = document.getElementById('tsId').value;
-            const name = document.getElementById('tsName').value; 
-            const selectedMaps = Array.from(document.querySelectorAll('.chk-map-edit:checked')).map(c => c.value);
+        async function saveOverview() {
+            const id = activeTourneyData._id;
+            const name = document.getElementById('ovName').value;
+            const prizePool = document.getElementById('ovPrize').value;
+            const formatDescription = document.getElementById('ovFormat').value;
+            const selectedMaps = Array.from(document.querySelectorAll('.chk-map-overview:checked')).map(c => c.value);
+            
             if(selectedMaps.length !== 7) return showToast(`Selected ${selectedMaps.length}/7 Maps! Exact 7 required.`, 'error');
+            
             await fetch(`${API_BASE}/api/tournaments/${id}`, {
                 method:'PUT', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
-                body:JSON.stringify({name, mapPool: selectedMaps})
+                body:JSON.stringify({name, mapPool: selectedMaps, prizePool, formatDescription})
             }); 
-            closeModal(); init(); showToast('System Updated'); 
-        }
-
-        function openTourneySettings(id, name) { 
-            document.getElementById('tsId').value = id; 
-            document.getElementById('tsName').value = name; 
-            const currentPool = activeTourneyData.mapPool && activeTourneyData.mapPool.length > 0 ? activeTourneyData.mapPool : ALL_MAPS;
-            renderMapCheckboxes('edit', currentPool);
-            openModal('tourneySettingsModal'); 
+            init(); showToast('Tournament Updated'); 
         }
         
         async function deleteTourney() { const id=document.getElementById('tsId').value; if(confirm("DELETE SYSTEM?")) { await fetch(`${API_BASE}/api/tournaments/${id}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); showToast('Deleted'); } }
@@ -1371,6 +1863,15 @@
         async function deleteMatch() { if(confirm('Delete Match?')) await fetch(`${API_BASE}/api/matches/${activeMatchId}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); }
         async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }
         async function rematchMatch() { if(!confirm("⚠️ Reset Match for Rematch?")) return; await fetch(`${API_BASE}/api/matches/${activeMatchId}/reset`, {method:'POST', headers:{'Authorization': token}}); closeModal(); init(); showToast('Reset Complete'); }
+        async function resolvePause(mid) { if(!confirm("Resolve Pause Request?")) return; await fetch(`${API_BASE}/api/matches/${mid}/pause/resolve`, {method:'POST', headers:{'Authorization': token}}); init(); showToast('Pause Resolved'); }
+        async function adminPauseMatch(mid) { await fetch(`${API_BASE}/api/matches/${mid}/admin-pause`, {method:'POST', headers:{'Authorization': token}}); init(); showToast('Veto Paused'); }
+        async function resetVetoTimer() { if(!confirm("Reset current turn timer?")) return; await fetch(`${API_BASE}/api/matches/${activeMatchId}/reset-timer`, {method:'POST', headers: {'Authorization': token}}); }
+        async function resetVeto() {
+            if(!confirm("Reset Veto State? This will clear bans/picks.")) return;
+            await fetch(`${API_BASE}/api/matches/${activeMatchId}/reset-veto`, {method:'POST', headers: {'Authorization': token}});
+            closeModal(); init(); showToast('Veto Reset');
+        }
+        async function testAudio(sound) { if(!activeMatchId) return; await fetch(`${API_BASE}/api/matches/${activeMatchId}/audio`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({sound})}); showToast(`Audio Triggered: ${sound}`); }
         async function approveTeam(id) { if(confirm('Approve Team Entry?')) { await fetch(`${API_BASE}/api/teams/${id}/approve`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Team Approved'); } }
         function editTeam(id) { 
             const t = allTeams.find(x => x._id === id);
@@ -1443,6 +1944,7 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
         function openVetoPage() { window.open(`/veto.html?match=${activeMatchId}`, '_blank'); }
+        function openOverlayPage() { window.open(`/overlay.html?match=${activeMatchId}`, '_blank'); }
         function exportStageCSV(tourneyId, stageIndex) {
             const t = activeTourneyData;
             if (!t || t._id !== tourneyId) return showToast('Tournament data mismatch', 'error');
@@ -1483,7 +1985,10 @@
                     roundCount: parseInt(document.getElementById('stRoundCount').value) || 1, 
                     randomize: document.getElementById('stRandom').checked,
                     hasThirdPlace: document.getElementById('stThirdPlace').checked,
-                    groupSize: parseInt(document.getElementById('stGroupSize').value) || 0,
+                    splitParticipants: document.getElementById('stSplitParticipants').checked,
+                    groupCount: parseInt(document.getElementById('stGroupCount')?.value) || 1,
+                    tiebreakers: [document.getElementById('tb1').value, document.getElementById('tb2').value, document.getElementById('tb3').value],
+                    swissRounds: parseInt(document.getElementById('stSwissRounds')?.value) || 3,
                     sourceStageIndex: -1 // Always manual mode now
                 } 
             }; 
@@ -1494,6 +1999,23 @@
             }); 
             closeModal(); init();
             localStorage.removeItem('stage_autosave');
+        }
+
+        function openStageSettings(tid, idx) {
+            const t = allTourneys.find(x => x._id === tid);
+            if(!t || !t.stages[idx]) return;
+            const s = t.stages[idx];
+            const tb = (s.settings && s.settings.tiebreakers) ? s.settings.tiebreakers : ['h2h', 'map_diff', 'round_diff'];
+            document.getElementById('ssTourneyId').value = tid; document.getElementById('ssStageIndex').value = idx;
+            document.getElementById('ssTb1').value = tb[0]; document.getElementById('ssTb2').value = tb[1]; document.getElementById('ssTb3').value = tb[2];
+            openModal('stageSettingsModal');
+        }
+
+        async function saveStageSettings() {
+            const tid = document.getElementById('ssTourneyId').value; const idx = document.getElementById('ssStageIndex').value;
+            const tiebreakers = [document.getElementById('ssTb1').value, document.getElementById('ssTb2').value, document.getElementById('ssTb3').value];
+            await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${idx}/settings`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ settings: { tiebreakers } }) });
+            closeModal(); init(true); showToast('Settings Updated');
         }
 
         // Drag & Drop Logic
@@ -1594,6 +2116,17 @@
                 menu.classList.remove('opacity-100', 'scale-100');
             }
         });
+
+        // Veto Countdown Timer
+        setInterval(() => {
+            document.querySelectorAll('.veto-countdown').forEach(el => {
+                const deadline = parseInt(el.dataset.deadline);
+                if(!deadline) return;
+                const diff = Math.ceil((deadline - Date.now()) / 1000);
+                el.innerText = diff > 0 ? `(${diff}s)` : '(0s)';
+                if(diff <= 10 && diff > 0) el.classList.add('animate-pulse'); else el.classList.remove('animate-pulse');
+            });
+        }, 1000);
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => { renderMapCheckboxes('create'); });

@@ -571,7 +571,13 @@ app.get('/api/matches', async (_, res) => {
             .populate({ path: 'teamB', populate: { path: 'members' } })
             .populate('winner')
             .populate('tournament');
-        res.json(matches);
+        
+        const matchesWithPresence = matches.map(m => {
+            const obj = m.toObject();
+            obj.presence = vetoMgr.presence[m._id.toString()] || {};
+            return obj;
+        });
+        res.json(matchesWithPresence);
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
@@ -621,6 +627,81 @@ app.get('/api/matches/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// [NEW] Public Overlay Endpoint
+app.get('/api/overlay/match/:id', async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id)
+            .populate('teamA', 'name shortName logo')
+            .populate('teamB', 'name shortName logo')
+            .populate('tournament', 'name')
+            .populate('vetoData.pickedMaps.pickedBy', 'shortName');
+
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+
+        let seriesA = 0, seriesB = 0;
+        const mapScores = match.scores || [];
+        
+        // Calculate Series Score
+        if (match.status === 'finished') {
+            mapScores.forEach(s => {
+                const sA = parseInt(s.teamAScore) || 0;
+                const sB = parseInt(s.teamBScore) || 0;
+                if (sA > sB) seriesA++;
+                else if (sB > sA) seriesB++;
+            });
+        } else {
+            // For live matches, only count completed maps (heuristic: >= 13 and diff >= 2)
+            mapScores.forEach(s => {
+                const sA = parseInt(s.teamAScore) || 0;
+                const sB = parseInt(s.teamBScore) || 0;
+                if ((sA >= 13 && sA >= sB + 2) || (sA > 12 && sB > 12 && sA > sB + 1)) seriesA++;
+                else if ((sB >= 13 && sB >= sA + 2) || (sB > 12 && sA > 12 && sB > sA + 1)) seriesB++;
+            });
+        }
+
+        // Determine Current Map
+        let currentMap = null;
+        if (match.status === 'live' && match.vetoData && match.vetoData.pickedMaps) {
+            const lastScore = mapScores[mapScores.length - 1];
+            let lastMapFinished = false;
+            if (lastScore) {
+                const sA = parseInt(lastScore.teamAScore) || 0;
+                const sB = parseInt(lastScore.teamBScore) || 0;
+                if ((sA >= 13 && sA >= sB + 2) || (sB >= 13 && sB >= sA + 2) || (sA > 12 && sB > 12 && Math.abs(sA-sB) >= 2)) lastMapFinished = true;
+            }
+            
+            let mapIndex = lastMapFinished ? mapScores.length : Math.max(0, mapScores.length - 1);
+            if (match.vetoData.pickedMaps[mapIndex]) {
+                currentMap = match.vetoData.pickedMaps[mapIndex].map;
+            }
+        }
+
+        res.json({
+            matchId: match._id,
+            tournament: match.tournament ? match.tournament.name : '',
+            stage: match.name,
+            format: match.format,
+            status: match.status,
+            teamA: { id: match.teamA?._id, name: match.teamA?.name || 'TBD', shortName: match.teamA?.shortName || 'TBD', logo: match.teamA?.logo || '', seriesScore: seriesA },
+            teamB: { id: match.teamB?._id, name: match.teamB?.name || 'TBD', shortName: match.teamB?.shortName || 'TBD', logo: match.teamB?.logo || '', seriesScore: seriesB },
+            currentMap: currentMap,
+            scores: mapScores,
+            veto: {
+                bans: match.vetoData?.bannedMaps || [],
+                picks: match.vetoData?.pickedMaps || [],
+                sequence: match.vetoData?.sequence || [],
+                status: match.vetoData?.status,
+                startTime: match.vetoData?.currentTurnStartTime,
+                deadline: match.vetoData?.currentTurnDeadline,
+                teamAReady: match.vetoData?.teamAReady,
+                teamBReady: match.vetoData?.teamBReady,
+                coinTossWinner: match.vetoData?.coinTossWinner
+            },
+            presence: vetoMgr.presence[match._id.toString()] || {}
+        });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 app.delete('/api/matches/:id', auth(['admin']), async (req, res) => {
     try {
         await Match.findByIdAndDelete(req.params.id);
@@ -640,6 +721,14 @@ app.put('/api/matches/:id', auth(['admin']), async(req, res) => {
 
         const match = await Match.findByIdAndUpdate(req.params.id, update, {new: true});
         io.emit('match_update', match);
+
+        // [NEW] Notify Teams on Schedule Change
+        if (scheduledTime !== undefined) {
+            const msg = `Match ${match.name} time updated: ${new Date(scheduledTime).toLocaleString()}`;
+            if(match.teamA) io.to(match.teamA.toString()).emit('notification', { msg });
+            if(match.teamB) io.to(match.teamB.toString()).emit('notification', { msg });
+        }
+
         res.json({ success: true, match });
     } catch(e) { res.status(500).json(e); }
 });
@@ -649,25 +738,36 @@ app.post('/api/matches/swap-teams', auth(['admin']), async (req, res) => {
     try {
         const { match1Id, slot1, match2Id, slot2 } = req.body;
         
-        const m1 = await Match.findById(match1Id);
-        const m2 = await Match.findById(match2Id);
+        let m1 = await Match.findById(match1Id);
+        let m2 = (match1Id === match2Id) ? m1 : await Match.findById(match2Id);
 
         if (!m1 || !m2) return res.status(404).json({ msg: 'Match not found' });
+        if (m1.status === 'finished' || m2.status === 'finished') return res.status(400).json({ msg: 'Cannot swap finished matches' });
 
-        const team1 = m1[slot1];
-        const team2 = m2[slot2];
+        const team1Id = m1[slot1];
+        const team2Id = m2[slot2];
         
         // Swap Teams
-        m1[slot1] = team2;
-        m2[slot2] = team1;
+        m1[slot1] = team2Id;
+        m2[slot2] = team1Id;
+
+        // Update Rosters
+        const getRoster = async (tid) => {
+            if (!tid) return [];
+            const t = await Team.findById(tid);
+            return t ? t.members : [];
+        };
+
+        m1[`${slot1}Roster`] = await getRoster(team2Id);
+        m2[`${slot2}Roster`] = await getRoster(team1Id);
 
         await m1.save();
-        await m2.save();
+        if (m1._id.toString() !== m2._id.toString()) await m2.save();
 
         await logAdminAction(req, 'SWAP_TEAMS', `Swapped ${slot1} of Match ${m1.matchNumber} with ${slot2} of Match ${m2.matchNumber}`, {});
 
         io.emit('match_update', m1);
-        io.emit('match_update', m2);
+        if (m1._id.toString() !== m2._id.toString()) io.emit('match_update', m2);
         io.emit('bracket_update');
 
         res.json({ success: true });
@@ -969,6 +1069,11 @@ app.post('/api/matches/:id/reschedule', auth(['team']), async (req, res) => {
         };
         await match.save();
         io.emit('match_update', match);
+
+        // [NEW] Notify Opponent
+        const opponentId = match.teamA.toString() === req.user.id ? match.teamB.toString() : match.teamA.toString();
+        io.to(opponentId).emit('notification', { msg: `Reschedule Request received for ${match.name}` });
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
@@ -984,6 +1089,8 @@ app.post('/api/matches/:id/reschedule/respond', auth(['team']), async (req, res)
         if (match.rescheduleRequest.requestedBy.toString() === req.user.id) return res.status(400).json({ msg: 'Cannot respond to own request' });
         if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) return res.status(403).json({ msg: 'Unauthorized' });
 
+        const requester = match.rescheduleRequest.requestedBy;
+
         if (action === 'accept') {
             match.scheduledTime = match.rescheduleRequest.proposedTime;
             match.checkIn = { teamA: false, teamB: false, windowOpen: false }; // Reset check-in
@@ -991,6 +1098,102 @@ app.post('/api/matches/:id/reschedule/respond', auth(['team']), async (req, res)
         match.rescheduleRequest = { status: 'none' }; // Clear request
         await match.save();
         io.emit('match_update', match);
+
+        // [NEW] Notify Requester
+        if (requester) {
+            const msg = action === 'accept' ? `Reschedule ACCEPTED for ${match.name}` : `Reschedule REJECTED for ${match.name}`;
+            io.to(requester.toString()).emit('notification', { msg });
+        }
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Pause Request
+app.post('/api/matches/:id/pause', auth(['team']), async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        
+        if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Unauthorized' });
+        }
+        
+        const isVetoLive = match.status === 'scheduled' && match.vetoData && match.vetoData.status === 'in_progress';
+        if (match.status !== 'live' && !isVetoLive) return res.status(400).json({ msg: 'Match is not live or in veto' });
+        
+        if (isVetoLive) {
+            const result = await vetoMgr.handleTeamPause(req.params.id, req.user.id);
+            if (!result.success) return res.status(400).json({ msg: result.msg });
+            return res.json({ success: true });
+        }
+
+        match.pauseRequest = {
+            requestedBy: req.user.id,
+            reason: reason || 'Technical Issue',
+            status: 'pending',
+            timestamp: new Date()
+        };
+        await match.save();
+
+        io.emit('match_update', match);
+        io.emit('notification', { msg: `⚠️ PAUSE REQUESTED: ${match.name}`, type: 'error' });
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Resume Match (Team)
+app.post('/api/matches/:id/resume', auth(['team']), async (req, res) => {
+    try {
+        const result = await vetoMgr.handleTeamResume(req.params.id, req.user.id);
+        if (!result.success) return res.status(400).json({ msg: result.msg });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Admin Pause Veto
+app.post('/api/matches/:id/admin-pause', auth(['admin']), async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        if (match.vetoData && match.vetoData.status === 'in_progress') {
+            await vetoMgr.adminPause(match);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Resolve Pause (Admin)
+app.post('/api/matches/:id/pause/resolve', auth(['admin']), async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+
+        match.pauseRequest.status = 'resolved';
+        
+        if (match.status === 'scheduled' && match.vetoData && match.vetoData.status === 'paused') {
+            match.vetoData.status = 'in_progress';
+            match.vetoData.pausedBy = null;
+            await vetoMgr.logAction(match, "RESUME: Admin resolved pause");
+            await match.save();
+            await vetoMgr.resumeTimer(match);
+        } else {
+            await match.save();
+        }
+
+        io.emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Admin Reset Veto Timer
+app.post('/api/matches/:id/reset-timer', auth(['admin']), async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        await vetoMgr.resetTurnTimer(match);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
@@ -1054,8 +1257,11 @@ app.post('/api/tournaments', auth(['admin']), async (req, res) => {
 
 app.put('/api/tournaments/:id', auth(['admin']), async (req, res) => {
     try {
-        const { name, mapPool } = req.body;
-        await Tournament.findByIdAndUpdate(req.params.id, { name, mapPool });
+        const { name, mapPool, prizePool, formatDescription } = req.body;
+        const update = { name, mapPool };
+        if (prizePool !== undefined) update.prizePool = prizePool;
+        if (formatDescription !== undefined) update.formatDescription = formatDescription;
+        await Tournament.findByIdAndUpdate(req.params.id, update);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ msg: e.message });
@@ -1105,25 +1311,23 @@ app.post('/api/tournaments/:id/stages/generate', auth(['admin']), async (req, re
             } 
             // --- CASE B: From League/Swiss (Top N) ---
             else if (['round_robin', 'swiss'].includes(sourceStage.type)) {
-                 let stats = {};
-                 sourceStage.stageParticipants.forEach(tid => { stats[tid] = { id: tid, wins: 0, diff: 0 }; });
+                 const standings = await BracketManager.getStageStandings(tournament._id, settings.sourceStageIndex);
                  
-                 sourceMatches.forEach(m => {
-                    if (m.status === 'finished' && m.winner) {
-                        if (stats[m.winner._id]) stats[m.winner._id].wins++;
-                        let sA=0, sB=0;
-                        m.scores.forEach(s => { sA += parseInt(s.teamAScore)||0; sB += parseInt(s.teamBScore)||0; });
-                        const winnerDiff = Math.abs(sA - sB);
-                        if (stats[m.winner._id]) stats[m.winner._id].diff += winnerDiff;
-                    }
+                 // Grouping Logic
+                 const grouped = {};
+                 standings.forEach(s => {
+                     const g = s.group || 'A';
+                     if(!grouped[g]) grouped[g] = [];
+                     grouped[g].push(s);
                  });
-
-                 const sortedIds = Object.values(stats)
-                    .sort((a,b) => b.wins - a.wins || b.diff - a.diff)
-                    .map(s => s.id);
                  
-                 const count = settings.advanceCount || sortedIds.length;
-                 const selectedIds = sortedIds.slice(0, count);
+                 const count = settings.advanceCount || 2;
+                 const selectedIds = [];
+                 
+                 Object.keys(grouped).sort().forEach(g => {
+                     const top = grouped[g].slice(0, count);
+                     selectedIds.push(...top.map(s => s.id));
+                 });
                  
                  const teamsDb = await Team.find({ _id: { $in: selectedIds } });
                  finalParticipants = selectedIds.map(id => teamsDb.find(t => t._id.toString() === id.toString())).filter(t=>t);
@@ -1194,6 +1398,23 @@ app.post('/api/tournaments/:id/stages/:stageIndex/swiss-next', auth(['admin']), 
     }
 });
 
+// [NEW] Update Stage Settings (e.g. Tiebreakers)
+app.put('/api/tournaments/:id/stages/:stageIndex/settings', auth(['admin']), async (req, res) => {
+    try {
+        const { settings } = req.body;
+        const tournament = await Tournament.findById(req.params.id);
+        if (!tournament || !tournament.stages[req.params.stageIndex]) return res.status(404).json({ msg: 'Stage not found' });
+        
+        tournament.stages[req.params.stageIndex].settings = { 
+            ...tournament.stages[req.params.stageIndex].settings, 
+            ...settings 
+        };
+        
+        await tournament.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 // [NEW] Get Stage Standings (Round Robin / Swiss)
 app.get('/api/tournaments/:id/stages/:stageIndex/standings', async (req, res) => {
     try {
@@ -1227,7 +1448,26 @@ app.delete('/api/tournaments/:id', auth(['admin']), async (req, res) => {
 
 // Socket.io Events
 io.on('connection', (socket) => {
-    socket.on('join_match', (id) => { socket.join(id); vetoMgr.broadcastState(id); });
+    socket.on('join_admin', () => { socket.join('admins'); });
+    socket.on('join_match', (data) => { 
+        const matchId = typeof data === 'object' ? data.matchId : data;
+        const teamId = typeof data === 'object' ? data.teamId : null;
+        socket.join(matchId); 
+        if (teamId) {
+            socket.matchId = matchId;
+            socket.teamId = teamId;
+            vetoMgr.handleConnection(matchId, teamId);
+        } else {
+            vetoMgr.broadcastState(matchId);
+        }
+    });
+    socket.on('update_status', (status) => {
+        if (socket.matchId && socket.teamId) vetoMgr.handleStatusUpdate(socket.matchId, socket.teamId, status);
+    });
+    socket.on('disconnect', () => {
+        if (socket.matchId && socket.teamId) vetoMgr.handleDisconnection(socket.matchId, socket.teamId);
+    });
+    socket.on('join_team_room', (teamId) => { socket.join(teamId); });
     socket.on('set_room_pass', (d) => vetoMgr.handleSetRoomPass(d.matchId, d.teamId, d.password));
     socket.on('send_chat', (d) => vetoMgr.handleChat(d.matchId, d.teamId, d.message));
     socket.on('team_ready', (d) => vetoMgr.handleReady(d.matchId, d.teamId));

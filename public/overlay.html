@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Overlay - Modern VCT Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tungsten:wght@600&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: transparent; overflow: hidden; font-family: 'Oswald', sans-serif; }
+        
+        /* --- Colors & Variables --- */
+        :root {
+            --val-red: #ff4655;
+            --val-green: #1fa474;
+            --val-dark: #0f1923;
+            --val-darker: #15171a;
+        }
+
+        /* --- Main Container with Slide Up Animation --- */
+        .veto-wrapper {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            opacity: 0;
+            transform: translate(-50%, 40px);
+            animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* --- Timer Bar (ติดด้านบนกล่อง) --- */
+        .timer-container {
+            width: 100%;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+        .timer-fill {
+            height: 100%;
+            width: 100%;
+            background-color: var(--val-red);
+            transition: width 1s linear;
+            box-shadow: 0 0 10px rgba(255, 70, 85, 0.5);
+        }
+
+        /* --- Veto Grid --- */
+        .veto-container {
+            display: flex;
+            height: 330px;
+            background: var(--val-darker);
+        }
+
+        .veto-col {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            width: 155px;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            opacity: 0;
+            animation: slideUpCol 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .veto-col:last-child { border-right: none; }
+
+        @keyframes slideUpCol {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Headers --- */
+        .veto-header {
+            background-color: rgba(0,0,0,0.4);
+            color: #ccc;
+            text-align: center;
+            padding: 8px 4px;
+            font-family: 'Tungsten', sans-serif;
+            font-size: 15px; /* ลดขนาดลงเพื่อให้พอดี */
+            font-weight: 600;
+            line-height: 1.1;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+        .veto-header .team-name { 
+            color: white; 
+            font-size: 18px; 
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis; /* ใส่ ... ถ้าชื่อทีมยาวเกินกล่อง */
+        }
+
+        /* --- Map Images --- */
+        .veto-map {
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-size: cover;
+            background-position: center;
+            background-color: #1a1d21;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .veto-map::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.1) 100%);
+            z-index: 1;
+        }
+
+        .veto-map.banned { filter: grayscale(1) brightness(0.6); }
+
+        /* --- Map Name --- */
+        .map-name {
+            position: relative;
+            z-index: 10;
+            font-family: 'Tungsten', sans-serif;
+            font-size: 22px; /* ลดจาก 38px เป็น 32px เพื่อให้พอดีกล่อง */
+            font-weight: 800;
+            width: 100%;
+            text-align: center;
+            padding: 0 4px;
+            color: white;
+            text-transform: uppercase;
+            text-shadow: 0 4px 15px rgba(0,0,0,1);
+            letter-spacing: 1px;
+        }
+
+        .ban-icon {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 90px;
+            height: 90px;
+            border: 6px solid var(--val-red);
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 0 10px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.5);
+            animation: slideUpBan 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation-delay: inherit;
+        }
+        .ban-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 130%;
+            height: 6px;
+            background-color: var(--val-red);
+            transform: translate(-50%, -50%) rotate(-45deg);
+        }
+
+        @keyframes slideUpBan {
+            from { opacity: 0; transform: translate(-50%, -50%) translateY(20px) scale(0.8); }
+            to { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); }
+        }
+
+        /* --- Footer (Pick/Def/Atk) --- */
+        .veto-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--val-green);
+            color: white;
+            text-align: center;
+            padding: 6px 0;
+            font-family: 'Tungsten', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.1;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            z-index: 10;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            /* แอนิเมชันตอน Footer เด้งขึ้นมา */
+            animation: slideUpFooter 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes slideUpFooter {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Status Text Animation --- */
+        .status-change {
+            display: inline-block;
+            animation: statusPulse 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes statusPulse {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Effect สำหรับกล่องที่กำลังเป็นตาเลือก (Active Turn) */
+        .veto-col.active-turn {
+            background-color: #fff;
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.2);
+            animation: pulseBg 2s infinite;
+        }
+        @keyframes pulseBg {
+            0% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
+            50% { box-shadow: inset 0 0 20px rgba(255,255,255,0.1); }
+            100% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="vetoWrapper" class="veto-wrapper opacity-0">
+        <div id="timerContainer" class="timer-container hidden">
+            <div id="timerFill" class="timer-fill"></div>
+        </div>
+        <div id="vetoGrid" class="veto-container"></div>
+    </div>
+
+    <script>
+        const matchId = new URLSearchParams(location.search).get('match');
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        
+        const MAP_IMAGES = {
+            'Abyss': 'https://media.valorant-api.com/maps/224b0a95-48b9-f703-1bd8-67aca101a61f/splash.png',
+            'Ascent': 'https://media.valorant-api.com/maps/7eaecc1b-4337-bbf6-6ab9-04b8f06b3319/splash.png',
+            'Bind': 'https://media.valorant-api.com/maps/2c9d57ec-4431-9c5e-2939-8f9ef6dd5cba/splash.png',
+            'Haven': 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png',
+            'Lotus': 'https://media.valorant-api.com/maps/2fe4ed3a-450a-948b-6d6b-e89a78e680a9/splash.png',
+            'Sunset': 'https://media.valorant-api.com/maps/92584fbe-486a-b1b2-9faa-39b0f486b498/splash.png',
+            'Pearl': 'https://media.valorant-api.com/maps/fd267378-4d1d-484f-ff52-77821ed10dc2/splash.png',
+            'Split': 'https://media.valorant-api.com/maps/d960549e-485c-e861-8d71-aa9d1aed12a2/splash.png',
+            'Fracture': 'https://media.valorant-api.com/maps/b529448b-4d60-346e-e89e-00a4c527a405/splash.png',
+            'Breeze': 'https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png',
+            'Icebox': 'https://media.valorant-api.com/maps/e2ad5c54-4114-a870-9641-8ea21279579a/splash.png',
+            'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg',
+            'Kasbah': 'https://media.valorant-api.com/maps/5d6b454a-44d7-0632-0b97-469915b94805/splash.png'
+        };
+
+        let currentVetoStatus = null;
+        let turnDeadline = null;
+        let turnStartTime = null;
+
+        async function update() {
+            if(!matchId) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/overlay/match/${matchId}`);
+                if(!res.ok) return;
+                const data = await res.json();
+
+                const vetoWrapper = document.getElementById('vetoWrapper');
+                const grid = document.getElementById('vetoGrid');
+                
+                // --- VETO IN PROGRESS ---
+
+                if (data.veto && data.veto.sequence && data.veto.sequence.length > 0) {
+                    vetoWrapper.classList.remove('opacity-0');
+                    
+                    currentVetoStatus = data.veto.status;
+                    turnDeadline = data.veto.deadline ? new Date(data.veto.deadline).getTime() : null;
+                    turnStartTime = data.veto.startTime ? new Date(data.veto.startTime).getTime() : null;
+                    const currentIndex = data.veto.sequenceIndex; 
+
+                    const bans = data.veto.bans || [];
+                    const picks = data.veto.picks || [];
+                    const sequence = data.veto.sequence.filter(s => s.act === 'ban' || s.act === 'pick' || s.act === 'decider');
+                    
+                    let banIdx = 0;
+                    let pickIdx = 0;
+
+                    sequence.forEach((step, index) => {
+                        let mapName = null;
+                        let teamName = "DECIDER";
+                        let headerSub = "MAP";
+                        let currentPick = null;
+                        
+                        const isActiveTurn = (currentVetoStatus === 'in_progress' && index === currentIndex);
+                        
+                        if (step.team) {
+                            teamName = (step.team === data.teamA.id || step.team === data.teamA._id) ? data.teamA.shortName : data.teamB.shortName;
+                            headerSub = step.act === 'ban' ? "VETO MAP" : "SELECT MAP";
+                        }
+
+                        if (step.act === 'ban') {
+                            if (bans[banIdx]) {
+                                mapName = bans[banIdx];
+                                banIdx++;
+                            }
+                        } else if (step.act === 'pick') {
+                            if (picks[pickIdx] && picks[pickIdx].pickedBy) {
+                                mapName = picks[pickIdx].map;
+                                currentPick = picks[pickIdx];
+                                pickIdx++;
+                            }
+                        } else if (step.act === 'decider') {
+                            const deciderMap = picks.find(p => !p.pickedBy);
+                            if (deciderMap) {
+                                mapName = deciderMap.map;
+                                currentPick = deciderMap;
+                            }
+                        }
+                        
+                        const mapImg = MAP_IMAGES[mapName] || 'https://via.placeholder.com/200x300/1a1d21/333333?text=?';
+                        const isActive = !!mapName;
+                        const isBanned = step.act === 'ban' && isActive;
+                        const animDelay = `${index * 0.1}s`;
+
+                        // ซ่อน Footer เริ่มต้น และจะโชว์ก็ต่อเมื่อมีข้อมูลเลือก Side แล้วเท่านั้น
+                        let footerHtml = '';
+                        if (step.act !== 'ban') {
+                            if (currentPick && (currentPick.teamAStartingSide || currentPick.teamBStartingSide)) {
+                                let sidePickerName = "";
+                                let chosenSide = "";
+                                const pickerId = currentPick.pickedBy?._id || currentPick.pickedBy;
+                                
+                                if (pickerId === data.teamA.id || pickerId === data.teamA._id) {
+                                    sidePickerName = data.teamB.shortName;
+                                    chosenSide = currentPick.teamBStartingSide === 'atk' ? 'ATTACK' : 'DEFENSE';
+                                } else if (pickerId === data.teamB.id || pickerId === data.teamB._id) {
+                                    sidePickerName = data.teamA.shortName;
+                                    chosenSide = currentPick.teamAStartingSide === 'atk' ? 'ATTACK' : 'DEFENSE';
+                                } else {
+                                    if (currentPick.teamAStartingSide) {
+                                        sidePickerName = data.teamA.shortName;
+                                        chosenSide = currentPick.teamAStartingSide === 'atk' ? 'ATTACK' : 'DEFENSE';
+                                    }
+                                }
+                                footerHtml = `<div class="veto-footer">${sidePickerName} PICKS<br>${chosenSide}</div>`;
+                            } 
+                            // นำ block 'else' ที่เคยเป็น WAITING ออกไป เพื่อให้ซ่อนแถบนี้จนกว่าจะเลือก
+                        }
+
+                        const colContent = `
+                            <div class="veto-header">
+                                <span class="team-name" title="${teamName}">${teamName}</span>${headerSub}
+                            </div>
+                            <div class="veto-map ${isBanned ? 'banned' : ''}" style="background-image: url('${isActive ? mapImg : ''}');">
+                                ${isBanned ? `<div class="ban-icon" style="animation-delay: ${parseFloat(index*0.1) + 0.3}s;"></div>` : ''}
+                                ${mapName ? `<div class="map-name">${mapName}</div>` : ''}
+                            </div>
+                            ${footerHtml}
+                        `;
+
+                        const colClass = `veto-col ${isActiveTurn && !mapName ? 'active-turn' : ''}`;
+                        
+                        let colEl = grid.children[index];
+                        if (!colEl) {
+                            colEl = document.createElement('div');
+                            colEl.className = colClass;
+                            colEl.style.animationDelay = animDelay;
+                            colEl.innerHTML = colContent;
+                            colEl._lastHTML = colContent;
+                            colEl._lastData = null; // Reset pre-match data
+                            grid.appendChild(colEl);
+                        } else {
+                            if (colEl.className !== colClass) colEl.className = colClass;
+                            if (colEl.style.width) colEl.style.width = '';
+                            if (colEl._lastHTML !== colContent) {
+                                colEl.innerHTML = colContent;
+                                colEl._lastHTML = colContent;
+                                colEl._lastData = null; // Reset pre-match data
+                            }
+                        }
+                    });
+                    
+                    while (grid.children.length > sequence.length) {
+                        grid.removeChild(grid.lastChild);
+                    }
+
+                } 
+                // --- PRE-MATCH / COIN TOSS / DECISION ---
+                else if (data.veto && (data.veto.status === 'pending' || data.veto.status === 'coin_toss' || data.veto.status === 'decision')) {
+                    vetoWrapper.classList.remove('opacity-0');
+                    
+                    const teamA = data.teamA;
+                    const teamB = data.teamB;
+                    const status = data.veto.status;
+                    
+                    let centerStatus = "WAITING";
+                    let footerA = data.veto.teamAReady ? "READY" : "CONNECTING...";
+                    let footerB = data.veto.teamBReady ? "READY" : "CONNECTING...";
+                    
+                    // Check presence
+                    const pA = data.presence && data.presence[teamA.id];
+                    const pB = data.presence && data.presence[teamB.id];
+                    if (!data.veto.teamAReady) footerA = pA ? "NOT READY" : "OFFLINE";
+                    if (!data.veto.teamBReady) footerB = pB ? "NOT READY" : "OFFLINE";
+
+                    if (status === 'coin_toss') {
+                        centerStatus = "COIN TOSS";
+                        footerA = "HEADS/TAILS";
+                        footerB = "HEADS/TAILS";
+                    } else if (status === 'decision') {
+                        centerStatus = "DECISION";
+                        const winnerId = data.veto.coinTossWinner?._id || data.veto.coinTossWinner;
+                        if (winnerId === teamA.id) { footerA = "CHOOSING"; footerB = "WAITING"; }
+                        else { footerA = "WAITING"; footerB = "CHOOSING"; }
+                    }
+
+                    // Helper to build HTML for new elements
+                    const buildColHtml = (d) => {
+                        const mapStyle = d.mapBg ? `background-image: ${d.mapBg}; background-size: 60%; background-repeat: no-repeat;` : 'background-color: #1a1d21; display: flex; align-items: center; justify-content: center;';
+                        const mapInner = d.mapContent || '';
+                        return `<div class="veto-header">${d.header}</div><div class="veto-map" style="${mapStyle}">${mapInner}</div><div class="veto-footer" style="position: absolute; bottom: 0; width: 100%; background-color: ${d.footerColor};">${d.footerText}</div>`;
+                    };
+
+                    const cols = [
+                        {
+                            width: '200px',
+                            delay: '0s',
+                            header: `<span class="team-name">${teamA.name}</span>TEAM A`,
+                            mapBg: `url('${teamA.logo}')`,
+                            footerText: footerA,
+                            footerColor: data.veto.teamAReady ? 'var(--val-green)' : '#333'
+                        },
+                        {
+                            width: '160px',
+                            delay: '0.1s',
+                            header: `MATCH`,
+                            mapContent: `<div class="text-6xl font-bold text-white" style="font-family: 'Tungsten', sans-serif;">VS</div>`,
+                            footerText: centerStatus,
+                            footerColor: 'var(--val-red)'
+                        },
+                        {
+                            width: '200px',
+                            delay: '0.2s',
+                            header: `<span class="team-name">${teamB.name}</span>TEAM B`,
+                            mapBg: `url('${teamB.logo}')`,
+                            footerText: footerB,
+                            footerColor: data.veto.teamBReady ? 'var(--val-green)' : '#333'
+                        }
+                    ];
+
+                    cols.forEach((colData, index) => {
+                        let colEl = grid.children[index];
+                        if (!colEl) {
+                            colEl = document.createElement('div');
+                            colEl.className = 'veto-col';
+                            colEl.style.width = colData.width;
+                            colEl.style.animationDelay = colData.delay;
+                            colEl.innerHTML = buildColHtml(colData);
+                            grid.appendChild(colEl);
+                        } else {
+                            if (colEl.style.width !== colData.width) colEl.style.width = colData.width;
+                            if (colEl.className !== 'veto-col') colEl.className = 'veto-col';
+                            
+                            const last = colEl._lastData;
+                            if (!last) {
+                                colEl.innerHTML = buildColHtml(colData);
+                            } else {
+                                if (last.footerText !== colData.footerText) {
+                                    const footer = colEl.querySelector('.veto-footer');
+                                    if (footer) footer.innerHTML = `<span class="status-change">${colData.footerText}</span>`;
+                                }
+                                if (last.footerColor !== colData.footerColor) {
+                                    const footer = colEl.querySelector('.veto-footer');
+                                    if (footer) footer.style.backgroundColor = colData.footerColor;
+                                }
+                            }
+                        }
+                        colEl._lastData = colData;
+                    });
+                    
+                    while (grid.children.length > cols.length) {
+                        grid.removeChild(grid.lastChild);
+                    }
+                }
+                else {
+                    // Fallback or hidden
+                    vetoWrapper.classList.add('opacity-0');
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function animateTimer() {
+            const timerContainer = document.getElementById('timerContainer');
+            const timerFill = document.getElementById('timerFill');
+
+            if (currentVetoStatus === 'in_progress' && turnDeadline && turnStartTime) {
+                timerContainer.classList.remove('hidden');
+                
+                const now = Date.now();
+                const totalDuration = turnDeadline - turnStartTime;
+                const remaining = turnDeadline - now;
+                
+                if (remaining > 0) {
+                    const pct = (remaining / totalDuration) * 100;
+                    timerFill.style.width = `${pct}%`;
+                    
+                    if (remaining < 10000) {
+                        timerFill.style.backgroundColor = '#ff4655';
+                    } else {
+                        timerFill.style.backgroundColor = '#1fa474';
+                    }
+                } else {
+                    timerFill.style.width = '0%';
+                }
+            } else {
+                timerContainer.classList.add('hidden');
+            }
+            
+            requestAnimationFrame(animateTimer);
+        }
+
+        if(matchId) {
+            update();
+            setInterval(update, 2000); 
+            requestAnimationFrame(animateTimer); 
+        } else {
+            document.body.innerHTML = '<div class="text-white p-4 font-header text-3xl text-center mt-10">NO MATCH ID PROVIDED IN URL (?match=...)</div>';
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,6 @@
 const Match = require('../models/Match');
+const Tournament = require('../models/Tournament');
+const Team = require('../models/Team');
 
 class BracketManager {
     
@@ -35,6 +37,24 @@ class BracketManager {
     async getNextMatchNumber(tournamentId) {
         const lastMatch = await Match.findOne({ tournament: tournamentId }).sort({ matchNumber: -1 });
         return (lastMatch && lastMatch.matchNumber) ? lastMatch.matchNumber + 1 : 1;
+    }
+
+    // Generate standard seeding order (1 vs N, 2 vs N-1, etc.)
+    getSeedingOrder(size) {
+        if (size < 2) return [0];
+        let rounds = Math.log2(size);
+        let seeds = [1, 2];
+        
+        for (let i = 0; i < rounds - 1; i++) {
+            let nextSeeds = [];
+            let sum = (Math.pow(2, i + 2)) + 1;
+            for (let j = 0; j < seeds.length; j++) {
+                nextSeeds.push(seeds[j]);
+                nextSeeds.push(sum - seeds[j]);
+            }
+            seeds = nextSeeds;
+        }
+        return seeds.map(s => s - 1);
     }
 
     // --- MAIN GENERATION FUNCTION ---
@@ -127,6 +147,11 @@ class BracketManager {
         else if (type === 'triple_elim') {
             let paddedTeams = this.padTeams(teams);
             const totalTeams = paddedTeams.length;
+            
+            // Apply Seeding
+            const seedingOrder = this.getSeedingOrder(totalTeams);
+            const orderedTeams = seedingOrder.map(i => paddedTeams[i]);
+
             const totalRounds = Math.log2(totalTeams); 
 
             const ubMatches = [];
@@ -138,7 +163,7 @@ class BracketManager {
                 ubMatches[r] = [];
                 const matchCount = totalTeams / Math.pow(2, r);
                 for (let i = 0; i < matchCount; i++) {
-                    const match = await createMatch(`UB R${r}-M${i+1}`, (r===1?paddedTeams[i*2]:null), (r===1?paddedTeams[i*2+1]:null), r, i, settings.defaultFormat, 'upper');
+                    const match = await createMatch(`UB R${r}-M${i+1}`, (r===1?orderedTeams[i*2]:null), (r===1?orderedTeams[i*2+1]:null), r, i, settings.defaultFormat, 'upper');
                     ubMatches[r].push(match);
                 }
             }
@@ -226,27 +251,46 @@ class BracketManager {
         // TYPE: ROUND ROBIN (LEAGUE)
         // ==========================================
         else if (type === 'round_robin') {
-            let teamPool = [...teams];
-            if (teamPool.length % 2 !== 0) teamPool.push(null);
-            const numTeams = teamPool.length;
-            const roundsPerLeg = numTeams - 1;
-            const matchesPerRound = numTeams / 2;
+            const groupCount = settings.groupCount || 1;
+            const groups = [];
 
-            for (let leg = 0; leg < (settings.roundCount || 1); leg++) {
-                let rotation = [...teamPool];
-                for (let r = 0; r < roundsPerLeg; r++) {
-                    const roundNum = r + 1 + (leg * roundsPerLeg);
-                    for (let m = 0; m < matchesPerRound; m++) {
-                        const tA = rotation[m];
-                        const tB = rotation[numTeams - 1 - m];
-                        if (tA && tB) { 
-                            const realA = leg % 2 === 0 ? tA : tB;
-                            const realB = leg % 2 === 0 ? tB : tA;
-                            await createMatch(`${stageName}: Round ${roundNum}`, realA, realB, roundNum, m);
+            if (groupCount > 1) {
+                for (let i = 0; i < groupCount; i++) groups[i] = [];
+                teams.forEach((team, index) => {
+                    groups[index % groupCount].push(team);
+                });
+            } else {
+                groups.push(teams);
+            }
+
+            const groupLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+            for (let g = 0; g < groups.length; g++) {
+                const groupTeams = groups[g];
+                const groupName = groupCount > 1 ? `Group ${groupLetters[g]}` : '';
+                
+                let teamPool = [...groupTeams];
+                if (teamPool.length % 2 !== 0) teamPool.push(null);
+                const numTeams = teamPool.length;
+                const roundsPerLeg = numTeams - 1;
+                const matchesPerRound = numTeams / 2;
+
+                for (let leg = 0; leg < (settings.roundCount || 1); leg++) {
+                    let rotation = [...teamPool];
+                    for (let r = 0; r < roundsPerLeg; r++) {
+                        const roundNum = r + 1 + (leg * roundsPerLeg);
+                        for (let m = 0; m < matchesPerRound; m++) {
+                            const tA = rotation[m];
+                            const tB = rotation[numTeams - 1 - m];
+                            if (tA && tB) { 
+                                const realA = leg % 2 === 0 ? tA : tB;
+                                const realB = leg % 2 === 0 ? tB : tA;
+                                const matchName = groupName ? `${stageName} ${groupName}: Round ${roundNum}` : `${stageName}: Round ${roundNum}`;
+                                await createMatch(matchName, realA, realB, roundNum, m);
+                            }
                         }
+                        rotation.splice(1, 0, rotation.pop());
                     }
-                    // Rotate array for next round pairing
-                    rotation.splice(1, 0, rotation.pop());
                 }
             }
         }
@@ -266,12 +310,109 @@ class BracketManager {
         }
 
         // ==========================================
+        // TYPE: DOUBLE ELIMINATION (SPLIT PARTICIPANTS)
+        // ==========================================
+        else if (type === 'double_elim' && settings.splitParticipants) {
+            // --- SPLIT PARTICIPANTS MODE ---
+            // Bottom half starts in Losers Bracket
+            const paddedTeams = this.padTeams(teams);
+            const half = paddedTeams.length / 2;
+            const ubTeams = paddedTeams.slice(0, half);
+            const lbTeams = paddedTeams.slice(half);
+
+            const ubTotalRounds = Math.log2(ubTeams.length);
+            const ubMatches = [];
+            const lbMatches = [];
+
+            // 1. Generate Upper Bracket (Half Size)
+            for (let r = 1; r <= ubTotalRounds; r++) {
+                ubMatches[r] = [];
+                const matchCount = ubTeams.length / Math.pow(2, r);
+                for (let i = 0; i < matchCount; i++) {
+                    const isFinal = (r === ubTotalRounds);
+                    const name = isFinal ? `${stageName} UB Final` : `UB R${r}-M${i+1}`;
+                    const tA = (r===1) ? ubTeams[i*2] : null;
+                    const tB = (r===1) ? ubTeams[i*2+1] : null;
+                    ubMatches[r].push(await createMatch(name, tA, tB, r, i, settings.defaultFormat, 'upper'));
+                }
+            }
+            // Link UB
+            for (let r = 1; r < ubTotalRounds; r++) {
+                for (let i = 0; i < ubMatches[r].length; i++) {
+                    await this.linkMatch(ubMatches[r][i], ubMatches[r+1][Math.floor(i/2)], (i%2===0)?'teamA':'teamB');
+                }
+            }
+
+            // 2. Generate Lower Bracket
+            const lbTotalRounds = ubTotalRounds * 2;
+            
+            // LB Round 1 (Starters)
+            lbMatches[1] = [];
+            for(let i=0; i<lbTeams.length/2; i++) {
+                lbMatches[1].push(await createMatch(`LB R1-M${i+1}`, lbTeams[i*2], lbTeams[i*2+1], 101, i, settings.defaultFormat, 'lower'));
+            }
+
+            // LB Round 2 onwards
+            let currentLbCount = lbTeams.length / 2;
+            for(let r=2; r <= lbTotalRounds; r++) {
+                lbMatches[r] = [];
+                if (r % 2 !== 0) currentLbCount /= 2; // Odd rounds consolidate
+                for(let i=0; i<currentLbCount; i++) {
+                    lbMatches[r].push(await createMatch(`LB R${r}-M${i+1}`, null, null, 100+r, i, settings.defaultFormat, 'lower'));
+                }
+            }
+
+            // Link LB Internal
+            for(let r=1; r < lbTotalRounds; r++) {
+                const nextR = r + 1;
+                if (nextR % 2 === 0) { // R1->R2, R3->R4 (Direct feed to Slot A)
+                    for(let i=0; i<lbMatches[r].length; i++) {
+                        await this.linkMatch(lbMatches[r][i], lbMatches[nextR][i], 'teamA');
+                    }
+                } else { // R2->R3, R4->R5 (Consolidate)
+                    for(let i=0; i<lbMatches[r].length; i++) {
+                        await this.linkMatch(lbMatches[r][i], lbMatches[nextR][Math.floor(i/2)], (i%2===0)?'teamA':'teamB');
+                    }
+                }
+            }
+
+            // Link UB Losers -> LB (Slot B)
+            for(let r=1; r <= ubTotalRounds; r++) {
+                const ubRound = ubMatches[r];
+                const lbTargetRoundIdx = r * 2; // UB R1 -> LB R2, UB R2 -> LB R4
+                const lbRound = lbMatches[lbTargetRoundIdx];
+                if (lbRound) {
+                    for(let i=0; i<ubRound.length; i++) {
+                        const targetIndex = (r===1) ? i : (ubRound.length - 1 - i); // Reverse seeding for later rounds
+                        const target = lbRound[targetIndex] || lbRound[0];
+                        if (target) {
+                            ubRound[i].loserMatchId = target._id;
+                            ubRound[i].loserMatchSlot = 'teamB';
+                            await ubRound[i].save();
+                        }
+                    }
+                }
+            }
+
+            // Grand Final
+            const ubFinal = ubMatches[ubTotalRounds][0];
+            const lbFinal = lbMatches[lbTotalRounds][0];
+            const grandFinal = await createMatch(`${stageName} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
+            await this.linkMatch(ubFinal, grandFinal, 'teamA');
+            await this.linkMatch(lbFinal, grandFinal, 'teamB');
+        }
+
+        // ==========================================
         // TYPE: SINGLE / DOUBLE ELIMINATION (DEFAULT)
         // ==========================================
         else {
             let paddedTeams = this.padTeams(teams);
             const totalTeams = paddedTeams.length;
             if (totalTeams < 2) return [];
+
+            // Apply Seeding
+            const seedingOrder = this.getSeedingOrder(totalTeams);
+            const orderedTeams = seedingOrder.map(i => paddedTeams[i]);
 
             const totalRounds = Math.log2(totalTeams);
             const ubMatches = []; 
@@ -284,7 +425,7 @@ class BracketManager {
                     const isFinal = (r === totalRounds);
                     const matchName = isFinal ? `${stageName} Final` : `UB R${r}-M${i + 1}`;
                     const format = isFinal ? (settings.finalFormat || 'BO3') : settings.defaultFormat;
-                    const match = await createMatch(matchName, (r===1?paddedTeams[i*2]:null), (r===1?paddedTeams[i*2+1]:null), r, i, format, 'upper');
+                    const match = await createMatch(matchName, (r===1?orderedTeams[i*2]:null), (r===1?orderedTeams[i*2+1]:null), r, i, format, 'upper');
                     ubMatches[r].push(match);
                 }
             }
@@ -310,65 +451,66 @@ class BracketManager {
 
             // [FEATURE] DOUBLE ELIMINATION LOGIC
             if (type === 'double_elim') {
-                const lbMatches = []; 
-                const lbTotalRounds = (totalRounds - 1) * 2;
-                
-                // Generate Lower Bracket
-                for (let r = 1; r <= lbTotalRounds; r++) {
-                    lbMatches[r] = [];
-                    const powerVal = Math.ceil(r / 2); 
-                    const matchCount = totalTeams / Math.pow(2, powerVal + 1);
-                    for (let i = 0; i < matchCount; i++) {
-                        const match = await createMatch(`LB R${r}-M${i + 1}`, null, null, 100 + r, i, settings.defaultFormat, 'lower');
-                        lbMatches[r].push(match);
+                // --- STANDARD DOUBLE ELIMINATION ---
+                    const lbMatches = []; 
+                    const lbTotalRounds = (totalRounds - 1) * 2;
+                    
+                    // Generate Lower Bracket
+                    for (let r = 1; r <= lbTotalRounds; r++) {
+                        lbMatches[r] = [];
+                        const powerVal = Math.ceil(r / 2); 
+                        const matchCount = totalTeams / Math.pow(2, powerVal + 1);
+                        for (let i = 0; i < matchCount; i++) {
+                            const match = await createMatch(`LB R${r}-M${i + 1}`, null, null, 100 + r, i, settings.defaultFormat, 'lower');
+                            lbMatches[r].push(match);
+                        }
                     }
-                }
 
-                // Link Lower Bracket Internal
-                for (let r = 1; r < lbTotalRounds; r++) {
-                    for (let i = 0; i < lbMatches[r].length; i++) {
-                        const next = (r % 2 !== 0) ? lbMatches[r + 1][i] : lbMatches[r + 1][Math.floor(i / 2)];
-                        const slot = (r % 2 !== 0) ? 'teamA' : ((i % 2 === 0) ? 'teamA' : 'teamB');
-                        if(next) await this.linkMatch(lbMatches[r][i], next, slot);
+                    // Link Lower Bracket Internal
+                    for (let r = 1; r < lbTotalRounds; r++) {
+                        for (let i = 0; i < lbMatches[r].length; i++) {
+                            const next = (r % 2 !== 0) ? lbMatches[r + 1][i] : lbMatches[r + 1][Math.floor(i / 2)];
+                            const slot = (r % 2 !== 0) ? 'teamA' : ((i % 2 === 0) ? 'teamA' : 'teamB');
+                            if(next) await this.linkMatch(lbMatches[r][i], next, slot);
+                        }
                     }
-                }
 
-                // Link Drops from Upper to Lower
-                for (let r = 1; r < totalRounds; r++) {
-                    const ubRoundMatches = ubMatches[r];
-                    const targetLbRound = r === 1 ? 1 : (r - 1) * 2;
-                    const lbRoundMatches = lbMatches[targetLbRound];
+                    // Link Drops from Upper to Lower
+                    for (let r = 1; r < totalRounds; r++) {
+                        const ubRoundMatches = ubMatches[r];
+                        const targetLbRound = r === 1 ? 1 : (r - 1) * 2;
+                        const lbRoundMatches = lbMatches[targetLbRound];
 
-                    if (lbRoundMatches) {
-                        for (let i = 0; i < ubRoundMatches.length; i++) {
-                            let lbMatch, lbSlot;
-                            if (r === 1) {
-                                lbMatch = lbRoundMatches[Math.floor(i / 2)];
-                                lbSlot = (i % 2 === 0) ? 'teamA' : 'teamB';
-                            } else {
-                                const reversedIndex = ubRoundMatches.length - 1 - i;
-                                lbMatch = lbRoundMatches[reversedIndex]; 
-                                lbSlot = 'teamB'; 
-                            }
-                            if (lbMatch) {
-                                ubRoundMatches[i].loserMatchId = lbMatch._id;
-                                ubRoundMatches[i].loserMatchSlot = lbSlot;
-                                await ubRoundMatches[i].save();
+                        if (lbRoundMatches) {
+                            for (let i = 0; i < ubRoundMatches.length; i++) {
+                                let lbMatch, lbSlot;
+                                if (r === 1) {
+                                    lbMatch = lbRoundMatches[Math.floor(i / 2)];
+                                    lbSlot = (i % 2 === 0) ? 'teamA' : 'teamB';
+                                } else {
+                                    const reversedIndex = ubRoundMatches.length - 1 - i;
+                                    lbMatch = lbRoundMatches[reversedIndex]; 
+                                    lbSlot = 'teamB'; 
+                                }
+                                if (lbMatch) {
+                                    ubRoundMatches[i].loserMatchId = lbMatch._id;
+                                    ubRoundMatches[i].loserMatchSlot = lbSlot;
+                                    await ubRoundMatches[i].save();
+                                }
                             }
                         }
                     }
-                }
 
-                // Grand Final (Winner UB vs Winner LB)
-                const ubFinal = ubMatches[totalRounds][0];
-                const lbFinal = lbMatches[lbTotalRounds][0];
-                const grandFinal = await createMatch(`${stageName} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
-                
-                await this.linkMatch(ubFinal, grandFinal, 'teamA');
-                await this.linkMatch(lbFinal, grandFinal, 'teamB');
-                
-                // (Optional) Link UB Final Loser to LB Final
-                ubFinal.loserMatchId = lbFinal._id; ubFinal.loserMatchSlot = 'teamB'; await ubFinal.save();
+                    // Grand Final (Winner UB vs Winner LB)
+                    const ubFinal = ubMatches[totalRounds][0];
+                    const lbFinal = lbMatches[lbTotalRounds][0];
+                    const grandFinal = await createMatch(`${stageName} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
+                    
+                    await this.linkMatch(ubFinal, grandFinal, 'teamA');
+                    await this.linkMatch(lbFinal, grandFinal, 'teamB');
+                    
+                    // (Optional) Link UB Final Loser to LB Final
+                    ubFinal.loserMatchId = lbFinal._id; ubFinal.loserMatchSlot = 'teamB'; await ubFinal.save();
             }
         }
 
@@ -407,6 +549,72 @@ class BracketManager {
         update[slot] = team._id;
         update[`${slot}Roster`] = team.members;
         await Match.findByIdAndUpdate(matchId, update, { new: true });
+    }
+
+    // --- STANDINGS CALCULATION ---
+    async getStageStandings(tournamentId, stageIndex) {
+        const tournament = await Tournament.findById(tournamentId);
+        if (!tournament || !tournament.stages[stageIndex]) return [];
+
+        const stage = tournament.stages[stageIndex];
+        const matches = await Match.find({ _id: { $in: stage.matches } });
+        const teams = await Team.find({ _id: { $in: stage.stageParticipants } });
+
+        let stats = {};
+        stage.stageParticipants.forEach(pid => {
+            const team = teams.find(t => t._id.toString() === pid.toString());
+            if (team) stats[pid] = { 
+                id: pid, name: team.name, shortName: team.shortName, logo: team.logo, 
+                wins: 0, losses: 0, played: 0, 
+                roundDiff: 0, mapWon: 0, mapLost: 0, mapDiff: 0,
+                h2h: {}, group: 'A'
+            };
+        });
+
+        matches.forEach(m => {
+            const gMatch = m.name.match(/Group\s+([A-Z])/);
+            const group = gMatch ? gMatch[1] : 'A';
+            if (m.teamA && stats[m.teamA.toString()]) stats[m.teamA.toString()].group = group;
+            if (m.teamB && stats[m.teamB.toString()]) stats[m.teamB.toString()].group = group;
+
+            if (m.status === 'finished' && m.winner) {
+                const winnerId = m.winner.toString();
+                const loserId = (m.teamA.toString() === winnerId) ? m.teamB.toString() : m.teamA.toString();
+
+                if (stats[winnerId]) { stats[winnerId].wins++; stats[winnerId].played++; stats[winnerId].h2h[loserId] = 'win'; }
+                if (stats[loserId]) { stats[loserId].losses++; stats[loserId].played++; stats[loserId].h2h[winnerId] = 'loss'; }
+
+                let sA = 0, sB = 0, mapsA = 0, mapsB = 0;
+                if (m.scores && m.scores.length > 0) {
+                    m.scores.forEach(s => {
+                        const scA = parseInt(s.teamAScore) || 0; const scB = parseInt(s.teamBScore) || 0;
+                        sA += scA; sB += scB;
+                        if (scA > scB) mapsA++; else if (scB > scA) mapsB++;
+                    });
+                    
+                    const tA = m.teamA.toString(); const tB = m.teamB.toString();
+                    if (stats[tA]) { stats[tA].roundDiff += (sA - sB); stats[tA].mapWon += mapsA; stats[tA].mapLost += mapsB; stats[tA].mapDiff += (mapsA - mapsB); }
+                    if (stats[tB]) { stats[tB].roundDiff += (sB - sA); stats[tB].mapWon += mapsB; stats[tB].mapLost += mapsA; stats[tB].mapDiff += (mapsB - mapsA); }
+                }
+            }
+        });
+
+        const tiebreakers = stage.settings?.tiebreakers || ['h2h', 'map_diff', 'round_diff'];
+
+        return Object.values(stats).sort((a, b) => {
+            if (b.wins !== a.wins) return b.wins - a.wins;
+
+            for (const rule of tiebreakers) {
+                if (rule === 'h2h') {
+                    if (a.h2h[b.id]) return a.h2h[b.id] === 'win' ? -1 : 1;
+                } else if (rule === 'map_diff') {
+                    if (b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff;
+                } else if (rule === 'round_diff') {
+                    if (b.roundDiff !== a.roundDiff) return b.roundDiff - a.roundDiff;
+                }
+            }
+            return 0;
+        });
     }
 }
 

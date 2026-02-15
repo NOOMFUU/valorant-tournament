@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Bracket | VLR Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1923; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
+
+        /* Bracket Specifics */
+        .match-node {
+            width: 220px;
+            background: #1a1d21;
+            border: 1px solid #333;
+            border-radius: 4px;
+            position: relative;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+        .match-node:hover { border-color: #888; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .match-node.live { border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.2); }
+        
+        .bracket-column {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            min-width: 260px;
+            padding: 20px 0;
+            position: relative;
+        }
+
+        /* SVG Lines Layer */
+        #bracketSvg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        path.connector {
+            fill: none;
+            stroke: #444;
+            stroke-width: 2;
+            opacity: 0.6;
+        }
+        path.connector.highlight { stroke: #ff4655; opacity: 1; stroke-width: 3; }
+
+        /* Tabs */
+        .nav-tab {
+            padding: 12px 24px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: bold;
+            color: #8b978f;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .nav-tab:hover { color: white; }
+        .nav-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
+
+        /* Table */
+        .vlr-table th { text-align: left; padding: 10px; font-size: 12px; color: #8b978f; text-transform: uppercase; border-bottom: 1px solid #333; }
+        .vlr-table td { padding: 10px; border-bottom: 1px solid #222; font-size: 14px; }
+        .vlr-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+        /* Highlight Styles */
+        .match-node.dimmed { opacity: 0.3; }
+        .match-node.highlight-team { opacity: 1; border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.4); z-index: 20; }
+        path.connector.dimmed { opacity: 0.1; }
+        path.connector.highlight-path { stroke: #ff4655; opacity: 1; stroke-width: 3; }
+
+        /* Modal Animation */
+        .animate-enter { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Team Card */
+        .team-card { transition: all 0.2s; cursor: pointer; }
+        .team-card:hover { background: #25282e; }
+        .roster-row { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .roster-row.open { max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="h-16 bg-[#111] border-b border-[#222] flex items-center px-8 shrink-0 z-20">
+        <div class="flex items-center gap-4 mr-12">
+            <i class="fa-solid fa-trophy text-[#ff4655] text-2xl"></i>
+            <h1 class="text-xl font-header tracking-wide text-white" id="tourneyTitle">LOADING...</h1>
+        </div>
+        <nav id="stageTabs" class="flex h-full overflow-x-auto no-scrollbar"></nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative overflow-hidden bg-[#0f1923]">
+        <div id="contentArea" class="w-full h-full overflow-auto custom-scroll p-8">
+            <!-- Dynamic Content Injected Here -->
+        </div>
+    </main>
+
+    <div id="matchModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeMatchModal()"></div>
+        <div class="relative w-full max-w-4xl bg-[#1a1d21] border border-[#333] rounded shadow-2xl overflow-hidden animate-enter">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const socket = io(API_BASE || undefined);
+        
+        let tournamentData = null;
+        let matchesData = [];
+        let teamsData = [];
+        let activeView = 'overview';
+        let activeStageIndex = 0;
+
+        // --- INITIALIZATION ---
+        async function init() {
+            try {
+                const [tRes, mRes, tmRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/tournaments`),
+                    fetch(`${API_BASE}/api/matches`),
+                    fetch(`${API_BASE}/api/teams`)
+                ]);
+                
+                const tourneys = await tRes.json();
+                matchesData = await mRes.json();
+                teamsData = await tmRes.json();
+
+                if (tourneys.length > 0) {
+                    tournamentData = tourneys[0];
+                    document.getElementById('tourneyTitle').innerText = tournamentData.name;
+                    renderTabs();
+                    renderContent();
+                } else {
+                    document.getElementById('contentArea').innerHTML = `<div class="flex h-full items-center justify-center text-gray-500">NO TOURNAMENT DATA</div>`;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        socket.on('match_update', () => init());
+        socket.on('bracket_update', () => init());
+
+        // --- TABS ---
+        function renderTabs() {
+            const container = document.getElementById('stageTabs');
+            let html = `
+                <button onclick="switchView('overview')" class="nav-tab ${activeView === 'overview' ? 'active' : ''}">Overview</button>
+                <button onclick="switchView('teams')" class="nav-tab ${activeView === 'teams' ? 'active' : ''}">Teams</button>
+            `;
+            html += tournamentData.stages.map((s, i) => `
+                <button onclick="switchStage(${i})" class="nav-tab ${i === activeStageIndex && activeView === 'stage' ? 'active' : ''}">
+                    ${s.name}
+                </button>
+            `).join('');
+            container.innerHTML = html;
+        }
+
+        function switchView(view) {
+            activeView = view;
+            renderTabs();
+            renderContent();
+        }
+
+        function switchStage(index) {
+            activeView = 'stage';
+            activeStageIndex = index;
+            renderTabs();
+            renderContent();
+        }
+
+        function renderContent() {
+            const container = document.getElementById('contentArea');
+            if (activeView === 'overview') renderOverview(container);
+            else if (activeView === 'teams') renderTeams(container);
+            else renderStage(container, activeStageIndex);
+        }
+
+        // --- OVERVIEW ---
+        function renderOverview(container) {
+            const prizePool = tournamentData.prizePool || "TBA";
+            const formatDesc = tournamentData.formatDescription || `
+                <div class="space-y-4 text-gray-300 text-sm leading-relaxed">
+                    <p><strong class="text-white">Group Stage:</strong> Two groups of four teams in a GSL format. Top two teams from each group advance to the Playoffs.</p>
+                    <p><strong class="text-white">Playoffs:</strong> Double-Elimination bracket. All matches are Bo3, except for the Lower Bracket Final and Grand Final which are Bo5.</p>
+                </div>
+            `;
+
+            container.innerHTML = `
+                <div class="max-w-5xl mx-auto space-y-8 animate-enter">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-2 bg-[#1a1d21] border border-[#333] rounded p-6">
+                            <h3 class="font-header text-xl text-white mb-4 border-l-4 border-[#ff4655] pl-3">Tournament Format</h3>
+                            ${formatDesc}
+                        </div>
+                        <div class="bg-[#1a1d21] border border-[#333] rounded p-6">
+                            <h3 class="font-header text-xl text-white mb-4 border-l-4 border-[#dda828] pl-3">Prize Pool</h3>
+                            <div class="text-3xl font-header text-[#dda828] mb-2">${prizePool}</div>
+                            <div class="text-xs text-gray-500 uppercase font-bold tracking-widest">Total Winnings</div>
+                            
+                            <div class="mt-6 space-y-2">
+                                <div class="flex justify-between text-sm border-b border-[#333] pb-1"><span>1st Place</span><span class="text-white">฿ 25,000</span></div>
+                                <div class="flex justify-between text-sm border-b border-[#333] pb-1"><span>2nd Place</span><span class="text-white">฿ 15,000</span></div>
+                                <div class="flex justify-between text-sm border-b border-[#333] pb-1"><span>3rd Place</span><span class="text-white">฿ 7,000</span></div>
+                                <div class="flex justify-between text-sm border-b border-[#333] pb-1"><span>4th Place</span><span class="text-white">฿ 3,000</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- TEAMS ---
+        function renderTeams(container) {
+            container.innerHTML = `
+                <div class="max-w-6xl mx-auto animate-enter">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-l-4 border-[#ff4655] pl-3 gap-4">
+                        <h3 class="font-header text-2xl text-white">All Teams <span class="text-gray-500 text-lg ml-2" id="teamCount">(${teamsData.length})</span></h3>
+                        <div class="relative w-full md:w-auto">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                            <input type="text" id="teamSearchInput" oninput="filterTeams()" placeholder="Search teams..." class="bg-[#1a1d21] border border-[#333] text-white text-sm pl-9 pr-4 py-2 rounded focus:border-[#ff4655] outline-none placeholder-gray-600 font-mono w-full md:w-64 transition-colors">
+                        </div>
+                    </div>
+                    <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                </div>
+            `;
+            filterTeams();
+        }
+
+        function filterTeams() {
+            const query = document.getElementById('teamSearchInput')?.value.toLowerCase() || '';
+            const filtered = teamsData.filter(t => t.name.toLowerCase().includes(query) || t.shortName.toLowerCase().includes(query));
+            
+            const grid = document.getElementById('teamsGrid');
+            if(grid) {
+                grid.innerHTML = filtered.map(t => `
+                    <div class="bg-[#1a1d21] border border-[#333] rounded overflow-hidden">
+                        <div class="p-4 flex items-center gap-4 team-card" onclick="toggleRoster('${t._id}')">
+                            <img src="${t.logo || 'https://via.placeholder.com/50'}" class="w-12 h-12 object-contain">
+                            <div class="flex-1">
+                                <div class="font-header text-xl text-white">${t.name}</div>
+                                <div class="text-xs text-gray-500 font-mono">${t.shortName}</div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down text-gray-500 transition-transform" id="icon-${t._id}"></i>
+                        </div>
+                        <div id="roster-${t._id}" class="roster-row bg-[#0f1113]">
+                            <div class="p-4 grid grid-cols-2 gap-2">
+                                ${(t.members || []).map(m => `<div class="flex items-center gap-2 text-sm text-gray-300"><i class="fa-solid fa-user text-[10px] text-[#ff4655]"></i> ${m.name}</div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            const countEl = document.getElementById('teamCount');
+            if(countEl) countEl.innerText = `(${filtered.length})`;
+        }
+
+        function toggleRoster(tid) {
+            const el = document.getElementById(`roster-${tid}`);
+            const icon = document.getElementById(`icon-${tid}`);
+            if (el.classList.contains('open')) { el.classList.remove('open'); icon.style.transform = 'rotate(0deg)'; } 
+            else { el.classList.add('open'); icon.style.transform = 'rotate(180deg)'; }
+        }
+
+        // --- STAGE RENDERER ---
+        function renderStage(container, index) {
+            const stage = tournamentData.stages[index];
+            const stageMatches = stage.matches.map(mid => matchesData.find(m => m._id === mid)).filter(m => m);
+
+            container.innerHTML = '';
+
+            if (stage.type === 'round_robin' || stage.type === 'swiss' || stage.type === 'gsl') {
+                renderGroupStage(container, stage, stageMatches);
+            } else {
+                renderBracketStage(container, stage, stageMatches);
+            }
+        }
+
+        // --- GROUP STAGE VIEW ---
+        function renderGroupStage(container, stage, matches) {
+            // 1. Calculate Standings
+            const stats = {};
+            stage.stageParticipants.forEach(tid => {
+                const t = teamsData.find(x => x._id === tid);
+                if(t) stats[tid] = { id: tid, name: t.name, short: t.shortName, logo: t.logo, w:0, l:0, mapW:0, mapL:0, diff:0 };
+            });
+
+            matches.forEach(m => {
+                if (m.status === 'finished' && m.winner) {
+                    const wId = m.winner._id || m.winner;
+                    const lId = (m.teamA._id === wId || m.teamA === wId) ? (m.teamB._id || m.teamB) : (m.teamA._id || m.teamA);
+                    
+                    if(stats[wId]) stats[wId].w++;
+                    if(stats[lId]) stats[lId].l++;
+
+                    let sA = 0, sB = 0;
+                    m.scores.forEach(s => { sA += parseInt(s.teamAScore)||0; sB += parseInt(s.teamBScore)||0; });
+                    
+                    // Map counts (simplified based on score comparison)
+                    let mapsA = 0, mapsB = 0;
+                    m.scores.forEach(s => { if(parseInt(s.teamAScore) > parseInt(s.teamBScore)) mapsA++; else mapsB++; });
+
+                    const tA = m.teamA._id || m.teamA;
+                    const tB = m.teamB._id || m.teamB;
+
+                    if(stats[tA]) { stats[tA].mapW += mapsA; stats[tA].mapL += mapsB; stats[tA].diff += (sA - sB); }
+                    if(stats[tB]) { stats[tB].mapW += mapsB; stats[tB].mapL += mapsA; stats[tB].diff += (sB - sA); }
+                }
+            });
+
+            const sortedStats = Object.values(stats).sort((a,b) => (b.w - a.w) || ((b.mapW-b.mapL) - (a.mapW-a.mapL)) || (b.diff - a.diff));
+
+            // 2. Render HTML
+            const tableHtml = `
+                <div class="mb-8 bg-[#1a1d21] border border-[#333] rounded overflow-hidden">
+                    <div class="p-4 bg-[#111] border-b border-[#333] font-header text-lg text-white">Standings</div>
+                    <table class="vlr-table w-full">
+                        <thead><tr><th>Team</th><th class="text-center">W</th><th class="text-center">L</th><th class="text-center">Maps</th><th class="text-center">Diff</th></tr></thead>
+                        <tbody>
+                            ${sortedStats.map(s => `
+                                <tr>
+                                    <td class="font-bold flex items-center gap-3">
+                                        <img src="${s.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain">
+                                        <span>${s.name}</span>
+                                    </td>
+                                    <td class="text-center text-green-400">${s.w}</td>
+                                    <td class="text-center text-red-400">${s.l}</td>
+                                    <td class="text-center text-gray-400">${s.mapW}-${s.mapL}</td>
+                                    <td class="text-center font-mono ${s.diff>0?'text-green-400':(s.diff<0?'text-red-400':'text-gray-500')}">${s.diff>0?'+':''}${s.diff}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            const matchesHtml = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${matches.map(m => createMatchCard(m)).join('')}
+                </div>
+            `;
+
+            container.innerHTML = `<div class="max-w-5xl mx-auto">${tableHtml}<div class="font-header text-lg text-white mb-4 border-l-4 border-[#ff4655] pl-3">Match Schedule</div>${matchesHtml}</div>`;
+        }
+
+        // --- BRACKET STAGE VIEW ---
+        function renderBracketStage(container, stage, matches) {
+            // Separate brackets
+            const upper = [], lower = [], final = [];
+            matches.forEach(m => {
+                if (m.matchOrder === 999 || m.round === 999) final.push(m);
+                else if (m.round >= 100) lower.push(m);
+                else upper.push(m);
+            });
+
+            // Group by round
+            const groupRounds = (arr) => {
+                const map = {};
+                arr.forEach(m => {
+                    if(!map[m.round]) map[m.round] = [];
+                    map[m.round].push(m);
+                });
+                return Object.keys(map).sort((a,b)=>a-b).map(k => map[k].sort((a,b)=>a.matchOrder-b.matchOrder));
+            };
+
+            const ubRounds = groupRounds(upper);
+            const lbRounds = groupRounds(lower);
+            const finalRounds = groupRounds(final);
+
+            // Render Container
+            container.innerHTML = `
+                <div class="relative min-w-max pb-20">
+                    <svg id="bracketSvg"></svg>
+                    <div class="flex flex-col gap-16 p-10">
+                        ${ubRounds.length ? `<div class="flex gap-16" id="upperBracket">${renderRoundColumns(ubRounds, 'UB')}</div>` : ''}
+                        ${lbRounds.length ? `<div class="flex gap-16 mt-8" id="lowerBracket">${renderRoundColumns(lbRounds, 'LB')}</div>` : ''}
+                        ${finalRounds.length ? `<div class="flex gap-16 mt-8 border-t border-[#333] pt-8" id="finalBracket">${renderRoundColumns(finalRounds, 'GF')}</div>` : ''}
+                    </div>
+                </div>
+            `;
+
+            // Draw Lines after render
+            setTimeout(() => drawBracketLines(matches), 100);
+        }
+
+        function renderRoundColumns(rounds, prefix) {
+            return rounds.map((matches, i) => `
+                <div class="bracket-column">
+                    <div class="absolute -top-6 left-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest w-full text-center">
+                        ${prefix} Round ${i+1}
+                    </div>
+                    ${matches.map(m => createBracketNode(m)).join('')}
+                </div>
+            `).join('');
+        }
+
+        function createBracketNode(m) {
+            const isLive = m.status === 'live';
+            const sA = calculateScore(m, 'A');
+            const sB = calculateScore(m, 'B');
+            const winA = m.winner && (m.winner === m.teamA?._id || m.winner._id === m.teamA?._id);
+            const winB = m.winner && (m.winner === m.teamB?._id || m.winner._id === m.teamB?._id);
+
+            const nameA = m.teamA ? m.teamA.shortName : getSourceText(m._id, 'teamA');
+            const nameB = m.teamB ? m.teamB.shortName : getSourceText(m._id, 'teamB');
+
+            const idA = m.teamA ? m.teamA._id : '';
+            const idB = m.teamB ? m.teamB._id : '';
+
+            return `
+                <div class="match-node ${isLive ? 'live' : ''} cursor-pointer" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
+                    <div class="flex justify-between items-center px-2 py-1 bg-[#111] border-b border-[#333] text-[10px] text-gray-500">
+                        <span>${isLive ? '<span class="text-[#ff4655] font-bold animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD')}</span>
+                        <span>${m.format || 'BO3'}</span>
+                    </div>
+                    <div class="p-1">
+                        <div class="flex justify-between items-center p-1 rounded ${winA ? 'bg-white/5' : ''} cursor-pointer hover:bg-white/5 transition" onmouseenter="highlightTeam('${idA}')" onmouseleave="resetHighlight()">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <img src="${m.teamA?.logo || 'https://via.placeholder.com/20'}" class="w-4 h-4 object-contain">
+                                <span class="text-xs font-bold truncate ${winA ? 'text-white' : 'text-gray-400'}" title="${nameA}">${nameA}</span>
+                            </div>
+                            <span class="font-mono text-xs ${winA ? 'text-[#ff4655]' : 'text-gray-500'}">${sA}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-1 rounded ${winB ? 'bg-white/5' : ''} cursor-pointer hover:bg-white/5 transition" onmouseenter="highlightTeam('${idB}')" onmouseleave="resetHighlight()">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <img src="${m.teamB?.logo || 'https://via.placeholder.com/20'}" class="w-4 h-4 object-contain">
+                                <span class="text-xs font-bold truncate ${winB ? 'text-white' : 'text-gray-400'}" title="${nameB}">${nameB}</span>
+                            </div>
+                            <span class="font-mono text-xs ${winB ? 'text-[#ff4655]' : 'text-gray-500'}">${sB}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createMatchCard(m) {
+            const sA = calculateScore(m, 'A');
+            const sB = calculateScore(m, 'B');
+            const isLive = m.status === 'live';
+            
+            return `
+                <div class="bg-[#1a1d21] border border-[#333] rounded p-3 hover:border-[#ff4655] transition group cursor-pointer" onclick="openMatchDetail('${m._id}')">
+                    <div class="flex justify-between items-center mb-2 text-[10px] text-gray-500 font-bold uppercase">
+                        <span>${isLive ? '<span class="text-[#ff4655] animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleString() : 'TBD')}</span>
+                        <span>${m.name}</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="flex items-center gap-2">
+                            <img src="${m.teamA?.logo || 'https://via.placeholder.com/30'}" class="w-5 h-5 object-contain">
+                            <span class="text-sm font-bold text-white">${m.teamA?.name || 'TBD'}</span>
+                        </div>
+                        <span class="font-mono text-lg ${sA > sB ? 'text-[#ff4655]' : 'text-gray-400'}">${sA}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <img src="${m.teamB?.logo || 'https://via.placeholder.com/30'}" class="w-5 h-5 object-contain">
+                            <span class="text-sm font-bold text-white">${m.teamB?.name || 'TBD'}</span>
+                        </div>
+                        <span class="font-mono text-lg ${sB > sA ? 'text-[#ff4655]' : 'text-gray-400'}">${sB}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function calculateScore(m, side) {
+            if(!m.scores) return 0;
+            let w = 0;
+            m.scores.forEach(s => {
+                const a = parseInt(s.teamAScore)||0;
+                const b = parseInt(s.teamBScore)||0;
+                if(side === 'A' && a > b) w++;
+                if(side === 'B' && b > a) w++;
+            });
+            return w;
+        }
+
+        function getSourceText(matchId, slot) {
+            const wSrc = matchesData.find(m => m.nextMatchId === matchId && m.nextMatchSlot === slot);
+            if (wSrc) return `Winner of ${shortenName(wSrc.name)}`;
+            const lSrc = matchesData.find(m => m.loserMatchId === matchId && m.loserMatchSlot === slot);
+            if (lSrc) return `Loser of ${shortenName(lSrc.name)}`;
+            return 'TBD';
+        }
+
+        function shortenName(name) {
+            return name.replace(/Upper Bracket/g, 'UB').replace(/Lower Bracket/g, 'LB').replace(/Round /g, 'R').replace(/Match /g, 'M').replace(/Grand Final/g, 'GF');
+        }
+
+        function highlightTeam(teamId) {
+            if(!teamId) return;
+            
+            document.querySelectorAll('.match-node').forEach(el => el.classList.add('dimmed'));
+            document.querySelectorAll('path.connector').forEach(el => el.classList.add('dimmed'));
+
+            const teamMatches = matchesData.filter(m => {
+                const tA = m.teamA?._id || m.teamA;
+                const tB = m.teamB?._id || m.teamB;
+                return tA === teamId || tB === teamId;
+            });
+            const teamMatchIds = new Set(teamMatches.map(m => m._id));
+
+            teamMatches.forEach(m => {
+                const el = document.getElementById(`match-${m._id}`);
+                if(el) {
+                    el.classList.remove('dimmed');
+                    el.classList.add('highlight-team');
+                }
+            });
+
+            document.querySelectorAll('path.connector').forEach(path => {
+                const src = path.getAttribute('data-source');
+                const tgt = path.getAttribute('data-target');
+                if(teamMatchIds.has(src) && teamMatchIds.has(tgt)) {
+                    path.classList.remove('dimmed');
+                    path.classList.add('highlight-path');
+                }
+            });
+        }
+
+        function resetHighlight() {
+            document.querySelectorAll('.match-node').forEach(el => {
+                el.classList.remove('dimmed', 'highlight-team');
+            });
+            document.querySelectorAll('path.connector').forEach(el => {
+                el.classList.remove('dimmed', 'highlight-path');
+            });
+        }
+
+        function openMatchDetail(matchId) {
+            const m = matchesData.find(x => x._id === matchId);
+            if (!m) return;
+            
+            const sA = calculateScore(m, 'A');
+            const sB = calculateScore(m, 'B');
+            const isLive = m.status === 'live';
+            
+            let mapsList = m.scores || [];
+            if (mapsList.length === 0 && m.vetoData && m.vetoData.pickedMaps && m.vetoData.pickedMaps.length > 0) {
+                mapsList = m.vetoData.pickedMaps.map(p => ({
+                    mapName: p.map,
+                    teamAScore: 0,
+                    teamBScore: 0
+                }));
+            }
+
+            const content = document.getElementById('modalContent');
+            content.innerHTML = `
+                <div class="bg-[#0f1113] p-4 flex justify-between items-center border-b border-[#333]">
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs bg-white/5 text-gray-300 px-3 py-1 font-bold uppercase tracking-widest border border-white/10">${m.name}</span>
+                        <span class="text-xs text-[#ff4655] font-mono tracking-widest">${m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString() : 'TBD'}</span>
+                    </div>
+                    <button onclick="closeMatchModal()" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="relative py-12 px-8 overflow-hidden bg-[#1a1d21]">
+                    <div class="flex items-center justify-center gap-10">
+                        <div class="flex flex-col items-center gap-2 w-1/3">
+                            <img src="${m.teamA?.logo || 'https://via.placeholder.com/100'}" class="w-24 h-24 object-contain">
+                            <h3 class="font-header text-2xl text-white uppercase text-center">${m.teamA?.name || 'TBD'}</h3>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="font-header text-6xl text-white font-bold flex gap-4">
+                                <span class="${sA > sB ? 'text-[#ff4655]' : ''}">${sA}</span>
+                                <span class="text-gray-600">-</span>
+                                <span class="${sB > sA ? 'text-[#ff4655]' : ''}">${sB}</span>
+                            </div>
+                            <div class="mt-2 text-xs font-bold uppercase tracking-[0.2em] ${isLive ? 'text-[#ff4655] animate-pulse' : 'text-gray-500'}">
+                                ${isLive ? 'LIVE NOW' : m.status}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-2 w-1/3">
+                            <img src="${m.teamB?.logo || 'https://via.placeholder.com/100'}" class="w-24 h-24 object-contain">
+                            <h3 class="font-header text-2xl text-white uppercase text-center">${m.teamB?.name || 'TBD'}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 bg-[#1a1d21] border-t border-[#333] grid grid-cols-1 gap-2">
+                     ${mapsList.map((s,i) => `<div class="bg-black/20 p-3 flex justify-between items-center border-l-2 border-[#333]"><span class="text-xs text-gray-500 uppercase tracking-widest">MAP ${i+1}: ${s.mapName || 'VETO'}</span><div class="font-header text-white text-xl"><span class="${parseInt(s.teamAScore) > parseInt(s.teamBScore) ? 'text-[#ff4655]' : ''}">${s.teamAScore}</span><span class="px-2 text-gray-600">:</span><span class="${parseInt(s.teamBScore) > parseInt(s.teamAScore) ? 'text-[#ff4655]' : ''}">${s.teamBScore}</span></div></div>`).join('')}
+                     ${mapsList.length === 0 ? '<div class="text-center text-gray-600 text-xs italic py-4">No map data available</div>' : ''}
+                </div>
+            `;
+            document.getElementById('matchModal').classList.remove('hidden');
+            document.getElementById('matchModal').classList.add('flex');
+        }
+
+        function closeMatchModal() {
+            document.getElementById('matchModal').classList.add('hidden');
+            document.getElementById('matchModal').classList.remove('flex');
+        }
+        
+        window.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeMatchModal(); });
+
+        // --- SVG LINE DRAWING ---
+        function drawBracketLines(matches) {
+            const svg = document.getElementById('bracketSvg');
+            if(!svg) return;
+            svg.innerHTML = '';
+            
+            // Resize SVG to fit container
+            const container = document.querySelector('.relative.min-w-max');
+            svg.setAttribute('width', container.scrollWidth);
+            svg.setAttribute('height', container.scrollHeight);
+
+            matches.forEach(m => {
+                const sourceEl = document.getElementById(`match-${m._id}`);
+                if(!sourceEl) return;
+
+                // Draw line to Next Match (Winner)
+                if(m.nextMatchId) {
+                    const targetMatch = matchesData.find(x => x._id === m.nextMatchId);
+                    // Skip lines to Grand Final (Round 999)
+                    if (targetMatch && (targetMatch.round === 999 || targetMatch.matchOrder === 999)) return;
+
+                    const targetEl = document.getElementById(`match-${m.nextMatchId}`);
+                    if(targetEl) drawPath(svg, sourceEl, targetEl, false);
+                }
+            });
+        }
+
+        function drawPath(svg, startEl, endEl, isLoser) {
+            const startRect = startEl.getBoundingClientRect();
+            const endRect = endEl.getBoundingClientRect();
+            const containerRect = svg.getBoundingClientRect();
+
+            // Calculate relative coordinates
+            const startX = startRect.right - containerRect.left;
+            const startY = startRect.top + (startRect.height / 2) - containerRect.top;
+            const endX = endRect.left - containerRect.left;
+            const endY = endRect.top + (endRect.height / 2) - containerRect.top;
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            
+            path.setAttribute("data-source", startEl.id.replace('match-', ''));
+            path.setAttribute("data-target", endEl.id.replace('match-', ''));
+            
+            // Bezier Curve Logic
+            const midX = (startX + endX) / 2;
+            let d = '';
+
+            if (isLoser) {
+                // Dashed line for loser bracket drop (often goes down then right)
+                // Simple elbow for loser drops
+                d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+                path.setAttribute("stroke-dasharray", "4");
+                path.setAttribute("stroke", "#666");
+            } else {
+                // Orthogonal line for winners (VLR style)
+                d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+                path.setAttribute("stroke", "#666");
+            }
+
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke-width", "2");
+            path.classList.add("connector");
+            
+            svg.appendChild(path);
+        }
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            const activeStage = tournamentData?.stages[activeStageIndex];
+            if(activeStage && activeStage.type !== 'round_robin' && activeStage.type !== 'swiss') {
+                const stageMatches = activeStage.matches.map(mid => matchesData.find(m => m._id === mid)).filter(m => m);
+                drawBracketLines(stageMatches);
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
