@@ -13,7 +13,7 @@ const TournamentSchema = new mongoose.Schema({
     stages: [{
         name: String, 
         // เพิ่ม gsl และ triple_elim
-        type: { type: String, enum: ['round_robin', 'single_elim', 'double_elim', 'triple_elim', 'swiss', 'gsl'], default: 'single_elim' },
+        type: { type: String, enum: ['round_robin', 'single_elim', 'double_elim', 'triple_elim', 'swiss', 'gsl', 'cross_group'], default: 'single_elim' },
         settings: {
             defaultFormat: { type: String, enum: ['BO1', 'BO3', 'BO5'], default: 'BO1' },
             roundCount: { type: Number, default: 1 }, 
@@ -26,6 +26,7 @@ const TournamentSchema = new mongoose.Schema({
             // สำหรับ Stage-to-Stage
             sourceStageIndex: { type: Number, default: -1 }, // -1 = Manual, 0+ = จาก Stage นั้น
             advanceCount: { type: Number, default: 0 }, // จำนวนทีมที่ดึงมา (เช่น Top 2)
+            qualifiedCount: { type: Number, default: 1 }, // จำนวนทีมที่ผ่านเข้ารอบจาก Stage นี้
             // 'cross_group' = เอาที่ 1 เจอที่ 2 ของอีกกลุ่ม (Standard Seed), 'top_standing' = เรียงตามคะแนนรวม
             advanceMethod: { type: String, enum: ['top_standing', 'cross_group'], default: 'top_standing' }
         },

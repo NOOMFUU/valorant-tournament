@@ -145,7 +145,8 @@
         .draggable-item { cursor: grab; user-select: none; }
         .draggable-item:active { cursor: grabbing; }
         .dragging { opacity: 0.5; }
-        .drag-over-item { border-top: 2px solid #ff4655 !important; background: rgba(255, 70, 85, 0.1); }
+        .drag-over-insert { border-top: 2px solid #ff4655 !important; background: rgba(255, 70, 85, 0.1); }
+        .drag-over-swap { background: rgba(255, 70, 85, 0.3) !important; border: 1px dashed #ff4655 !important; }
 
         /* Bracket Lines */
         #bracketSvg { overflow: visible; }
@@ -192,9 +193,6 @@
             </button>
             <button onclick="nav('logs')" id="nav-logs" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-clipboard-list w-5 text-center"></i> LOGS
-            </button>
-            <button onclick="openBroadcastModal()" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base text-yellow-500 hover:text-yellow-400">
-                <i class="fa-solid fa-bullhorn w-5 text-center"></i> BROADCAST
             </button>
         </nav>
 
@@ -486,113 +484,106 @@
             <div class="p-6 border-t border-[#333] bg-[#21252b]"><button onclick="saveMatchEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm tracking-widest">SAVE CHANGES</button></div>
         </div>
 
-        <div id="stageModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
-            <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">NEW STAGE CONFIGURATION</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
-            <div class="p-8 space-y-6">
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Stage Name</label><input id="stName" class="w-full input-dark" placeholder="e.g. Playoffs Phase 1"></div>
-                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Match Format</label><select id="stDefBO" class="w-full bg-[#1a1d21] text-white border-b-2 border-[#333] text-sm py-2"><option value="BO1">BO1</option><option value="BO3" selected>BO3</option><option value="BO5">BO5</option></select></div>
+        <div id="stageModal" class="modal-content hidden bg-[#1a1d21] w-full h-full border-none rounded-none shadow-none animate-slide-up flex flex-col">
+            <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <h3 class="text-base font-header text-white">CONFIGURE STAGE</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Format Selection Sidebar -->
+                <div class="w-80 shrink-0 bg-[#15171a] border-r border-[#333] overflow-y-auto custom-scroll p-4 space-y-2">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Format</div>
+                    <button onclick="selectFormat('single_elim')" id="btn-fmt-single_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">Single Elimination</div>
+                        <div class="text-[10px] text-gray-500 mt-1">Standard knockout bracket. Winners advance, losers eliminated.</div>
+                    </button>
+                    <button onclick="selectFormat('double_elim')" id="btn-fmt-double_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">Double Elimination</div>
+                        <div class="text-[10px] text-gray-500 mt-1">Winners and Losers brackets. Second chance for players.</div>
+                    </button>
+                    <button onclick="selectFormat('round_robin')" id="btn-fmt-round_robin" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">Round Robin</div>
+                        <div class="text-[10px] text-gray-500 mt-1">League style. Everyone plays everyone.</div>
+                    </button>
+                    <button onclick="selectFormat('swiss')" id="btn-fmt-swiss" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">Swiss System</div>
+                        <div class="text-[10px] text-gray-500 mt-1">Non-elimination. Pair by record.</div>
+                    </button>
+                    <button onclick="selectFormat('gsl')" id="btn-fmt-gsl" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">GSL Groups</div>
+                        <div class="text-[10px] text-gray-500 mt-1">Dual Tournament group stage.</div>
+                    </button>
+                    <button onclick="selectFormat('cross_group')" id="btn-fmt-cross_group" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                        <div class="font-bold text-white group-hover:text-[#ff4655]">Cross-Group</div>
+                        <div class="text-[10px] text-gray-500 mt-1">Split 2 groups. A plays B.</div>
+                    </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-2">
-                        <label class="text-xs text-gray-500 font-bold uppercase">Structure Type</label>
-                        <select id="stType" onchange="toggleStageOptions()" class="w-full bg-[#1a1d21] text-white border-b-2 border-[#333] text-sm py-2">
-                            <option value="single_elim">Single Elimination</option>
-                            <option value="double_elim">Double Elimination</option>
-                            <option value="triple_elim">Triple Elimination</option>
-                            <option value="gsl">GSL Groups (Dual)</option>
-                            <option value="swiss">Swiss System</option>
-                            <option value="round_robin">Round Robin (League)</option>
-                        </select>
-                    </div>
+                <!-- Configuration Area -->
+                <div class="flex-1 p-8 overflow-y-auto custom-scroll">
+                    <input type="hidden" id="stType">
                     
-                    <div class="space-y-3 pt-2">
-                        <div id="stRoundCountContainer" class="hidden"><label class="text-xs text-gray-500 font-bold uppercase mr-2">Legs:</label><input type="number" id="stRoundCount" value="1" min="1" max="5" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded"></div>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-2">Stage Name</label>
+                            <input id="stName" class="w-full input-dark" placeholder="e.g. Group Stage, Playoffs">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="text-xs text-gray-500 font-bold uppercase block mb-2">Match Format</label>
+                                <select id="stDefBO" class="w-full bg-[#1a1d21] text-white border-b-2 border-[#333] text-sm py-2 outline-none focus:border-[#ff4655]">
+                                    <option value="BO1">Best of 1</option>
+                                    <option value="BO3" selected>Best of 3</option>
+                                    <option value="BO5">Best of 5</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end pb-2">
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="stRandom" class="accent-[#ff4655] w-4 h-4">
+                                    <label for="stRandom" class="text-xs text-gray-300 select-none">Randomize Seeding</label>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <div class="flex items-center gap-2">
-                            <input type="checkbox" id="stRandom" class="accent-[#ff4655] w-4 h-4">
-                            <label for="stRandom" class="text-xs text-gray-300 select-none">Randomize Seeding</label>
+                        <!-- Dynamic Settings Container -->
+                        <div id="formatSettings" class="p-4 bg-[#0f1113] border border-[#2d3139] rounded hidden">
+                            <!-- Injected via JS -->
                         </div>
 
-                        <!-- Group Settings -->
-                        <div id="stGroupSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
-                            <div class="flex justify-between items-center">
-                                <label class="text-xs text-gray-500 font-bold uppercase">Number of Groups</label>
-                                <input type="number" id="stGroupCount" value="1" min="1" max="8" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
+                        <!-- Participants Import -->
+                        <div class="p-4 bg-[#0f1113] border border-[#2d3139] rounded relative">
+                            <div class="flex flex-col gap-3 mb-4 border-b border-[#333] pb-4">
+                                <label class="text-xs text-[#ff4655] font-bold uppercase">Participants</label>
+                                <div class="flex gap-2">
+                                    <select id="impStage" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none"></select>
+                                    <select id="impType" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none" onchange="toggleImpInput()">
+                                        <option value="all">All Participants</option>
+                                        <option value="top_n">Top N (Standings)</option>
+                                        <option value="gsl">GSL Qualified (Top 2)</option>
+                                    </select>
+                                    <input type="number" id="impCount" value="4" class="w-16 bg-[#1a1d21] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500" placeholder="N">
+                                    <button onclick="runImport()" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
+                                </div>
+                            </div>
+
+                            <div id="manualSelectUI" class="grid grid-cols-2 gap-6 h-[500px]">
+                                <div class="flex flex-col bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
+                                    <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between items-center"><span>Pool</span><span id="availCount">0</span></div>
+                                    <div class="px-2 py-1 border-b border-[#333]"><input id="poolSearch" oninput="renderStageLists()" class="w-full bg-[#0f1113] border border-[#333] text-[10px] px-2 py-1 rounded text-white focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Search team..."></div>
+                                    <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'pool')"></div>
+                                </div>
+                                <div class="flex flex-col bg-[#1a1d21] border border-[#ff4655]/30 rounded overflow-hidden">
+                                    <div class="p-2 bg-[#222] text-xs font-bold text-[#ff4655] uppercase flex justify-between"><span>Selected</span><span id="selCount">0</span></div>
+                                    <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'selected')"></div>
+                                    <button onclick="clearStageSelection()" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Elim Specifics -->
-                        <div id="stThirdPlaceContainer" class="flex items-center gap-2">
-                            <input type="checkbox" id="stThirdPlace" class="accent-[#ff4655] w-4 h-4">
-                            <label for="stThirdPlace" class="text-xs text-gray-300 select-none">Create 3rd Place Match</label>
-                        </div>
-
-                        <!-- Double Elim Specifics -->
-                        <div id="stDESettings" class="hidden flex items-center gap-2">
-                            <input type="checkbox" id="stSplitParticipants" class="accent-[#ff4655] w-4 h-4" checked>
-                            <label for="stSplitParticipants" class="text-xs text-gray-300 select-none" title="Bottom half starts in Losers Bracket">Split Participants</label>
-                            <i class="fa-solid fa-circle-info text-gray-500 text-[10px] cursor-help" title="If enabled, the bottom half of participants will start in the Losers Bracket (Lower Bracket)."></i>
-                        </div>
-
-                        <!-- Tiebreaker Settings -->
-                        <div id="stTiebreakers" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
-                            <label class="text-xs text-gray-500 font-bold uppercase">Tiebreaker Priority</label>
-                            <div class="flex gap-2">
-                                <select id="tb1" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
-                                    <option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option>
-                                </select>
-                                <select id="tb2" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
-                                    <option value="map_diff" selected>Map Diff</option><option value="h2h">Head to Head</option><option value="round_diff">Round Diff</option>
-                                </select>
-                                <select id="tb3" class="bg-[#0f1113] border border-[#333] text-white text-xs p-1 rounded flex-1 outline-none focus:border-[#ff4655]">
-                                    <option value="round_diff" selected>Round Diff</option><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Swiss Specifics -->
-                        <div id="stSwissSettings" class="hidden space-y-2 border-t border-[#333] pt-2 mt-2">
-                            <div class="flex justify-between items-center">
-                                <label class="text-xs text-gray-500 font-bold uppercase">Total Rounds</label>
-                                <input type="number" id="stSwissRounds" value="3" min="1" max="10" class="bg-[#0f1113] border border-[#333] text-white w-16 text-center rounded text-xs">
-                            </div>
-                        </div>
+                        <button onclick="generateStage()" class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
                     </div>
                 </div>
-
-                <div class="p-4 bg-[#0f1113] border border-[#2d3139] rounded relative">
-                    <div class="flex flex-col gap-3 mb-4 border-b border-[#333] pb-4">
-                        <label class="text-xs text-[#ff4655] font-bold uppercase">Import Participants (Optional)</label>
-                        <div class="flex gap-2">
-                            <select id="impStage" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none"></select>
-                            <select id="impType" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none" onchange="toggleImpInput()">
-                                <option value="all">All Participants</option>
-                                <option value="top_n">Top N (Standings)</option>
-                                <option value="gsl">GSL Qualified (Top 2)</option>
-                            </select>
-                            <input type="number" id="impCount" value="4" class="w-16 bg-[#1a1d21] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500" placeholder="N">
-                            <button onclick="runImport()" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
-                        </div>
-                    </div>
-
-                    <div id="manualSelectUI" class="grid grid-cols-2 gap-6 h-[200px]">
-                        <div class="flex flex-col bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
-                            <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between items-center"><span>Pool</span><span id="availCount">0</span></div>
-                            <div class="px-2 py-1 border-b border-[#333]"><input id="poolSearch" oninput="renderStageLists()" class="w-full bg-[#0f1113] border border-[#333] text-[10px] px-2 py-1 rounded text-white focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Search team..."></div>
-                            <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'pool')"></div>
-                        </div>
-                        <div class="flex flex-col bg-[#1a1d21] border border-[#ff4655]/30 rounded overflow-hidden">
-                            <div class="p-2 bg-[#222] text-xs font-bold text-[#ff4655] uppercase flex justify-between"><span>Selected</span><span id="selCount">0</span></div>
-                            <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'selected')"></div>
-                            <button onclick="clearStageSelection()" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
-                        </div>
-                    </div>
-                </div>
-
-                <button onclick="generateStage()" class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
             </div>
         </div>
 
@@ -648,6 +639,14 @@
                 </div>
                 <button onclick="saveStageSettings()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SETTINGS</button>
             </div>
+        </div>
+        
+        <div id="manageTeamsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-4xl border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <h3 class="text-base font-header text-white">MANAGE STAGE TEAMS</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="manageTeamsContent" class="p-8 overflow-y-auto custom-scroll flex-1"></div>
         </div>
 
         <div id="rosterModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
@@ -708,6 +707,8 @@
         let activeStageIndex = 0; // NEW: For Tab System
         let overviewMapPool = []; // Track map pool in overview tab
         let vetoTimerInt = null;
+        let stageGroupNames = {}; // Store custom group names
+        let swapSourceIndex = null; // For click-to-swap
 
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
 
@@ -990,13 +991,6 @@
                     ${renderTeamRow(m.teamB, 'teamB', sB, sB > sA)}
                 </div>
                 ${vetoUI}
-                <div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-600 truncate flex justify-between items-center">
-                    <span class="truncate max-w-[120px]" title="${m.name}">${m.name}</span>
-                    ${(nextWin||nextLose) ? `<div class="flex gap-2 font-mono text-[9px]">
-                        ${nextWin ? `<span class="text-green-500/70" title="Winner to ${nextWin}">W<i class="fa-solid fa-arrow-right ml-0.5"></i></span>` : ''}
-                        ${nextLose ? `<span class="text-red-500/70" title="Loser to ${nextLose}">L<i class="fa-solid fa-arrow-right ml-0.5"></i></span>` : ''}
-                    </div>` : ''}
-                </div>
             </div>`;
         }
 
@@ -1085,9 +1079,13 @@
                 let contentHtml = '';
                 let swissBtn = '';
                 let settingsBtn = '';
+                let manageTeamsBtn = '';
                 if (s.type === 'swiss') swissBtn = `<button onclick="generateSwissNext('${t._id}', ${activeStageIndex})" class="btn-val px-4 py-2 rounded text-[10px] font-bold ml-4">GENERATE ROUND</button>`;
                 if (s.type === 'round_robin' || s.type === 'swiss') {
                      settingsBtn = `<button onclick="openStageSettings('${t._id}', ${activeStageIndex})" class="text-gray-400 hover:text-white text-xs font-bold uppercase ml-4 border border-[#333] px-3 py-1 rounded hover:bg-[#333] transition"><i class="fa-solid fa-sliders mr-2"></i> Settings</button>`;
+                }
+                if (s.type === 'round_robin' || s.type === 'cross_group') {
+                     manageTeamsBtn = `<button onclick="openManageTeams('${t._id}', ${activeStageIndex})" class="text-blue-400 hover:text-white text-xs font-bold uppercase ml-4 border border-[#333] px-3 py-1 rounded hover:bg-[#333] transition"><i class="fa-solid fa-users-gear mr-2"></i> Manage Teams</button>`;
                 }
 
                 const stageControls = `
@@ -1096,64 +1094,236 @@
                             <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Type: <span class="text-white">${s.type.replace('_',' ')}</span></span>
                             ${swissBtn}
                             ${settingsBtn}
+                            ${manageTeamsBtn}
                             <button onclick="exportStageCSV('${t._id}', ${activeStageIndex})" class="text-green-500 hover:text-green-400 text-xs font-bold uppercase ml-4"><i class="fa-solid fa-file-csv mr-2"></i> Export CSV</button>
                         </div>
                         <button onclick="deleteStage('${t._id}', ${activeStageIndex})" class="text-red-500 hover:text-red-400 text-xs font-bold uppercase"><i class="fa-solid fa-trash mr-2"></i> Delete Stage</button>
                     </div>
                 `;
 
-                if (s.type === 'round_robin' || s.type === 'swiss') {
-                    const standings = calculateStandings(ms, s.stageParticipants, s.settings);
-                    
-                    const groupedStandings = {};
-                    standings.forEach(st => { if(!groupedStandings[st.group]) groupedStandings[st.group] = []; groupedStandings[st.group].push(st); });
-                    
-                    let tablesHtml = '';
-                    Object.keys(groupedStandings).sort().forEach(g => {
-                        const groupSt = groupedStandings[g];
-                        const rows = groupSt.map((st, i) => `<tr><td class="font-mono text-center text-gray-600 border-r border-[#222]">${i+1}</td><td class="font-bold text-white">${st.name}</td><td class="text-center">${st.played}</td><td class="text-center font-bold text-green-400">${st.wins}</td><td class="text-center text-red-400">${st.losses}</td><td class="text-center font-mono text-gray-300 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td><td class="text-center font-mono ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td><td class="text-center font-mono text-gray-500 border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td></tr>`).join('');
-                        tablesHtml += `<div class="mb-4"><div class="p-2 text-xs font-bold text-gray-500 uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Group ${g}</div><table class="table-val w-full"><thead><tr><th class="w-10 text-center">#</th><th>Team</th><th class="w-12 text-center">P</th><th class="w-12 text-center">W</th><th class="w-12 text-center">L</th><th class="w-16 text-center border-l border-[#333]">Maps</th><th class="w-12 text-center">M±</th><th class="w-12 text-center border-l border-[#333]">R±</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+                if (s.type === 'round_robin' || s.type === 'swiss' || s.type === 'gsl' || s.type === 'cross_group') {
+                    if (s.type === 'cross_group') {
+                        const participants = s.stageParticipants || [];
+                        const mid = Math.ceil(participants.length / 2);
+                        const alphaIds = participants.slice(0, mid);
+                        const omegaIds = participants.slice(mid);
+                        
+                        const allParticipants = new Set();
+                        ms.forEach(m => { if(m.teamA) allParticipants.add(m.teamA._id || m.teamA); if(m.teamB) allParticipants.add(m.teamB._id || m.teamB); });
+                        const globalStandings = calculateStandings(ms, Array.from(allParticipants), s.settings);
+                        
+                        const alphaStandings = globalStandings.filter(st => alphaIds.includes(st.id));
+                        const omegaStandings = globalStandings.filter(st => omegaIds.includes(st.id));
+
+                        const renderAdminTable = (title, standings, color) => {
+                            const rows = standings.map((st, i) => `
+                                <tr class="hover:bg-[#222] transition-colors border-b border-[#222] last:border-0">
+                                    <td class="py-3 px-4 text-center font-mono text-gray-500 border-r border-[#222]">${i+1}</td>
+                                    <td class="py-3 px-4 font-bold text-white">${st.name}</td>
+                                    <td class="py-3 px-4 text-center text-gray-300">${st.played}</td>
+                                    <td class="py-3 px-4 text-center font-bold text-green-400 bg-green-500/5">${st.wins}</td>
+                                    <td class="py-3 px-4 text-center font-bold text-red-400 bg-red-500/5">${st.losses}</td>
+                                    <td class="py-3 px-4 text-center font-mono text-gray-400 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td>
+                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td>
+                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.diff>0?'text-green-400':(st.diff<0?'text-red-400':'text-gray-500')} border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td>
+                                </tr>`).join('');
+                            return `<div class="bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden shadow-sm mb-4"><div class="px-4 py-3 bg-[#1a1d21] border-b border-[#2d3139] flex justify-between items-center"><span class="text-xs font-bold ${color} uppercase tracking-widest">${title}</span><i class="fa-solid fa-table text-gray-600"></i></div><table class="w-full text-sm text-left border-collapse"><thead class="text-xs text-gray-500 uppercase bg-[#111] border-b border-[#2d3139]"><tr><th class="py-3 px-4 text-center w-12">#</th><th class="py-3 px-4">Team</th><th class="py-3 px-4 text-center w-12" title="Played">P</th><th class="py-3 px-4 text-center w-12" title="Wins">W</th><th class="py-3 px-4 text-center w-12" title="Losses">L</th><th class="py-3 px-4 text-center w-20 border-l border-[#2d3139]">Maps</th><th class="py-3 px-4 text-center w-14">M±</th><th class="py-3 px-4 text-center w-14 border-l border-[#2d3139]">R±</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+                        };
+
+                        const rounds = {}; ms.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
+                        let matchesListHtml = '';
+                        Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(r => {
+                            const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
+                            matchesListHtml += `<div class="mb-6 last:mb-0"><div class="flex justify-between items-center bg-[#1a1d21] px-3 py-2 rounded border-l-4 border-[#ff4655] border-y border-r border-y-[#2d3139] border-r-[#2d3139] mb-3 shadow-sm"><span class="text-xs font-bold text-white uppercase tracking-widest">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                        });
+
+                        contentHtml += `<div class="animate-slide-up">${stageControls}<div class="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8"><div class="xl:col-span-5">${renderAdminTable('GROUP ALPHA', alphaStandings, 'text-[#ff4655]')}${renderAdminTable('GROUP OMEGA', omegaStandings, 'text-[#00d4ff]')}</div><div class="xl:col-span-7"><div class="flex items-center justify-between mb-4"><span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Match Schedule</span></div><div class="max-h-[600px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
+                        list.innerHTML = contentHtml;
+                        return;
+                    }
+
+                    const matchesByGroup = {};
+                    ms.forEach(m => {
+                        const gMatch = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                        const groupName = gMatch ? `Group ${gMatch[1].toUpperCase()}` : 'General';
+                        if(!matchesByGroup[groupName]) matchesByGroup[groupName] = [];
+                        matchesByGroup[groupName].push(m);
                     });
 
-                    const rounds = {}; ms.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
-                    const sortedRoundKeys = Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b));
-                    const matchesListHtml = sortedRoundKeys.map(r => {
-                        const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
-                        return `<div class="mb-6"><div class="flex justify-between items-center bg-[#1a1d21] p-2 rounded mb-3 border border-[#2d3139]"><span class="text-xs font-bold text-[#ff4655] uppercase tracking-widest pl-2">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-xs bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
-                    }).join('');
+                    contentHtml = `<div class="animate-slide-up">${stageControls}`;
+
+                    Object.keys(matchesByGroup).sort().forEach(gName => {
+                        const gMatches = matchesByGroup[gName];
+                        let groupContent = '';
+                        
+                        if (s.type === 'gsl') {
+                            const openA = gMatches.find(m => m.name.includes('Opening A'));
+                            const openB = gMatches.find(m => m.name.includes('Opening B'));
+                            const winners = gMatches.find(m => m.name.includes('Winners'));
+                            const elim = gMatches.find(m => m.name.includes('Elimination'));
+                            const decider = gMatches.find(m => m.name.includes('Decider'));
+                            const mCard = (m) => m ? renderMatchCard(m) : '<div class="p-4 text-center text-gray-600 bg-[#15171a] border border-[#2d3139] rounded text-xs font-bold uppercase tracking-widest">TBD</div>';
+
+                            groupContent = `
+                                <div class="p-6 overflow-x-auto">
+                                    <div class="flex gap-8 min-w-max">
+                                        <div class="flex flex-col gap-4 w-80">
+                                            <div class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-[#333] pb-1">Opening Matches</div>
+                                            ${mCard(openA)}
+                                            ${mCard(openB)}
+                                        </div>
+                                        <div class="flex flex-col justify-between w-80">
+                                            <div>
+                                                <div class="text-xs font-bold text-[#1fa474] uppercase tracking-widest mb-2 border-b border-[#1fa474]/30 pb-1">Winners Match</div>
+                                                ${mCard(winners)}
+                                            </div>
+                                            <div>
+                                                <div class="text-xs font-bold text-[#ff4655] uppercase tracking-widest mb-2 border-b border-[#ff4655]/30 pb-1">Elimination Match</div>
+                                                ${mCard(elim)}
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col justify-center w-80">
+                                            <div class="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-2 border-b border-yellow-500/30 pb-1">Decider Match</div>
+                                            ${mCard(decider)}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // Round Robin / Swiss
+                            const groupParticipants = new Set();
+                            gMatches.forEach(m => { if(m.teamA) groupParticipants.add(m.teamA._id || m.teamA); if(m.teamB) groupParticipants.add(m.teamB._id || m.teamB); });
+                            const standings = calculateStandings(gMatches, Array.from(groupParticipants), s.settings);
+                            const rows = standings.map((st, i) => `
+                                <tr class="hover:bg-[#222] transition-colors border-b border-[#222] last:border-0">
+                                    <td class="py-3 px-4 text-center font-mono text-gray-500 border-r border-[#222]">${i+1}</td>
+                                    <td class="py-3 px-4 font-bold text-white">${st.name}</td>
+                                    <td class="py-3 px-4 text-center text-gray-300">${st.played}</td>
+                                    <td class="py-3 px-4 text-center font-bold text-green-400 bg-green-500/5">${st.wins}</td>
+                                    <td class="py-3 px-4 text-center font-bold text-red-400 bg-red-500/5">${st.losses}</td>
+                                    <td class="py-3 px-4 text-center font-mono text-gray-400 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td>
+                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td>
+                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.diff>0?'text-green-400':(st.diff<0?'text-red-400':'text-gray-500')} border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td>
+                                </tr>`).join('');
+                            
+                            const tableHtml = `
+                                <div class="bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden shadow-sm">
+                                    <div class="px-4 py-3 bg-[#1a1d21] border-b border-[#2d3139] flex justify-between items-center">
+                                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Group Standings</span>
+                                        <i class="fa-solid fa-table text-gray-600"></i>
+                                    </div>
+                                    <table class="w-full text-sm text-left border-collapse">
+                                        <thead class="text-xs text-gray-500 uppercase bg-[#111] border-b border-[#2d3139]">
+                                            <tr>
+                                                <th class="py-3 px-4 text-center w-12">#</th>
+                                                <th class="py-3 px-4">Team</th>
+                                                <th class="py-3 px-4 text-center w-12" title="Played">P</th>
+                                                <th class="py-3 px-4 text-center w-12" title="Wins">W</th>
+                                                <th class="py-3 px-4 text-center w-12" title="Losses">L</th>
+                                                <th class="py-3 px-4 text-center w-20 border-l border-[#2d3139]">Maps</th>
+                                                <th class="py-3 px-4 text-center w-14">M±</th>
+                                                <th class="py-3 px-4 text-center w-14 border-l border-[#2d3139]">R±</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>`;
+                            
+                            const rounds = {}; gMatches.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
+                            let matchesListHtml = '';
+                            Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(r => {
+                                const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
+                                matchesListHtml += `
+                                    <div class="mb-6 last:mb-0">
+                                        <div class="flex justify-between items-center bg-[#1a1d21] px-3 py-2 rounded border-l-4 border-[#ff4655] border-y border-r border-y-[#2d3139] border-r-[#2d3139] mb-3 shadow-sm">
+                                            <span class="text-xs font-bold text-white uppercase tracking-widest">${label}</span>
+                                            <button onclick="openRoundScheduler('${matchIds}')" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2">
+                                                <i class="fa-regular fa-clock"></i> Set Time
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            ${roundMatches.map(m => renderMatchCard(m)).join('')}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            groupContent = `<div class="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8"><div class="xl:col-span-5">${tableHtml}</div><div class="xl:col-span-7"><div class="flex items-center justify-between mb-4"><span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Match Schedule</span></div><div class="max-h-[600px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div>`;
+                        }
+
+                        contentHtml += `
+                            <div class="mb-10 bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden">
+                                <div class="bg-[#1a1d21] px-6 py-4 border-b border-[#2d3139] flex justify-between items-center"><h3 class="text-lg font-header text-white tracking-wide border-l-4 border-[#ff4655] pl-3">${gName}</h3><span class="text-xs font-mono text-gray-500">${s.type.toUpperCase().replace('_',' ')}</span></div>
+                                ${groupContent}
+                            </div>
+                        `;
+                    });
                     
-                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"><div class="lg:col-span-5 border-r border-[#2d3139] bg-[#0f1113]"><div class="p-3 text-xs text-gray-500 font-bold uppercase bg-[#1a1d21] border-b border-[#2d3139] tracking-widest">Standings</div><div class="overflow-x-auto max-h-[800px] custom-scroll">${tablesHtml}</div></div><div class="lg:col-span-7 bg-[#15171a] p-5"><div class="mb-4 flex justify-between items-center pb-2 border-b border-[#2d3139]"><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Match Schedule</span><span class="text-xs text-gray-500 font-bold uppercase">${ms.filter(m=>m.status==='finished').length} / ${ms.length} Comp.</span></div><div class="max-h-[800px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
+                    contentHtml += `</div>`;
                 }
                 else {
-                    const upper = [], middle = [], lower = [], final = [];
+                    // Group matches by Group Name
+                    const groups = {};
                     ms.forEach(m => { 
-                        if(m.matchOrder === 999 || m.round === 999) final.push(m); 
-                        else if(m.round >= 200) lower.push(m); 
-                        else if(m.round >= 100) middle.push(m); 
-                        else upper.push(m); 
+                        const matchGroup = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                        const gName = matchGroup ? `Group ${matchGroup[1].toUpperCase()}` : 'Main Bracket';
+                        if (!groups[gName]) groups[gName] = [];
+                        groups[gName].push(m);
                     });
-                    const renderSection = (matches, label, color = 'border-[#ff4655]') => {
-                        if(matches.length === 0) return '';
-                        const rounds = {}; matches.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
-                        const sortedRounds = Object.keys(rounds).sort((a,b) => parseInt(a)-parseInt(b));
-                        const columnsHtml = sortedRounds.map(r => {
-                            const roundMatches = rounds[r].sort((a,b) => a.matchOrder - b.matchOrder); const matchIds = roundMatches.map(m => m._id).join(',');
-                            let displayRound = r;
-                            if (r >= 200) displayRound = r - 200; else if (r >= 100) displayRound = r - 100;
-                            const gapClass = compactMode ? 'gap-2' : 'gap-4';
-                            const widthStyle = compactMode ? 'min-width: 200px;' : '';
-                            return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>Round ${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col ${gapClass}">${roundMatches.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m)}</div>`).join('')}</div></div>`;
-                        }).join('');
-                        return `<div class="mb-8 relative z-10"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container" style="overflow: visible">${columnsHtml}</div></div>`;
-                    };
-                    let finalHtml = ''; if(final.length > 0) { const matchIds = final.map(m => m._id).join(','); finalHtml = `<div class="mt-6 pt-6 border-t border-[#333] relative z-10"><div class="bracket-header max-w-[320px]"><span>Grand Final</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-clock"></i></button></div><div class="max-w-[350px]">${final.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m, true)}</div>`).join('')}</div></div>`; }
-                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8 overflow-x-auto relative"><div class="relative min-w-max"><svg id="bracketSvg" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
-                        ${renderSection(upper, "Upper Bracket", "border-[#ff4655]")}
-                        ${renderSection(middle, s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket", "border-[#dda828]")}
-                        ${renderSection(lower, "Last Chance Bracket", "border-[#00d4ff]")}
-                        ${finalHtml}
-                    </div></div></div>`;
-                    setTimeout(() => drawBracketLines(ms), 50);
+
+                    const sortedGroups = Object.keys(groups).sort();
+                    let groupsHtml = '';
+
+                    sortedGroups.forEach((gName, idx) => {
+                        const groupMatches = groups[gName];
+                        const upper = [], middle = [], lower = [], final = [];
+                        groupMatches.forEach(m => { 
+                            if(m.matchOrder === 999 || m.round === 999) final.push(m); 
+                            else if(m.round >= 200) lower.push(m); 
+                            else if(m.round >= 100) middle.push(m); 
+                            else upper.push(m); 
+                        });
+
+                        // Merge Final into Upper for continuous display
+                        const upperAndFinal = [...upper, ...final];
+
+                        const renderSection = (matches, label, color = 'border-[#ff4655]') => {
+                            if(matches.length === 0) return '';
+                            const rounds = {}; matches.forEach(m => { if(!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
+                            const sortedRounds = Object.keys(rounds).sort((a,b) => parseInt(a)-parseInt(b));
+                            const columnsHtml = sortedRounds.map(r => {
+                                const roundMatches = rounds[r].sort((a,b) => a.matchOrder - b.matchOrder); const matchIds = roundMatches.map(m => m._id).join(',');
+                                let displayRound = `Round ${r}`;
+                                if (parseInt(r) === 999) displayRound = "Grand Final";
+                                else if (parseInt(r) >= 200) displayRound = `Round ${r - 200}`;
+                                else if (parseInt(r) >= 100) displayRound = `Round ${r - 100}`;
+                                
+                                const widthStyle = compactMode ? 'min-width: 200px;' : '';
+                                return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col justify-around flex-1">${roundMatches.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m)}</div>`).join('')}</div></div>`;
+                            }).join('');
+                            return `<div class="mb-8 relative z-10"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container" style="overflow: visible">${columnsHtml}</div></div>`;
+                        };
+
+                        groupsHtml += `
+                            <div class="mb-16 bg-[#15171a]/50 border border-[#333] rounded-lg p-6 relative">
+                                ${sortedGroups.length > 1 ? `<h3 class="text-xl font-header text-white mb-6 border-l-4 border-[#ff4655] pl-3">${gName}</h3>` : ''}
+                                <div class="overflow-x-auto relative">
+                                    <div class="relative min-w-max">
+                                        <svg id="bracketSvg-${idx}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
+                                        ${renderSection(upperAndFinal, "Upper Bracket", "border-[#ff4655]")}
+                                        ${renderSection(middle, s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket", "border-[#dda828]")}
+                                        ${renderSection(lower, "Last Chance Bracket", "border-[#00d4ff]")}
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+
+                    contentHtml = `<div class="animate-slide-up">${stageControls}<div class="p-8">${groupsHtml}</div></div>`;
+                    
+                    setTimeout(() => {
+                        sortedGroups.forEach((gName, idx) => {
+                            drawBracketLines(groups[gName], `bracketSvg-${idx}`);
+                        });
+                    }, 50);
                 }
 
                 list.innerHTML = contentHtml;
@@ -1175,7 +1345,7 @@
             participants.forEach(pid => { const team = allTeams.find(t=>t._id === pid); if(team) stats[pid] = { id: pid, name: team.shortName, wins:0, losses:0, played:0, diff:0, mapsWon:0, mapsLost:0, mapDiff:0, h2h: {}, group: 'A' }; });
             
             matches.forEach(m => {
-                const gMatch = m.name.match(/Group\s+([A-Z])/);
+                const gMatch = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
                 const group = gMatch ? gMatch[1] : 'A';
                 if (m.teamA && stats[m.teamA._id || m.teamA]) stats[m.teamA._id || m.teamA].group = group;
                 if (m.teamB && stats[m.teamB._id || m.teamB]) stats[m.teamB._id || m.teamB].group = group;
@@ -1403,6 +1573,8 @@
             } else {
                 stageSelected = []; 
                 stagePool = allTeams.filter(t => t.status === 'approved'); 
+                stageGroupNames = {};
+                swapSourceIndex = null;
             }
             if(document.getElementById('poolSearch')) document.getElementById('poolSearch').value = '';
             
@@ -1416,9 +1588,142 @@
             }
             
             renderStageLists(); 
-            toggleStageOptions();
+            selectFormat('single_elim'); // Default
             toggleImpInput();
             openModal('stageModal'); 
+        }
+
+        function selectFormat(type) {
+            document.getElementById('stType').value = type;
+            document.querySelectorAll('.format-btn').forEach(b => {
+                b.classList.remove('bg-[#ff4655]/10', 'border-[#ff4655]');
+                b.classList.add('border-[#333]');
+            });
+            const btn = document.getElementById('btn-fmt-' + type);
+            if(btn) {
+                btn.classList.remove('border-[#333]');
+                btn.classList.add('bg-[#ff4655]/10', 'border-[#ff4655]');
+            }
+            
+            const settingsDiv = document.getElementById('formatSettings');
+            settingsDiv.classList.remove('hidden');
+            settingsDiv.innerHTML = '';
+
+            if (type === 'single_elim') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Groups:</label>
+                            <input type="number" id="stGroupCount" value="1" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Qualified Teams:</label>
+                            <input type="number" id="stQualifiedCount" value="1" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="stThirdPlace" class="accent-[#ff4655] w-4 h-4">
+                            <label for="stThirdPlace" class="text-xs text-gray-300 select-none">Include 3rd Place Match</label>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2">Winners advance, losers are eliminated.</p>
+                `;
+            } else if (type === 'double_elim') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Groups:</label>
+                            <input type="number" id="stGroupCount" value="1" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Qualified Teams:</label>
+                            <input type="number" id="stQualifiedCount" value="1" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="stSplitParticipants" class="accent-[#ff4655] w-4 h-4">
+                            <label for="stSplitParticipants" class="text-xs text-gray-300 select-none">Split Participants (Half start in Losers)</label>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2">Players have a second chance in the Losers Bracket.</p>
+                `;
+            } else if (type === 'round_robin') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Qualified (per group):</label>
+                            <input type="number" id="stQualifiedCount" value="2" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Iterations:</label>
+                            <input type="number" id="stRoundCount" value="1" min="1" max="5" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                            <span class="text-xs text-gray-500">(1x, 2x, 3x...)</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Groups:</label>
+                            <input type="number" id="stGroupCount" value="1" min="1" max="8" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="border-t border-[#333] pt-2">
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-1">Tiebreakers</label>
+                            <div class="flex gap-2">
+                                <select id="tb1" class="bg-[#1a1d21] border border-[#333] text-white text-[10px] p-1 rounded flex-1"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select>
+                                <select id="tb2" class="bg-[#1a1d21] border border-[#333] text-white text-[10px] p-1 rounded flex-1"><option value="map_diff" selected>Map Diff</option><option value="h2h">Head to Head</option><option value="round_diff">Round Diff</option></select>
+                                <select id="tb3" class="bg-[#1a1d21] border border-[#333] text-white text-[10px] p-1 rounded flex-1"><option value="round_diff" selected>Round Diff</option><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option></select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'swiss') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Qualified Teams:</label>
+                            <input type="number" id="stQualifiedCount" value="8" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Total Rounds:</label>
+                            <input type="number" id="stSwissRounds" value="3" min="1" max="10" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2">Players paired with similar records. Median-Buchholz tiebreakers.</p>
+                `;
+            } else if (type === 'gsl') {
+                settingsDiv.innerHTML = `
+                    <div class="flex items-center gap-3 mb-2">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Qualified (per group):</label>
+                        <input type="number" id="stQualifiedCount" value="2" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                    </div>
+                    <div id="gslInfo" class="text-xs text-white font-bold uppercase mb-2"></div>
+                    <p class="text-[10px] text-gray-500 mt-2">Double elimination groups (4 teams per group).</p>
+                `;
+            } else if (type === 'cross_group') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs font-bold text-[#ff4655] uppercase">Format:</span>
+                            <span class="text-xs text-white">Inter-Group Round Robin</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Qualified (Total):</label>
+                            <input type="number" id="stQualifiedCount" value="4" min="1" class="bg-[#1a1d21] border border-[#333] text-white w-16 text-center rounded p-1">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500">Teams are split into two groups (Alpha & Omega). Each team in Alpha plays every team in Omega once.</p>
+                    <div class="mt-3 p-2 bg-[#1a1d21] border border-[#333] rounded">
+                        <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">Structure</div>
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-[#ff4655]">Group Alpha</span>
+                            <i class="fa-solid fa-xmark text-gray-600"></i>
+                            <span class="text-[#00d4ff]">Group Omega</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderStageLists();
+        }
+
+        function updateGroupName(idx, val) {
+            stageGroupNames[idx] = val;
+            // No re-render needed, input keeps focus
         }
 
         function toggleImpInput() {
@@ -1440,9 +1745,6 @@
             if (type === 'all') {
                 importedIds = stage.stageParticipants;
             } else if (type === 'top_n') {
-                const count = parseInt(document.getElementById('impCount').value) || 4;
-                const standings = calculateStandings(ms, stage.stageParticipants);
-                importedIds = standings.slice(0, count).map(s => s.id);
                 const count = parseInt(document.getElementById('impCount').value) || 2;
                 const standings = calculateStandings(ms, stage.stageParticipants, stage.settings);
                 
@@ -1487,34 +1789,18 @@
             localStorage.setItem('stage_autosave', JSON.stringify(ids));
         }
 
-        function toggleStageOptions() {
-            const type = document.getElementById('stType').value;
-            const lc = document.getElementById('stRoundCountContainer');
-            const tp = document.getElementById('stThirdPlaceContainer');
-            const de = document.getElementById('stDESettings');
-            const sw = document.getElementById('stSwissSettings');
-            const tb = document.getElementById('stTiebreakers');
-            const gr = document.getElementById('stGroupSettings');
-            
-            lc.classList.add('hidden');
-            tp.classList.add('hidden');
-            de.classList.add('hidden');
-            if(gr) gr.classList.add('hidden');
-            if(sw) sw.classList.add('hidden');
-            if(tb) tb.classList.add('hidden');
-
-            renderStageLists();
-            if(type==='round_robin') {
-                lc.classList.remove('hidden'); 
-                if(tb) tb.classList.remove('hidden');
-                if(gr) gr.classList.remove('hidden');
-            } else if(type==='single_elim') {
-                tp.classList.remove('hidden');
-            } else if(type==='double_elim' || type==='triple_elim') {
-                de.classList.remove('hidden');
-            } else if(type==='swiss' && sw) {
-                sw.classList.remove('hidden');
-                if(tb) tb.classList.remove('hidden');
+        function handleSwapClick(idx) {
+            if (swapSourceIndex === null) {
+                swapSourceIndex = idx;
+                renderStageLists(); // Re-render to show highlight
+            } else {
+                if (swapSourceIndex !== idx) {
+                    // Swap
+                    [stageSelected[swapSourceIndex], stageSelected[idx]] = [stageSelected[idx], stageSelected[swapSourceIndex]];
+                    saveStageState();
+                }
+                swapSourceIndex = null;
+                renderStageLists();
             }
         }
 
@@ -1527,17 +1813,110 @@
             ).join(''); 
             document.getElementById('availCount').innerText = query ? `${filteredPool.length}/${stagePool.length}` : stagePool.length; 
             
+            const container = document.getElementById('selectedList');
             const type = document.getElementById('stType').value;
+            const groupCountInput = document.getElementById('stGroupCount');
+            const groupCount = groupCountInput ? parseInt(groupCountInput.value) || 1 : 1;
+            
             let html = '';
-            stageSelected.forEach((t, idx) => {
-                if (type === 'gsl' && idx % 4 === 0) {
-                    const groupChar = String.fromCharCode(65 + Math.floor(idx / 4));
-                    html += `<div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2 mb-1 pl-1 border-b border-[#333] pb-1">Group ${groupChar}</div>`;
+            
+            // Helper to render a team item
+            const renderItem = (t, idx) => {
+                const isSwapSource = swapSourceIndex === idx;
+                const swapClass = isSwapSource ? 'border-[#ff4655] bg-[#ff4655]/20' : 'border-[#333] bg-[#0f1113] hover:border-gray-500';
+                return `
+                <div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'selected', ${idx})" ondragend="handleDragEnd(event)" ondragover="handleItemDragOver(event)" ondragleave="handleItemDragLeave(event)" ondrop="handleItemDrop(event, ${idx})" 
+                    class="draggable-item p-2 rounded ${swapClass} border flex justify-between items-center group transition mb-1">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <span class="text-[10px] bg-[#333] text-white px-1.5 rounded font-mono">${idx+1}</span>
+                        <span class="text-xs text-white font-bold truncate">${t.name}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="handleSwapClick(${idx})" class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-gray-500 hover:text-white transition" title="Swap Position">
+                            <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                        </button>
+                        <button onclick="removeTeamFromStage('${t._id}')" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/20 text-gray-500 hover:text-red-500 transition">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </div>`;
+            };
+
+            // Helper to render a group container
+            const renderGroup = (name, teams, startIndex, groupIndex) => {
+                const customName = stageGroupNames[groupIndex] !== undefined ? stageGroupNames[groupIndex] : name;
+                let itemsHtml = '';
+                teams.forEach((t, i) => itemsHtml += renderItem(t, startIndex + i));
+                
+                return `
+                <div class="mb-2 bg-[#15171a] border border-[#333] rounded overflow-hidden">
+                    <div class="px-2 py-1 bg-[#222] flex justify-between items-center">
+                        <input type="text" value="${customName}" oninput="updateGroupName(${groupIndex}, this.value)" class="bg-transparent border-b border-transparent hover:border-gray-600 focus:border-[#ff4655] text-[10px] font-bold text-gray-400 uppercase outline-none w-32 transition-colors" placeholder="Group Name">
+                        <span class="text-[10px] font-bold text-gray-600">${teams.length}</span>
+                    </div>
+                    <div class="p-1">${itemsHtml}</div>
+                </div>`;
+            };
+
+            if (type === 'gsl') {
+                const count = Math.ceil(stageSelected.length / 4) || 1;
+                for (let i = 0; i < count; i++) {
+                    const groupTeams = stageSelected.slice(i * 4, (i * 4) + 4);
+                    html += renderGroup(`Group ${String.fromCharCode(65 + i)}`, groupTeams, i * 4, i);
                 }
-                html += `<div draggable="true" ondragstart="handleDragStart(event, '${t._id}', 'selected', ${idx})" ondragend="handleDragEnd(event)" ondragover="handleItemDragOver(event)" ondragleave="handleItemDragLeave(event)" ondrop="handleItemDrop(event, ${idx})" onclick="removeTeamFromStage('${t._id}')" class="draggable-item p-2 rounded bg-[#1a1d21] border border-[#ff4655]/30 hover:border-red-500 flex justify-between items-center group transition mb-1"><div class="flex items-center gap-3 overflow-hidden"><span class="text-[10px] bg-[#ff4655] text-white px-1.5 rounded font-mono">${idx+1}</span><span class="text-xs text-white font-bold truncate">${t.name}</span></div><i class="fa-solid fa-xmark text-xs text-gray-600 group-hover:text-red-500"></i></div>`;
-            });
-            document.getElementById('selectedList').innerHTML = html;
+            } else if (type === 'cross_group') {
+                const mid = Math.ceil(stageSelected.length / 2);
+                html += renderGroup('Group Alpha', stageSelected.slice(0, mid), 0, 0);
+                html += renderGroup('Group Omega', stageSelected.slice(mid), mid, 1);
+            } else if ((type === 'round_robin' || type === 'single_elim' || type === 'double_elim') && groupCount > 1) {
+                // Distribute teams into groups for visualization
+                const groups = Array.from({length: groupCount}, () => []);
+                stageSelected.forEach((t, i) => groups[i % groupCount].push({t, idx: i}));
+                
+                // Note: In Round Robin/Elim with groups, BracketManager distributes by modulo (i % groupCount).
+                // But for UI "Swap" to work intuitively with the flat list `stageSelected`, 
+                // we should display them in the order they appear in the array if possible, 
+                // OR we display them grouped but keep track of real index.
+                // BracketManager logic: groups[i % groupCount].push(t)
+                // So Team 0 -> Grp 0, Team 1 -> Grp 1, Team 2 -> Grp 0...
+                
+                // To make "Move to Group B" intuitive (drag/drop), it's better if the array is sliced (0..N -> A, N+1..M -> B).
+                // BUT BracketManager uses modulo distribution for fairness by default.
+                // Let's stick to visualizing the modulo distribution so the user knows where teams land.
+                
+                groups.forEach((g, i) => {
+                    const groupName = `Group ${String.fromCharCode(65 + i)}`;
+                    const customName = stageGroupNames[i] !== undefined ? stageGroupNames[i] : groupName;
+                    
+                    html += `
+                    <div class="mb-2 bg-[#15171a] border border-[#333] rounded overflow-hidden">
+                        <div class="px-2 py-1 bg-[#222] flex justify-between items-center">
+                            <input type="text" value="${customName}" oninput="updateGroupName(${i}, this.value)" class="bg-transparent border-b border-transparent hover:border-gray-600 focus:border-[#ff4655] text-[10px] font-bold text-gray-400 uppercase outline-none w-32 transition-colors" placeholder="Group Name">
+                            <span class="text-[10px] font-bold text-gray-600">${g.length}</span>
+                        </div>
+                        <div class="p-1">
+                            ${g.map(item => renderItem(item.t, item.idx)).join('')}
+                        </div>
+                    </div>`;
+                });
+            } else {
+                stageSelected.forEach((t, idx) => {
+                    html += renderItem(t, idx);
+                });
+            }
+
+            container.innerHTML = html;
             document.getElementById('selCount').innerText = stageSelected.length; 
+            
+            if (type === 'gsl') updateGSLInfo();
+        }
+        
+        function updateGSLInfo() {
+            const el = document.getElementById('gslInfo');
+            if(el) {
+                const count = Math.ceil(stageSelected.length / 4) || 0;
+                el.innerText = `${count} Group${count !== 1 ? 's' : ''} will be created`;
+            }
         }
         function selectTeamForStage(tid) { const idx = stagePool.findIndex(t => t._id === tid); if(idx > -1) { stageSelected.push(stagePool[idx]); stagePool.splice(idx, 1); renderStageLists(); saveStageState(); } }
         function removeTeamFromStage(tid) { const idx = stageSelected.findIndex(t => t._id === tid); if(idx > -1) { stagePool.push(stageSelected[idx]); stageSelected.splice(idx, 1); stagePool.sort((a,b) => a.name.localeCompare(b.name)); renderStageLists(); saveStageState(); } }
@@ -1976,29 +2355,42 @@
         }
         function adjustTime(m) { const i=document.getElementById('emTime'); const d=i.value?new Date(i.value):new Date(); d.setMinutes(d.getMinutes()+m); i.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
         async function generateStage() { 
+            // Prepare group names array
+            const groupNames = [];
+            Object.keys(stageGroupNames).forEach(k => groupNames[parseInt(k)] = stageGroupNames[k]);
+
             const body = { 
                 name: document.getElementById('stName').value, 
                 type: document.getElementById('stType').value, 
                 participants: stageSelected.map(t=>t._id), 
                 settings: { 
                     defaultFormat: document.getElementById('stDefBO').value, 
-                    roundCount: parseInt(document.getElementById('stRoundCount').value) || 1, 
-                    randomize: document.getElementById('stRandom').checked,
-                    hasThirdPlace: document.getElementById('stThirdPlace').checked,
-                    splitParticipants: document.getElementById('stSplitParticipants').checked,
+                    roundCount: parseInt(document.getElementById('stRoundCount')?.value) || 1, 
+                    randomize: document.getElementById('stRandom')?.checked,
+                    hasThirdPlace: document.getElementById('stThirdPlace')?.checked,
+                    splitParticipants: document.getElementById('stSplitParticipants')?.checked,
                     groupCount: parseInt(document.getElementById('stGroupCount')?.value) || 1,
-                    tiebreakers: [document.getElementById('tb1').value, document.getElementById('tb2').value, document.getElementById('tb3').value],
+                    tiebreakers: [document.getElementById('tb1')?.value, document.getElementById('tb2')?.value, document.getElementById('tb3')?.value].filter(Boolean),
                     swissRounds: parseInt(document.getElementById('stSwissRounds')?.value) || 3,
+                    qualifiedCount: parseInt(document.getElementById('stQualifiedCount')?.value) || 1,
+                    groupNames: groupNames,
                     sourceStageIndex: -1 // Always manual mode now
                 } 
             }; 
-            await fetch(`${API_BASE}/api/tournaments/${activeTourneyData._id}/stages/generate`, {
+            const res = await fetch(`${API_BASE}/api/tournaments/${activeTourneyData._id}/stages/generate`, {
                 method:'POST', 
                 headers: {'Authorization': token, 'Content-Type': 'application/json'}, 
                 body:JSON.stringify(body)
             }); 
-            closeModal(); init();
-            localStorage.removeItem('stage_autosave');
+            
+            if (res.ok) {
+                closeModal(); init();
+                localStorage.removeItem('stage_autosave');
+                showToast('Stage Generated');
+            } else {
+                const d = await res.json().catch(() => ({}));
+                showToast(d.message || d.msg || 'Error Generating Stage', 'error');
+            }
         }
 
         function openStageSettings(tid, idx) {
@@ -2016,6 +2408,105 @@
             const tiebreakers = [document.getElementById('ssTb1').value, document.getElementById('ssTb2').value, document.getElementById('ssTb3').value];
             await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${idx}/settings`, { method: 'PUT', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({ settings: { tiebreakers } }) });
             closeModal(); init(true); showToast('Settings Updated');
+        }
+        
+        // --- MANAGE TEAMS (ADD/SWAP) ---
+        let manageTeamsState = { tid: null, sIdx: null, swapSrc: null };
+        
+        function openManageTeams(tid, idx) {
+            manageTeamsState = { tid, sIdx: idx, swapSrc: null };
+            const t = allTourneys.find(x => x._id === tid);
+            const s = t.stages[idx];
+            const ms = s.matches.map(mid => allMatches.find(m => m._id === mid)).filter(m => m);
+            
+            // Group Teams
+            const groups = {};
+            if (s.type === 'cross_group') {
+                const mid = Math.ceil(s.stageParticipants.length / 2);
+                groups['Group Alpha'] = s.stageParticipants.slice(0, mid);
+                groups['Group Omega'] = s.stageParticipants.slice(mid);
+            } else {
+                // Round Robin: Infer from matches or just list all if 1 group
+                // For simplicity in UI, we try to group by match names or just show "Group A" etc.
+                // If we can't infer, we just show one big list, but user asked for groups.
+                // Let's use the same logic as renderStructure to find groups
+                ms.forEach(m => {
+                    const gMatch = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                    const gName = gMatch ? `Group ${gMatch[1].toUpperCase()}` : 'General';
+                    if (!groups[gName]) groups[gName] = new Set();
+                    if (m.teamA) groups[gName].add(m.teamA._id);
+                    if (m.teamB) groups[gName].add(m.teamB._id);
+                });
+                // Convert Sets to Arrays
+                Object.keys(groups).forEach(k => groups[k] = Array.from(groups[k]));
+                if (Object.keys(groups).length === 0) groups['General'] = s.stageParticipants;
+            }
+
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+            Object.keys(groups).sort().forEach((gName, gIdx) => {
+                const teamIds = groups[gName];
+                html += `
+                <div class="bg-[#0f1113] border border-[#333] rounded flex flex-col">
+                    <div class="p-3 bg-[#1a1d21] border-b border-[#333] font-bold text-xs text-white uppercase tracking-widest">${gName}</div>
+                    <div class="p-2 flex-1 space-y-1">
+                        ${teamIds.map(tid => {
+                            const team = allTeams.find(t => t._id === tid);
+                            if(!team) return '';
+                            return `<div onclick="handleManageSwap('${tid}')" class="p-2 bg-[#1a1d21] border border-[#333] rounded flex justify-between items-center cursor-pointer hover:border-[#ff4655] transition group manage-team-item" data-id="${tid}">
+                                <span class="text-xs font-bold text-gray-300 group-hover:text-white">${team.name}</span>
+                                <i class="fa-solid fa-arrow-right-arrow-left text-[10px] text-gray-600 group-hover:text-[#ff4655]"></i>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <div class="p-2 border-t border-[#333]">
+                        <div class="flex gap-2">
+                            <select id="addTeamSel_${gIdx}" class="bg-[#1a1d21] text-white text-[10px] border border-[#333] rounded flex-1 outline-none"><option value="">Select Team to Add...</option>${allTeams.filter(t => t.status==='approved' && !s.stageParticipants.includes(t._id)).map(t => `<option value="${t._id}">${t.name}</option>`).join('')}</select>
+                            <button onclick="addTeamToStageSubmit(${gIdx})" class="bg-green-600/20 text-green-500 hover:bg-green-600 hover:text-white border border-green-600/50 px-3 rounded text-[10px] font-bold uppercase transition">ADD</button>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div><p class="mt-4 text-[10px] text-gray-500 italic">* Click two teams to swap them. Adding a team generates extra matches automatically.</p>';
+            
+            document.getElementById('manageTeamsContent').innerHTML = html;
+            openModal('manageTeamsModal');
+        }
+
+        async function handleManageSwap(tid) {
+            if (!manageTeamsState.swapSrc) {
+                manageTeamsState.swapSrc = tid;
+                document.querySelectorAll('.manage-team-item').forEach(el => el.classList.remove('border-[#ff4655]', 'bg-[#ff4655]/10'));
+                const el = document.querySelector(`.manage-team-item[data-id="${tid}"]`);
+                if(el) el.classList.add('border-[#ff4655]', 'bg-[#ff4655]/10');
+            } else {
+                if (manageTeamsState.swapSrc !== tid) {
+                    if(confirm("Swap these two teams in all matches?")) {
+                        await fetch(`${API_BASE}/api/tournaments/${manageTeamsState.tid}/stages/${manageTeamsState.sIdx}/teams/swap`, {
+                            method: 'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'},
+                            body: JSON.stringify({ team1Id: manageTeamsState.swapSrc, team2Id: tid })
+                        });
+                        init(true);
+                        openManageTeams(manageTeamsState.tid, manageTeamsState.sIdx); // Refresh modal
+                        showToast('Teams Swapped');
+                    }
+                }
+                manageTeamsState.swapSrc = null;
+                document.querySelectorAll('.manage-team-item').forEach(el => el.classList.remove('border-[#ff4655]', 'bg-[#ff4655]/10'));
+            }
+        }
+
+        async function addTeamToStageSubmit(gIdx) {
+            const teamId = document.getElementById(`addTeamSel_${gIdx}`).value;
+            if(!teamId) return;
+            if(!confirm("Add team and generate matches?")) return;
+            
+            await fetch(`${API_BASE}/api/tournaments/${manageTeamsState.tid}/stages/${manageTeamsState.sIdx}/teams/add`, {
+                method: 'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'},
+                body: JSON.stringify({ teamId, groupIndex: gIdx })
+            });
+            init(true);
+            openManageTeams(manageTeamsState.tid, manageTeamsState.sIdx);
+            showToast('Team Added');
         }
 
         // Drag & Drop Logic
@@ -2045,14 +2536,21 @@
             draggedItem = null; 
         }
 
-        function handleItemDragOver(e) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add('drag-over-item'); }
-        function handleItemDragLeave(e) { e.currentTarget.classList.remove('drag-over-item'); }
+        function handleItemDragOver(e) { 
+            e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; 
+            if (draggedItem && draggedItem.source === 'selected') e.currentTarget.classList.add('drag-over-swap');
+            else e.currentTarget.classList.add('drag-over-insert');
+        }
+        function handleItemDragLeave(e) { e.currentTarget.classList.remove('drag-over-insert', 'drag-over-swap'); }
         function handleItemDrop(e, targetIndex) {
-            e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('drag-over-item');
+            e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('drag-over-insert', 'drag-over-swap');
             if (!draggedItem) return;
             if (draggedItem.source === 'selected') {
-                const item = stageSelected.splice(draggedItem.index, 1)[0];
-                stageSelected.splice(targetIndex, 0, item);
+                // Swap Logic (Better for Groups/Seeding)
+                const srcIdx = draggedItem.index;
+                if (srcIdx !== targetIndex) {
+                    [stageSelected[srcIdx], stageSelected[targetIndex]] = [stageSelected[targetIndex], stageSelected[srcIdx]];
+                }
             } else {
                 const poolIndex = stagePool.findIndex(t => t._id === draggedItem.id);
                 if (poolIndex > -1) { const item = stagePool.splice(poolIndex, 1)[0]; stageSelected.splice(targetIndex, 0, item); }
@@ -2100,14 +2598,6 @@
             }
         }
 
-        async function openBroadcastModal() {
-            const msg = prompt("📢 ENTER GLOBAL ANNOUNCEMENT MESSAGE:\n(This will be shown to all connected users)");
-            if(msg && msg.trim()) {
-                await fetch(`${API_BASE}/api/admin/broadcast`, { method: 'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body: JSON.stringify({message: msg}) });
-                showToast('Announcement Sent');
-            }
-        }
-
         // Close context menu on click outside
         window.addEventListener('click', () => {
             const menu = document.getElementById('matchCtxMenu');
@@ -2131,6 +2621,40 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => { renderMapCheckboxes('create'); });
         init();
+
+        // --- BRACKET LINES UTILS ---
+        function drawBracketLines(matches, svgId) {
+            const svg = document.getElementById(svgId);
+            if(!svg) return;
+            svg.innerHTML = '';
+            const container = svg.parentElement;
+            svg.setAttribute('width', container.scrollWidth);
+            svg.setAttribute('height', container.scrollHeight);
+
+            matches.forEach(m => {
+                const sourceEl = document.getElementById(`bracket-match-${m._id}`);
+                if(!sourceEl) return;
+                if(m.nextMatchId) {
+                    const targetMatch = allMatches.find(x => x._id === m.nextMatchId);
+                    const targetEl = document.getElementById(`bracket-match-${m.nextMatchId}`);
+                    if(targetEl) drawPath(svg, sourceEl, targetEl, false);
+                }
+            });
+        }
+        function drawPath(svg, startEl, endEl, isLoser) {
+            const startRect = startEl.getBoundingClientRect();
+            const endRect = endEl.getBoundingClientRect();
+            const containerRect = svg.getBoundingClientRect();
+            const startX = startRect.right - containerRect.left;
+            const startY = startRect.top + (startRect.height / 2) - containerRect.top;
+            const endX = endRect.left - containerRect.left;
+            const endY = endRect.top + (endRect.height / 2) - containerRect.top;
+            const midX = (startX + endX) / 2;
+            const d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", d); path.setAttribute("fill", "none"); path.setAttribute("stroke", "#444"); path.setAttribute("stroke-width", "2"); path.classList.add("connector");
+            svg.appendChild(path);
+        }
     </script>
 </body>
 </html>

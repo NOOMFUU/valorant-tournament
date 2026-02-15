@@ -373,8 +373,15 @@ class VetoManager {
 
     async handleTimeout(matchId) {
         const match = await Match.findById(matchId);
-        if(!match || match.vetoData.status !== 'in_progress') return;
+        if(!match || (match.vetoData.status !== 'in_progress' && match.vetoData.status !== 'decision')) return;
         
+        if (match.vetoData.status === 'decision') {
+            const choice = Math.random() < 0.5 ? 'first' : 'second';
+            await this.logAction(match, `TIMEOUT: Auto-decision ${choice.toUpperCase()}`);
+            await this.handleDecision(matchId, match.vetoData.coinTossWinner.toString(), choice);
+            return;
+        }
+
         const v = match.vetoData;
         const step = v.sequence[v.sequenceIndex];
         

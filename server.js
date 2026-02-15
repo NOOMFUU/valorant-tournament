@@ -1415,6 +1415,24 @@ app.put('/api/tournaments/:id/stages/:stageIndex/settings', auth(['admin']), asy
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// [NEW] Add Team to Stage (Round Robin / Cross Group)
+app.post('/api/tournaments/:id/stages/:stageIndex/teams/add', auth(['admin']), async (req, res) => {
+    try {
+        const { teamId, groupIndex } = req.body;
+        await BracketManager.addTeamToStage(req.params.id, req.params.stageIndex, teamId, groupIndex);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Swap Teams in Stage
+app.post('/api/tournaments/:id/stages/:stageIndex/teams/swap', auth(['admin']), async (req, res) => {
+    try {
+        const { team1Id, team2Id } = req.body;
+        await BracketManager.swapTeamsInStage(req.params.id, req.params.stageIndex, team1Id, team2Id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 // [NEW] Get Stage Standings (Round Robin / Swiss)
 app.get('/api/tournaments/:id/stages/:stageIndex/standings', async (req, res) => {
     try {

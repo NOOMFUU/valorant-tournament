@@ -83,6 +83,12 @@
         .map-card.interactive:hover { border-color: var(--val-white); transform: translateY(-8px); box-shadow: 0 15px 40px rgba(0,0,0,0.6); z-index: 20; }
         .map-card.interactive:hover .map-card-bg { transform: scale(1.15); filter: brightness(1) saturate(1.1); }
         .map-card.interactive:hover .map-name { color: var(--val-red); bottom: 2.5rem; transform: scale(1.1); }
+        
+        /* Action-specific hover states */
+        .map-card[data-action="pick"]:hover { border-color: var(--val-green); box-shadow: 0 0 30px rgba(31, 164, 116, 0.4); }
+        .map-card[data-action="pick"]:hover .map-name { color: var(--val-green); }
+        .map-card[data-action="ban"]:hover { border-color: var(--val-red); box-shadow: 0 0 30px rgba(255, 70, 85, 0.4); }
+        .map-card[data-action="ban"]:hover .map-name { color: var(--val-red); }
 
         /* Banned State */
         .map-card.banned .map-card-bg { filter: grayscale(100%) brightness(0.2); }
@@ -160,17 +166,23 @@
         .end-map-card { position: relative; flex: 1; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); overflow: hidden; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.1); }
         .end-map-card:hover { flex: 1.5; border-color: var(--val-red); z-index: 10; }
 
-        .coin-container { width: 150px; height: 150px; perspective: 1000px; margin: 0 auto; }
-        .coin { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 3s; }
-        .coin-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 50%; border: 5px solid white; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: #0f1923; }
-        .face-heads { color: #1fa474; } .face-tails { color: #ff4655; transform: rotateY(180deg); }
+        .coin-container { width: 200px; height: 200px; perspective: 1000px; margin: 0 auto; }
+        .coin { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 3s cubic-bezier(0.1, 0, 0.2, 1); }
+        .coin-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 50%; border: 4px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; background: #1a1d21; overflow: hidden; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .coin-face img { width: 70%; height: 70%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+        .face-heads { transform: rotateY(0deg); } 
+        .face-tails { transform: rotateY(180deg); }
         .spin-to-heads { transform: rotateY(1800deg); }
+        .spin-to-tails { transform: rotateY(1980deg); }
 
         /* YOUR TURN INDICATOR */
         .your-turn-pulse {
             box-shadow: inset 0 0 50px rgba(255, 70, 85, 0.3);
             animation: pulse-border 2s infinite;
         }
+        
+        /* Dimmed Grid for Opponent Turn */
+        .grid-dimmed .map-card:not(.picked):not(.banned) { opacity: 0.3; filter: grayscale(0.8); transition: all 0.5s ease; }
         
         /* PAUSE OVERLAY */
         #pauseOverlay {
@@ -215,7 +227,7 @@
             <div class="p-4 bg-black/20">
                 <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1">Lobby ID / Password</div>
                 <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 cursor-pointer hover:border-white/30 transition group">
-                    <span id="roomPassContent" class="font-mono text-xl text-white font-bold flex-1 truncate tracking-wider">---</span>
+                    <span id="roomPassContent" class="font-mono text-lg text-white font-bold flex-1 truncate tracking-wider">---</span>
                     <i class="fa-regular fa-copy text-gray-500 group-hover:text-white transition"></i>
                 </div>
             </div>
@@ -255,7 +267,7 @@
         <main class="main-stage">
             <div class="w-full h-[6px] bg-[#1f2731] relative z-20">
                 <div id="timerBar" class="h-full bg-[#ff4655] shadow-[0_0_20px_#ff4655] w-0 transition-all duration-75 ease-linear"></div>
-                <div id="timerText" class="absolute top-4 right-6 text-6xl font-header text-white/5 font-bold pointer-events-none transition-colors duration-300 select-none"></div>
+                <div id="timerText" class="absolute top-6 right-8 text-8xl font-header text-white/5 font-bold pointer-events-none transition-colors duration-300 select-none z-0"></div>
             </div>
             
             <div class="flex justify-center mt-2 opacity-0 absolute top-6 left-0 right-0 z-50 pointer-events-none" id="topInfo">
@@ -404,6 +416,7 @@
         let timerInt;
         let pauseInt;
         let coinFlipDone = false; 
+        let isAnimatingCoin = false;
         let lastSeqIndex = -1;
         let lastStatus = '';
         let currentVetoState = null;
@@ -618,7 +631,13 @@
                 else chatInput.classList.remove('hidden');
             }
 
-            if(v.status === 'in_progress' && !isPaused) runTimer(v.currentTurnStartTime, v.turnTimeLimit);
+            if((v.status === 'in_progress' || v.status === 'decision') && !isPaused) {
+                let dur = v.turnTimeLimit;
+                if(v.status === 'decision' && v.currentTurnDeadline && v.currentTurnStartTime) {
+                    dur = (new Date(v.currentTurnDeadline) - new Date(v.currentTurnStartTime)) / 1000;
+                }
+                runTimer(v.currentTurnStartTime, dur);
+            }
             else { document.getElementById('timerBar').style.width = '0%'; clearInterval(timerInt); }
 
             const logHtml = v.history.slice().reverse().map(l => `<div class="border-b border-white/5 pb-1"><span class="text-[#ff4655] font-bold mr-2">>></span>${l.text}</div>`).join('');
@@ -708,6 +727,13 @@
                 document.getElementById('headerTB').style.opacity = activeA ? '0.2' : '1';
                 document.getElementById('phaseText').innerText = `// ${activeA?m.teamA.name:m.teamB.name} TURN //`;
                 
+                // Grid Dimming Logic
+                if (!areIdsEqual(step.team, teamId)) {
+                    document.getElementById('grid').classList.add('grid-dimmed');
+                } else {
+                    document.getElementById('grid').classList.remove('grid-dimmed');
+                }
+
                 // Visual Cue for My Turn
                 const isMyTurn = areIdsEqual(step.team, teamId);
                 document.getElementById('appBody').classList.toggle('your-turn-pulse', isMyTurn);
@@ -716,6 +742,7 @@
                 st.className = "bg-white text-black px-12 py-2 font-ui text-4xl font-bold clip-val z-20";
                 document.getElementById('headerTA').style.opacity = '1'; document.getElementById('headerTB').style.opacity = '1';
                 document.getElementById('appBody').classList.remove('your-turn-pulse');
+                document.getElementById('grid').classList.remove('grid-dimmed');
             }
         }
 
@@ -737,6 +764,7 @@
                 }
                 else if(myTurn && (step.act==='ban'||step.act==='pick')) {
                     el.classList.add('interactive');
+                    el.setAttribute('data-action', step.act);
                     const color = step.act==='ban' ? 'bg-[#ff4655]' : 'bg-[#1fa474]';
                     const icon = step.act==='ban' ? 'fa-ban' : 'fa-check';
                     html += `<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition duration-300 z-30 backdrop-blur-sm cursor-pointer" onclick="socket.emit('veto_action',{matchId,teamId,action:'${step.act}',map:'${map}'})"><div class="w-16 h-16 ${color} rounded-full flex items-center justify-center mb-2 shadow-[0_0_20px_currentColor] scale-90 group-hover:scale-100 transition"><i class="fa-solid ${icon} text-3xl text-white"></i></div><span class="font-ui text-3xl text-white tracking-widest drop-shadow-md">${step.act.toUpperCase()}</span></div>`;
@@ -953,6 +981,12 @@
                     }
                 }
 
+                const mTimer = document.getElementById('modalTimer');
+                if(mTimer) {
+                    mTimer.innerText = sec > 0 ? sec : '0';
+                    if(sec <= 10) mTimer.classList.add('text-[#ff4655]', 'animate-pulse');
+                }
+
                 if (p <= 0) clearInterval(timerInt); 
             }, 50); 
         }
@@ -965,16 +999,32 @@
                 m.classList.remove('hidden'); m.classList.add('flex'); 
                 if(v.status==='decision' && !coinFlipDone) { 
                     coinFlipDone=true; 
-                    c.innerHTML=`<div class="coin-container"><div id="coin" class="coin"><div class="coin-face face-heads"><i class="fa-solid fa-crown"></i></div><div class="coin-face face-tails"><i class="fa-solid fa-minus"></i></div></div></div><div class="text-white font-header text-4xl mt-8 tracking-widest">COIN FLIP</div>`; 
-                    setTimeout(()=>{document.getElementById('coin').className="coin spin-to-heads"; setTimeout(()=>renderCoinResult(v,myId),3000)},100); 
-                } else if(v.status==='decision') {
-                    renderCoinResult(v,myId); 
+                    isAnimatingCoin=true;
+                    const tA = currentMatchData.teamA;
+                    const tB = currentMatchData.teamB;
+                    const winnerId = v.coinTossWinner._id || v.coinTossWinner;
+                    const isHeads = areIdsEqual(winnerId, tA._id);
+                    
+                    c.innerHTML=`
+                        <div class="coin-container">
+                            <div id="coin" class="coin">
+                                <div class="coin-face face-heads"><img src="${tA.logo || DEFAULT_LOGO}"></div>
+                                <div class="coin-face face-tails"><img src="${tB.logo || DEFAULT_LOGO}"></div>
+                            </div>
+                        </div>
+                        <div class="text-white font-header text-5xl mt-12 tracking-widest drop-shadow-2xl">COIN TOSS</div>
+                        <div class="text-gray-400 font-mono text-sm tracking-widest mt-2">DETERMINING PRIORITY...</div>
+                    `; 
+                    setTimeout(()=>{ document.getElementById('coin').className = isHeads ? "coin spin-to-heads" : "coin spin-to-tails"; setTimeout(()=>{ isAnimatingCoin=false; renderCoinResult(v,myId); }, 3500); }, 100); 
+                } else if(v.status==='decision' && !isAnimatingCoin) {
+                    renderCoinResult(v,myId);
                 } else if(v.sequence[v.sequenceIndex].act === 'side' && !isSpectator) { 
                     const map = v.pickedMaps.find(p=>!p.selectedSide).map; 
                     c.innerHTML=`<div class="text-[#1fa474] font-mono tracking-widest text-sm mb-2">MAP SELECTED</div><h2 class="text-8xl font-header text-white mb-12 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">${map}</h2><div class="flex gap-12 justify-center"><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'atk'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#ff4655] hover:shadow-[0_0_30px_rgba(255,70,85,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#ff4655] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-crosshairs text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">ATTACK</span></button><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'def'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#1fa474] hover:shadow-[0_0_30px_rgba(31,164,116,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#1fa474] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-shield-halved text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">DEFENSE</span></button></div>`; 
                 } 
             } else { 
                 m.classList.add('hidden'); m.classList.remove('flex'); 
+                coinFlipDone = false; isAnimatingCoin = false;
             } 
         }
         function renderCoinResult(v, myId) { 
@@ -983,7 +1033,7 @@
             const isSpectator = currentMatchData && !areIdsEqual(myId, currentMatchData.teamA._id) && !areIdsEqual(myId, currentMatchData.teamB._id);
 
             if(win) { 
-                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-8 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-8">You won the coin toss. Choose your advantage.</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-2xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-2xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; 
+                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-4 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-4">You won the coin toss. Choose your advantage.</div><div id="modalTimer" class="text-6xl font-header text-white mb-8">--</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-2xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-2xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; 
             } else if (isSpectator) {
                 const winnerName = v.coinTossWinner.name || 'TEAM';
                 c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">COIN TOSS</div><div class="text-white font-mono tracking-widest mb-2">WINNER: <span class="text-[#1fa474] font-bold">${winnerName}</span></div><div class="text-gray-500 font-mono animate-pulse tracking-widest text-xs">WAITING FOR DECISION...</div>`;

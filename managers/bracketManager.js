@@ -114,7 +114,8 @@ class BracketManager {
                 const groupTeams = teams.slice(g * 4, g * 4 + 4);
                 while(groupTeams.length < 4) groupTeams.push(null);
 
-                const prefix = `${stageName} `;
+                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : `Group ${letters[g] || (g + 1)}`;
+                const prefix = `${stageName} ${groupName}`;
 
                 // Opening Matches (Seed 1 vs 4, Seed 2 vs 3)
                 const m1 = await createMatch(`${prefix}: Opening A`, groupTeams[0], groupTeams[3], 1, (g*10)+1);
@@ -267,7 +268,7 @@ class BracketManager {
 
             for (let g = 0; g < groups.length; g++) {
                 const groupTeams = groups[g];
-                const groupName = groupCount > 1 ? `Group ${groupLetters[g]}` : '';
+                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : (groupCount > 1 ? `Group ${groupLetters[g]}` : '');
                 
                 let teamPool = [...groupTeams];
                 if (teamPool.length % 2 !== 0) teamPool.push(null);
@@ -306,6 +307,29 @@ class BracketManager {
             }
             if (teams.length % 2 !== 0) {
                  await createMatch(`${stageName}: R1-Bye`, teams[teams.length-1], null, 1, matchCount);
+            }
+        }
+
+        // ==========================================
+        // TYPE: CROSS GROUP (Inter-Group Round Robin)
+        // ==========================================
+        else if (type === 'cross_group') {
+            const half = Math.ceil(teams.length / 2);
+            const groupA = teams.slice(0, half);
+            const groupB = teams.slice(half);
+            
+            const maxCount = Math.max(groupA.length, groupB.length);
+            const paddedA = [...groupA]; while(paddedA.length < maxCount) paddedA.push(null);
+            const paddedB = [...groupB]; while(paddedB.length < maxCount) paddedB.push(null);
+
+            for (let r = 0; r < maxCount; r++) {
+                for (let i = 0; i < maxCount; i++) {
+                    const tA = paddedA[i];
+                    const tB = paddedB[(i + r) % maxCount];
+                    if (tA && tB) {
+                        await createMatch(`${stageName}: Round ${r+1}`, tA, tB, r+1, i);
+                    }
+                }
             }
         }
 
@@ -406,111 +430,212 @@ class BracketManager {
         // TYPE: SINGLE / DOUBLE ELIMINATION (DEFAULT)
         // ==========================================
         else {
-            let paddedTeams = this.padTeams(teams);
-            const totalTeams = paddedTeams.length;
-            if (totalTeams < 2) return [];
+            const groupCount = settings.groupCount || 1;
+            const groups = [];
 
-            // Apply Seeding
-            const seedingOrder = this.getSeedingOrder(totalTeams);
-            const orderedTeams = seedingOrder.map(i => paddedTeams[i]);
-
-            const totalRounds = Math.log2(totalTeams);
-            const ubMatches = []; 
-            
-            // Generate Upper Bracket
-            for (let r = 1; r <= totalRounds; r++) {
-                ubMatches[r] = [];
-                const matchCount = totalTeams / Math.pow(2, r);
-                for (let i = 0; i < matchCount; i++) {
-                    const isFinal = (r === totalRounds);
-                    const matchName = isFinal ? `${stageName} Final` : `UB R${r}-M${i + 1}`;
-                    const format = isFinal ? (settings.finalFormat || 'BO3') : settings.defaultFormat;
-                    const match = await createMatch(matchName, (r===1?orderedTeams[i*2]:null), (r===1?orderedTeams[i*2+1]:null), r, i, format, 'upper');
-                    ubMatches[r].push(match);
-                }
+            if (groupCount > 1) {
+                let teamsToDist = [...teams];
+                for(let i=0; i<groupCount; i++) groups[i] = [];
+                teamsToDist.forEach((t, i) => groups[i % groupCount].push(t));
+            } else {
+                groups.push(teams);
             }
+            const groupLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-            // Link Upper Bracket
-            for (let r = 1; r < totalRounds; r++) {
-                for (let i = 0; i < ubMatches[r].length; i++) {
-                    await this.linkMatch(ubMatches[r][i], ubMatches[r + 1][Math.floor(i / 2)], (i % 2 === 0) ? 'teamA' : 'teamB');
+            for (let g = 0; g < groups.length; g++) {
+                const groupTeams = groups[g];
+                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : `Group ${groupLetters[g]}`;
+                const groupPrefix = groupCount > 1 ? `${stageName} ${groupName}` : stageName;
+                
+                let paddedTeams = this.padTeams(groupTeams);
+                const totalTeams = paddedTeams.length;
+                if (totalTeams < 2) continue;
+
+                const seedingOrder = this.getSeedingOrder(totalTeams);
+                // Initial Nodes: Array of { type: 'team', data: team } or null (ghost)
+                let currentNodes = seedingOrder.map(i => paddedTeams[i] ? { type: 'team', data: paddedTeams[i] } : null);
+
+                const totalRounds = Math.log2(totalTeams);
+                const ubDrops = {}; // Map round -> array of drops (match or null)
+                
+                // Determine rounds to play based on qualifiedCount
+                let roundsToPlay = totalRounds;
+                if (type === 'single_elim' && settings.qualifiedCount > 1) {
+                    const reduction = Math.floor(Math.log2(settings.qualifiedCount));
+                    roundsToPlay = Math.max(1, totalRounds - reduction);
                 }
-            }
 
-            // [FEATURE] 3RD PLACE MATCH (For Single Elim)
-            if (type === 'single_elim' && settings.hasThirdPlace && totalRounds >= 2) {
-                const semiMatches = ubMatches[totalRounds - 1];
-                if (semiMatches && semiMatches.length === 2) {
-                    const thirdPlaceMatch = await createMatch(`${stageName} 3rd Place`, null, null, totalRounds, 1, settings.defaultFormat, 'upper');
+                // --- UPPER BRACKET GENERATION ---
+                for (let r = 1; r <= roundsToPlay; r++) {
+                    const nextNodes = [];
+                    const roundDrops = []; 
+                    const matchCount = currentNodes.length / 2;
+
+                    for (let i = 0; i < matchCount; i++) {
+                        const top = currentNodes[i * 2];
+                        const bottom = currentNodes[i * 2 + 1];
+
+                        // Logic: Avoid creating matches for Byes
+                        if (!top && !bottom) {
+                            nextNodes.push(null);
+                            roundDrops.push(null);
+                        } else if (top && !bottom) {
+                            nextNodes.push(top); // Advance top (Bye)
+                            roundDrops.push(null); // No loser
+                        } else if (!top && bottom) {
+                            nextNodes.push(bottom); // Advance bottom (Bye)
+                            roundDrops.push(null); // No loser
+                        } else {
+                            // Create Real Match
+                            const isFinal = (r === totalRounds && settings.qualifiedCount === 1);
+                            const matchName = isFinal ? `${groupPrefix} Final` : `${groupPrefix} UB Round ${r} Match ${i + 1}`;
+                            const format = isFinal ? (settings.finalFormat || 'BO3') : settings.defaultFormat;
+                            
+                            const match = await createMatch(matchName, null, null, r, i, format, 'upper');
+                            
+                            // [FIX] Reset status for Round 1 because createMatch defaults to 'finished' for null vs null
+                            if (r === 1) {
+                                match.status = 'scheduled';
+                                match.note = '';
+                            }
+                            
+                            // [FIX] Reset status for Round 1 because createMatch defaults to 'finished' for null vs null
+                            if (r === 1) {
+                                match.status = 'scheduled';
+                                match.note = '';
+                            }
+                            
+                            // Link Sources
+                            if (top.type === 'team') { match.teamA = top.data._id; match.teamARoster = top.data.members; }
+                            else if (top.type === 'match') { await this.linkMatch(top.data, match, 'teamA'); }
+                            
+                            if (bottom.type === 'team') { match.teamB = bottom.data._id; match.teamBRoster = bottom.data.members; }
+                            else if (bottom.type === 'match') { await this.linkMatch(bottom.data, match, 'teamB'); }
+
+                            await match.save();
+                            nextNodes.push({ type: 'match', data: match });
+                            roundDrops.push({ type: 'match', data: match });
+                        }
+                    }
+                    currentNodes = nextNodes;
+                    ubDrops[r] = roundDrops;
+                }
+
+                // [FEATURE] 3RD PLACE MATCH (Single Elim only)
+                if (type === 'single_elim' && settings.hasThirdPlace && settings.qualifiedCount === 1 && totalRounds >= 2) {
+                    // Logic requires tracking losers of Semis. 
+                    // Since we don't have a simple array of matches, we'd need to look at ubDrops[totalRounds-1] if it exists.
+                    // For simplicity in this optimized version, 3rd place is best handled if we have the semi-final matches.
+                    const semiDrops = ubDrops[totalRounds - 1];
+                    if (semiDrops && semiDrops.length === 2 && semiDrops[0] && semiDrops[1]) {
+                        const thirdPlaceMatch = await createMatch(`${groupPrefix} 3rd Place`, null, null, totalRounds, 1, settings.defaultFormat, 'upper');
+                        semiDrops[0].data.loserMatchId = thirdPlaceMatch._id; semiDrops[0].data.loserMatchSlot = 'teamA'; await semiDrops[0].data.save();
+                        semiDrops[1].data.loserMatchId = thirdPlaceMatch._id; semiDrops[1].data.loserMatchSlot = 'teamB'; await semiDrops[1].data.save();
+                    }
+                }
+
+                // --- DOUBLE ELIMINATION GENERATION ---
+                if (type === 'double_elim') {
+                    let lbNodes = []; 
                     
-                    // Link Losers of Semi-Finals to 3rd Place
-                    semiMatches[0].loserMatchId = thirdPlaceMatch._id; semiMatches[0].loserMatchSlot = 'teamA'; await semiMatches[0].save();
-                    semiMatches[1].loserMatchId = thirdPlaceMatch._id; semiMatches[1].loserMatchSlot = 'teamB'; await semiMatches[1].save();
-                }
-            }
+                    // LB Round 1: Pair UB R1 Drops
+                    const lbR1Drops = ubDrops[1] || [];
+                    for (let i = 0; i < lbR1Drops.length / 2; i++) {
+                        const d1 = lbR1Drops[i * 2];
+                        const d2 = lbR1Drops[i * 2 + 1];
 
-            // [FEATURE] DOUBLE ELIMINATION LOGIC
-            if (type === 'double_elim') {
-                // --- STANDARD DOUBLE ELIMINATION ---
-                    const lbMatches = []; 
-                    const lbTotalRounds = (totalRounds - 1) * 2;
-                    
-                    // Generate Lower Bracket
-                    for (let r = 1; r <= lbTotalRounds; r++) {
-                        lbMatches[r] = [];
-                        const powerVal = Math.ceil(r / 2); 
-                        const matchCount = totalTeams / Math.pow(2, powerVal + 1);
-                        for (let i = 0; i < matchCount; i++) {
-                            const match = await createMatch(`LB R${r}-M${i + 1}`, null, null, 100 + r, i, settings.defaultFormat, 'lower');
-                            lbMatches[r].push(match);
+                        if (d1 && d2) {
+                            const match = await createMatch(`${groupPrefix} LB Round 1 Match ${i + 1}`, null, null, 101, i, settings.defaultFormat, 'lower');
+                            d1.data.loserMatchId = match._id; d1.data.loserMatchSlot = 'teamA'; await d1.data.save();
+                            d2.data.loserMatchId = match._id; d2.data.loserMatchSlot = 'teamB'; await d2.data.save();
+                            lbNodes.push({ type: 'match', data: match });
+                        } else if (d1) {
+                            lbNodes.push({ type: 'loser_ref', data: d1.data }); // Bye
+                        } else if (d2) {
+                            lbNodes.push({ type: 'loser_ref', data: d2.data }); // Bye
+                        } else {
+                            lbNodes.push(null);
                         }
                     }
 
-                    // Link Lower Bracket Internal
-                    for (let r = 1; r < lbTotalRounds; r++) {
-                        for (let i = 0; i < lbMatches[r].length; i++) {
-                            const next = (r % 2 !== 0) ? lbMatches[r + 1][i] : lbMatches[r + 1][Math.floor(i / 2)];
-                            const slot = (r % 2 !== 0) ? 'teamA' : ((i % 2 === 0) ? 'teamA' : 'teamB');
-                            if(next) await this.linkMatch(lbMatches[r][i], next, slot);
-                        }
-                    }
+                    let lbRoundNum = 2;
+                    for (let r = 2; r <= totalRounds; r++) {
+                        // Step 1: Match LB Nodes vs UB Drops (Cross Seeding)
+                        const ubRoundDrops = ubDrops[r] || [];
+                        const ubDropsReversed = [...ubRoundDrops].reverse();
+                        const nextLbNodes = [];
 
-                    // Link Drops from Upper to Lower
-                    for (let r = 1; r < totalRounds; r++) {
-                        const ubRoundMatches = ubMatches[r];
-                        const targetLbRound = r === 1 ? 1 : (r - 1) * 2;
-                        const lbRoundMatches = lbMatches[targetLbRound];
+                        for (let i = 0; i < lbNodes.length; i++) {
+                            const lbNode = lbNodes[i];
+                            const ubDrop = ubDropsReversed[i];
 
-                        if (lbRoundMatches) {
-                            for (let i = 0; i < ubRoundMatches.length; i++) {
-                                let lbMatch, lbSlot;
-                                if (r === 1) {
-                                    lbMatch = lbRoundMatches[Math.floor(i / 2)];
-                                    lbSlot = (i % 2 === 0) ? 'teamA' : 'teamB';
-                                } else {
-                                    const reversedIndex = ubRoundMatches.length - 1 - i;
-                                    lbMatch = lbRoundMatches[reversedIndex]; 
-                                    lbSlot = 'teamB'; 
-                                }
-                                if (lbMatch) {
-                                    ubRoundMatches[i].loserMatchId = lbMatch._id;
-                                    ubRoundMatches[i].loserMatchSlot = lbSlot;
-                                    await ubRoundMatches[i].save();
-                                }
+                            if (lbNode && ubDrop) {
+                                const match = await createMatch(`${groupPrefix} LB Round ${lbRoundNum} Match ${i + 1}`, null, null, 100 + lbRoundNum, i, settings.defaultFormat, 'lower');
+                                
+                                if (lbNode.type === 'match') await this.linkMatch(lbNode.data, match, 'teamA');
+                                else { lbNode.data.loserMatchId = match._id; lbNode.data.loserMatchSlot = 'teamA'; await lbNode.data.save(); }
+
+                                ubDrop.data.loserMatchId = match._id; ubDrop.data.loserMatchSlot = 'teamB'; await ubDrop.data.save();
+                                nextLbNodes.push({ type: 'match', data: match });
+                            } else if (lbNode) {
+                                nextLbNodes.push(lbNode); // UB Drop was Bye -> Advance
+                            } else if (ubDrop) {
+                                nextLbNodes.push({ type: 'loser_ref', data: ubDrop.data }); // LB Node was empty -> Drop fills slot
+                            } else {
+                                nextLbNodes.push(null);
                             }
                         }
+                        lbNodes = nextLbNodes;
+                        lbRoundNum++;
+
+                        // Step 2: Consolidate LB (Pairing) - Skip if this was the last UB round (LB Final handled by GF link)
+                        if (r < totalRounds) {
+                            const consolidatedNodes = [];
+                            for (let i = 0; i < lbNodes.length / 2; i++) {
+                                const top = lbNodes[i * 2];
+                                const bottom = lbNodes[i * 2 + 1];
+                                
+                                if (top && bottom) {
+                                    const match = await createMatch(`${groupPrefix} LB Round ${lbRoundNum} Match ${i + 1}`, null, null, 100 + lbRoundNum, i, settings.defaultFormat, 'lower');
+                                    
+                                    if (top.type === 'match') await this.linkMatch(top.data, match, 'teamA');
+                                    else { top.data.loserMatchId = match._id; top.data.loserMatchSlot = 'teamA'; await top.data.save(); }
+
+                                    if (bottom.type === 'match') await this.linkMatch(bottom.data, match, 'teamB');
+                                    else { bottom.data.loserMatchId = match._id; bottom.data.loserMatchSlot = 'teamB'; await bottom.data.save(); }
+
+                                    consolidatedNodes.push({ type: 'match', data: match });
+                                } else if (top) {
+                                    consolidatedNodes.push(top);
+                                } else if (bottom) {
+                                    consolidatedNodes.push(bottom);
+                                } else {
+                                    consolidatedNodes.push(null);
+                                }
+                            }
+                            lbNodes = consolidatedNodes;
+                            lbRoundNum++;
+                        }
                     }
 
-                    // Grand Final (Winner UB vs Winner LB)
-                    const ubFinal = ubMatches[totalRounds][0];
-                    const lbFinal = lbMatches[lbTotalRounds][0];
-                    const grandFinal = await createMatch(`${stageName} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
-                    
-                    await this.linkMatch(ubFinal, grandFinal, 'teamA');
-                    await this.linkMatch(lbFinal, grandFinal, 'teamB');
-                    
-                    // (Optional) Link UB Final Loser to LB Final
-                    ubFinal.loserMatchId = lbFinal._id; ubFinal.loserMatchSlot = 'teamB'; await ubFinal.save();
+                    // Grand Final
+                    if (settings.qualifiedCount === 1) {
+                        const ubFinalNode = currentNodes[0];
+                        const lbFinalNode = lbNodes[0];
+                        
+                        if (ubFinalNode && lbFinalNode) {
+                            const grandFinal = await createMatch(`${groupPrefix} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
+                            
+                            if (ubFinalNode.type === 'match') await this.linkMatch(ubFinalNode.data, grandFinal, 'teamA');
+                            else if (ubFinalNode.type === 'team') { grandFinal.teamA = ubFinalNode.data._id; grandFinal.teamARoster = ubFinalNode.data.members; }
+
+                            if (lbFinalNode.type === 'match') await this.linkMatch(lbFinalNode.data, grandFinal, 'teamB');
+                            else if (lbFinalNode.type === 'loser_ref') { lbFinalNode.data.loserMatchId = grandFinal._id; lbFinalNode.data.loserMatchSlot = 'teamB'; await lbFinalNode.data.save(); }
+                            
+                            await grandFinal.save();
+                        }
+                    }
+                }
             }
         }
 
@@ -537,9 +662,14 @@ class BracketManager {
             await this.updateMatchSlot(match.nextMatchId, match.nextMatchSlot, winner);
             if(this.io) this.io.emit('notification', { msg: `Bracket: ${winner.shortName} advanced to next round!` });
         }
-        if (match.loserMatchId && loser) {
-            await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loser);
-            if(this.io) this.io.emit('notification', { msg: `Bracket: ${loser.shortName} dropped to lower bracket.` });
+        if (match.loserMatchId) {
+            if (loser) {
+                await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loser);
+                if(this.io) this.io.emit('notification', { msg: `Bracket: ${loser.shortName} dropped to lower bracket.` });
+            } else {
+                // [FIX] Handle BYE drop (no loser) - Propagate BYE to lower bracket
+                await this.handleByeDrop(match.loserMatchId, match.loserMatchSlot);
+            }
         }
     }
 
@@ -548,7 +678,75 @@ class BracketManager {
         const update = {};
         update[slot] = team._id;
         update[`${slot}Roster`] = team.members;
-        await Match.findByIdAndUpdate(matchId, update, { new: true });
+        
+        // Update and return new doc
+        const match = await Match.findByIdAndUpdate(matchId, update, { new: true });
+        
+        // [FIX] Check for BYE_DROP condition to auto-advance
+        const otherSlot = slot === 'teamA' ? 'teamB' : 'teamA';
+        const byeFlag = otherSlot === 'teamA' ? 'BYE_DROP_A' : 'BYE_DROP_B';
+        
+        if (match && match.note && match.note.includes(byeFlag) && !match.winner) {
+             match.winner = team._id;
+             match.status = 'finished';
+             match.note += " (Auto-Advance)";
+             await match.save();
+             await this.propagateMatchResult(match, team, null);
+             
+             await Team.findByIdAndUpdate(team._id, { $inc: { wins: 1 } });
+             if (this.io) {
+                 this.io.emit('match_update', match);
+                 this.io.emit('bracket_update');
+             }
+        }
+    }
+
+    // [FIX] New method to handle BYE drops in Lower Bracket
+    async handleByeDrop(matchId, slot) {
+        const match = await Match.findById(matchId);
+        if (!match) return;
+
+        const flag = slot === 'teamA' ? 'BYE_DROP_A' : 'BYE_DROP_B';
+        if (!match.note) match.note = flag;
+        else if (!match.note.includes(flag)) match.note += ` ${flag}`;
+
+        // [FIX] Check for Double Bye (Both slots are BYE drops)
+        // ถ้าทั้ง 2 ฝั่งเป็น BYE DROP ให้จบแมตช์นี้แล้วส่ง BYE ต่อไปรอบหน้าเลย
+        const otherByeFlag = slot === 'teamA' ? 'BYE_DROP_B' : 'BYE_DROP_A';
+        if (match.note.includes(otherByeFlag)) {
+            match.status = 'finished';
+            match.note += " (Double Bye)";
+            await match.save();
+            
+            // Propagate Bye to next match (if any)
+            if (match.nextMatchId) {
+                await this.handleByeDrop(match.nextMatchId, match.nextMatchSlot);
+            }
+            return;
+        }
+
+        // Check if we can resolve the match now (if other team is already present)
+        const otherSlot = slot === 'teamA' ? 'teamB' : 'teamA';
+        const otherTeamId = match[otherSlot];
+
+        if (otherTeamId) {
+            const wTeam = await Team.findById(otherTeamId);
+            if (wTeam) {
+                match.winner = wTeam._id;
+                match.status = 'finished';
+                match.note += " (Auto-Advance)";
+                await match.save();
+                await this.propagateMatchResult(match, wTeam, null);
+                
+                await Team.findByIdAndUpdate(wTeam._id, { $inc: { wins: 1 } });
+                if (this.io) {
+                    this.io.emit('match_update', match);
+                    this.io.emit('bracket_update');
+                }
+            }
+        } else {
+            await match.save();
+        }
     }
 
     // --- STANDINGS CALCULATION ---
@@ -615,6 +813,113 @@ class BracketManager {
             }
             return 0;
         });
+    }
+
+    // --- DYNAMIC STAGE MANAGEMENT ---
+
+    async addTeamToStage(tournamentId, stageIndex, teamId, groupIndex = 0) {
+        const tournament = await Tournament.findById(tournamentId);
+        const stage = tournament.stages[stageIndex];
+        const team = await Team.findById(teamId);
+        if (!stage || !team) throw new Error("Stage or Team not found");
+
+        // 1. Update Participants List
+        if (stage.type === 'cross_group') {
+            // Insert based on Alpha/Omega split
+            const currentLen = stage.stageParticipants.length;
+            const mid = Math.ceil(currentLen / 2);
+            if (groupIndex === 0) { // Alpha: Insert at mid (end of Alpha)
+                stage.stageParticipants.splice(mid, 0, team._id);
+            } else { // Omega: Push to end
+                stage.stageParticipants.push(team._id);
+            }
+        } else {
+            stage.stageParticipants.push(team._id);
+        }
+
+        // 2. Generate Extra Matches
+        const newMatches = [];
+        let nextNum = await this.getNextMatchNumber(tournamentId);
+
+        if (stage.type === 'round_robin') {
+            // Identify existing teams in the target group
+            const groupTeams = new Set();
+            const stageMatches = await Match.find({ _id: { $in: stage.matches } });
+            
+            const groupLetter = String.fromCharCode(65 + groupIndex);
+            const groupName = (stage.settings.groupNames && stage.settings.groupNames[groupIndex]) 
+                ? stage.settings.groupNames[groupIndex] 
+                : (stage.settings.groupCount > 1 ? `Group ${groupLetter}` : '');
+
+            stageMatches.forEach(m => {
+                let belongs = !groupName || m.name.includes(groupName); // Simple heuristic
+                if (belongs) {
+                    if (m.teamA) groupTeams.add(m.teamA.toString());
+                    if (m.teamB) groupTeams.add(m.teamB.toString());
+                }
+            });
+
+            for (const opponentId of groupTeams) {
+                if (opponentId === teamId.toString()) continue;
+                const m = await this.createMatchForManager(tournamentId, `${stage.name} ${groupName}: Extra`, nextNum++, team, await Team.findById(opponentId), stage.settings.defaultFormat, 99);
+                newMatches.push(m._id);
+            }
+        } else if (stage.type === 'cross_group') {
+            const participants = stage.stageParticipants;
+            const mid = Math.ceil(participants.length / 2);
+            const alpha = participants.slice(0, mid);
+            const omega = participants.slice(mid);
+            const opponents = (groupIndex === 0) ? omega : alpha;
+
+            for (const oppId of opponents) {
+                if (!oppId) continue;
+                const m = await this.createMatchForManager(tournamentId, `${stage.name}: Extra`, nextNum++, team, await Team.findById(oppId), stage.settings.defaultFormat, 99);
+                newMatches.push(m._id);
+            }
+        }
+
+        stage.matches.push(...newMatches);
+        await tournament.save();
+    }
+
+    async swapTeamsInStage(tournamentId, stageIndex, team1Id, team2Id) {
+        const tournament = await Tournament.findById(tournamentId);
+        const stage = tournament.stages[stageIndex];
+        if (!stage) throw new Error("Stage not found");
+
+        // 1. Swap in Participants Array
+        const idx1 = stage.stageParticipants.findIndex(id => id.toString() === team1Id);
+        const idx2 = stage.stageParticipants.findIndex(id => id.toString() === team2Id);
+        if (idx1 !== -1 && idx2 !== -1) {
+            stage.stageParticipants.set(idx1, team2Id);
+            stage.stageParticipants.set(idx2, team1Id);
+            await tournament.save();
+        }
+
+        // 2. Swap in Matches
+        const matches = await Match.find({ _id: { $in: stage.matches } });
+        const t1 = await Team.findById(team1Id);
+        const t2 = await Team.findById(team2Id);
+
+        for (const m of matches) {
+            let changed = false;
+            if (m.teamA && m.teamA.toString() === team1Id) { m.teamA = team2Id; m.teamARoster = t2.members; changed = true; }
+            else if (m.teamA && m.teamA.toString() === team2Id) { m.teamA = team1Id; m.teamARoster = t1.members; changed = true; }
+            if (m.teamB && m.teamB.toString() === team1Id) { m.teamB = team2Id; m.teamBRoster = t2.members; changed = true; }
+            else if (m.teamB && m.teamB.toString() === team2Id) { m.teamB = team1Id; m.teamBRoster = t1.members; changed = true; }
+            if (changed) { await m.save(); if (this.io) this.io.emit('match_update', m); }
+        }
+    }
+
+    async createMatchForManager(tId, name, num, tA, tB, fmt, round) {
+        const m = new Match({
+            tournament: tId, name, matchNumber: num,
+            teamA: tA._id, teamB: tB._id, format: fmt || 'BO1',
+            status: 'scheduled', round,
+            teamARoster: tA.members, teamBRoster: tB.members
+        });
+        await m.save();
+        return m;
     }
 }
 

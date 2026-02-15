@@ -2,170 +2,179 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Tournament Protocol | VCT System</title>
+    <title>VALORANT PROTOCOL // ACCESS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        :root {
+            --val-red: #ff4655;
+            --val-dark: #0f1923;
+            --val-white: #ece8e1;
+        }
+        body { font-family: 'Rajdhani', sans-serif; background-color: var(--val-dark); color: var(--val-white); }
+        .font-header { font-family: 'Tungsten', sans-serif; text-transform: uppercase; }
         
-        /* Glassmorphism for Form Container */
-        .min-input {
-            background: #f8fafc;
-            border: 1.5px solid #f1f5f9;
-            border-radius: 12px;
+        .val-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
             padding: 12px 16px;
-            font-size: 0.95rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1rem;
+            transition: all 0.3s;
             outline: none;
             width: 100%;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
         }
-        .min-input:focus {
-            background: #fff;
-            border-color: #0f172a;
-            box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.05);
+        .val-input:focus {
+            border-color: var(--val-red);
+            background: rgba(0,0,0,0.3);
         }
 
-        .min-btn {
-            background: #0f172a;
+        .val-btn {
+            background: var(--val-red);
             color: white;
-            border-radius: 12px;
-            font-weight: 600;
-            padding: 14px;
-            transition: all 0.3s ease;
+            font-family: 'Tungsten', sans-serif;
+            letter-spacing: 2px;
+            font-size: 1.5rem;
+            padding: 12px;
+            transition: all 0.2s;
             position: relative;
-            overflow: hidden;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
         }
-        .min-btn:hover { background: #1e293b; transform: translateY(-2px); box-shadow: 0 10px 20px -10px rgba(0,0,0,0.2); }
-        .min-btn:active { transform: translateY(0); }
+        .val-btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+        .val-btn:active { transform: translateY(0); }
         
-        /* Hero Image Container */
         .hero-bg {
-            background-image: url('https://wallpapercat.com/w/full/4/d/7/1868806-3840x2160-desktop-4k-valorant-wallpaper-image.jpg'); /* เปลี่ยน URL รูปภาพตรงนี้ */
+            background-image: url('https://images.contentstack.io/v3/assets/bltb6530b271fddd0b1/blt5f81a6580216090f/61d8a2403334265558045932/VALORANT_VCT22_Stage1_Challengers_ArticleHero_16x9.jpg');
             background-size: cover;
             background-position: center;
         }
 
-        .custom-scroll::-webkit-scrollbar { width: 5px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1a1d21; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #333; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
+
+        .tab-active { border-bottom: 2px solid var(--val-red); color: white; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+        .tab-inactive:hover { color: #9ca3af; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
-        #tabIndicator { transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
     </style>
 </head>
-<body class="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
+<body class="flex h-screen overflow-hidden">
 
-    <div class="hidden lg:block w-[58%] hero-bg relative">
-        <div class="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
-        <div class="absolute bottom-8 left-8 flex items-center gap-3">
-            <div class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center border border-white/20">
-                <i class="fa-solid fa-bolt-lightning text-white text-xl"></i>
-            </div>
-            <span class="text-white font-bold tracking-widest text-xs uppercase opacity-80">Protocol v2.5</span>
+    <div class="hidden lg:block w-[60%] hero-bg relative">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#0f1923]/80 to-[#0f1923]"></div>
+        <div class="absolute bottom-10 left-10">
+            <h1 class="text-8xl font-header text-white leading-none mb-2">VALORANT</h1>
+            <h2 class="text-4xl font-header text-[#ff4655] tracking-widest">TOURNAMENT PROTOCOL</h2>
         </div>
     </div>
 
-    <div class="w-full lg:w-[42%] flex flex-col items-center justify-center p-8 bg-white relative shadow-2xl z-10">
+    <div class="w-full lg:w-[40%] flex flex-col items-center justify-center p-8 bg-[#0f1923] relative border-l border-white/5">
         <div class="w-full max-w-[400px] animate-slide-up">
             
             <div class="mb-10 text-center lg:text-left">
-                <h2 id="formTitle" class="text-4xl font-extrabold text-slate-900 mb-3 tracking-tight">Welcome back</h2>
-                <p id="formSub" class="text-slate-500 font-medium">Please enter your details to continue.</p>
+                <h2 id="formTitle" class="text-5xl font-header text-white mb-2">IDENTIFY YOURSELF</h2>
+                <p id="formSub" class="text-gray-500 font-mono text-xs tracking-widest uppercase">Secure Access Required</p>
             </div>
 
-            <div class="flex p-1.5 bg-slate-100 rounded-2xl mb-8 w-full relative">
-                <div id="tabIndicator" class="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-white rounded-xl shadow-md left-1.5"></div>
-                <button onclick="setTab('login')" id="tabLogin" class="relative z-10 flex-1 py-3 text-sm font-bold text-slate-900 transition-all">
-                    Sign In
+            <div class="flex mb-8 border-b border-white/10">
+                <button onclick="setTab('login')" id="tabLogin" class="flex-1 py-3 text-lg font-header tracking-wider tab-active transition-colors">
+                    LOGIN
                 </button>
-                <button onclick="setTab('register')" id="tabRegister" class="relative z-10 flex-1 py-3 text-sm font-bold text-slate-400 transition-all hover:text-slate-600">
-                    Register Team
+                <button onclick="setTab('register')" id="tabRegister" class="flex-1 py-3 text-lg font-header tracking-wider tab-inactive transition-colors">
+                    REGISTER TEAM
                 </button>
             </div>
 
-            <div id="loginForm" class="space-y-5">
-                <div class="flex gap-2 mb-6">
-                    <button onclick="setRole('team')" id="roleTeam" class="flex-1 py-2 px-3 rounded-xl border-2 border-slate-900 bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider transition-all">
+            <div id="loginForm" class="space-y-6">
+                <div class="flex gap-4 mb-6">
+                    <button onclick="setRole('team')" id="roleTeam" class="flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all">
                         Team Captain
                     </button>
-                    <button onclick="setRole('admin')" id="roleAdmin" class="flex-1 py-2 px-3 rounded-xl border-2 border-slate-100 bg-white text-slate-400 text-[11px] font-black uppercase tracking-wider transition-all hover:border-slate-200">
+                    <button onclick="setRole('admin')" id="roleAdmin" class="flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30">
                         Admin
                     </button>
                 </div>
                 <input type="hidden" id="role" value="team">
 
                 <div class="space-y-4">
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
-                        <div class="relative group">
-                            <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900 transition-colors"></i>
-                            <input id="lUser" class="min-input pl-11" placeholder="Enter username">
-                        </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Username</label>
+                        <input id="lUser" class="val-input" placeholder="AGENT ID">
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                        <div class="relative group">
-                            <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900 transition-colors"></i>
-                            <input id="lPass" type="password" class="min-input pl-11 pr-11" placeholder="••••••••">
-                            <button onclick="togglePass('lPass')" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-900">
-                                <i class="fa-solid fa-eye text-sm"></i>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Password</label>
+                        <div class="relative">
+                            <input id="lPass" type="password" class="val-input pr-10" placeholder="ACCESS CODE">
+                            <button onclick="togglePass('lPass')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                                <i class="fa-solid fa-eye"></i>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <button onclick="login()" id="btnLogin" class="min-btn w-full mt-4 flex justify-center items-center gap-3">
-                    <span>Sign In</span>
-                    <i class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
+                <button onclick="login()" id="btnLogin" class="val-btn w-full mt-6">
+                    INITIATE LINK
                 </button>
             </div>
 
-            <div id="registerForm" class="hidden space-y-6 overflow-y-auto custom-scroll max-h-[50vh] pr-2">
-                <div class="grid grid-cols-1 gap-5">
-                    <div class="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                        <div class="space-y-4">
-                            <input id="rUsername" class="min-input" placeholder="Login Username *">
-                            <div class="relative">
-                                <input id="rPass" type="password" onkeyup="checkStrength(this.value)" class="min-input pr-11" placeholder="Password *">
-                                <button onclick="togglePass('rPass')" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-                                    <i class="fa-solid fa-eye text-sm"></i>
-                                </button>
-                                <div id="strengthBar" class="h-1 w-0 bg-slate-200 mt-2 rounded-full transition-all"></div>
-                            </div>
+            <div id="registerForm" class="hidden space-y-6 overflow-y-auto custom-scroll max-h-[60vh] pr-2">
+                <div class="space-y-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Login Username</label>
+                        <input id="rUsername" class="val-input" placeholder="CAPTAIN ID">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Password</label>
+                        <div class="relative">
+                            <input id="rPass" type="password" onkeyup="checkStrength(this.value)" class="val-input pr-10" placeholder="SECURE CODE">
+                            <button onclick="togglePass('rPass')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="h-1 bg-gray-800 mt-1 w-full overflow-hidden"><div id="strengthBar" class="h-full w-0 transition-all duration-300"></div></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="col-span-2 space-y-1">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Team Name</label>
+                            <input id="rName" class="val-input" placeholder="FULL NAME">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tag</label>
+                            <input id="rShort" class="val-input text-center uppercase" placeholder="TAG" maxlength="4">
                         </div>
                     </div>
 
-                    <div class="space-y-4">
-                        <div class="grid grid-cols-4 gap-3">
-                            <div class="col-span-3">
-                                <input id="rName" class="min-input" placeholder="Team Display Name">
-                            </div>
-                            <div class="col-span-1">
-                                <input id="rShort" class="min-input text-center font-bold uppercase" placeholder="TAG" maxlength="4">
-                            </div>
+                    <div class="relative group cursor-pointer border border-dashed border-white/20 hover:border-[#ff4655] transition p-6 text-center" onclick="document.getElementById('rLogo').click()">
+                        <input id="rLogo" type="file" class="hidden" accept="image/*" onchange="previewImage(this)">
+                        <div id="logoPreview" class="flex flex-col items-center justify-center">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-500 mb-2 group-hover:text-[#ff4655] transition"></i>
+                            <span id="logoText" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Upload Team Logo</span>
                         </div>
-
-                        <div class="relative group cursor-pointer" onclick="document.getElementById('rLogo').click()">
-                            <input id="rLogo" type="file" class="hidden" accept="image/*" onchange="previewImage(this)">
-                            <div id="logoPreview" class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center bg-slate-50 group-hover:bg-white group-hover:border-slate-400 transition-all">
-                                <i class="fa-solid fa-image text-2xl text-slate-300 mb-2"></i>
-                                <span id="logoText" class="text-xs font-bold text-slate-400">Upload Team Logo</span>
-                            </div>
-                        </div>
+                        <img id="logoImg" class="hidden w-16 h-16 object-contain mx-auto">
                     </div>
                 </div>
 
-                <button onclick="register()" id="btnRegister" class="min-btn w-full !bg-blue-600 hover:!bg-blue-700 shadow-xl shadow-blue-100">
-                    Create Team Account
+                <button onclick="register()" id="btnRegister" class="val-btn w-full bg-white text-black hover:bg-gray-200">
+                    REGISTER SQUAD
                 </button>
             </div>
 
             <div id="msgContainer" class="mt-6 hidden animate-slide-up">
-                <div id="msgBox" class="flex items-center gap-3 p-4 rounded-xl text-[13px] font-bold border">
+                <div id="msgBox" class="flex items-center gap-3 p-3 border-l-4 bg-white/5">
                     <i id="msgIcon" class="fa-solid"></i>
-                    <span id="msgText"></span>
+                    <span id="msgText" class="text-xs font-mono font-bold uppercase tracking-wide"></span>
                 </div>
             </div>
 
@@ -179,7 +188,7 @@
             const el = document.getElementById(id);
             const icon = el.nextElementSibling.querySelector('i');
             el.type = el.type === 'password' ? 'text' : 'password';
-            icon.className = el.type === 'password' ? 'fa-solid fa-eye text-sm' : 'fa-solid fa-eye-slash text-sm';
+            icon.className = el.type === 'password' ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
         }
 
         function setTab(t) {
@@ -187,7 +196,6 @@
             const registerForm = document.getElementById('registerForm');
             const tabLogin = document.getElementById('tabLogin');
             const tabRegister = document.getElementById('tabRegister');
-            const indicator = document.getElementById('tabIndicator');
             const title = document.getElementById('formTitle');
             const sub = document.getElementById('formSub');
             
@@ -196,19 +204,17 @@
             if (t === 'login') {
                 loginForm.classList.remove('hidden');
                 registerForm.classList.add('hidden');
-                tabLogin.classList.replace('text-slate-400', 'text-slate-900');
-                tabRegister.classList.replace('text-slate-900', 'text-slate-400');
-                indicator.style.left = '6px';
-                title.innerText = "Welcome back";
-                sub.innerText = "Please enter your details to continue.";
+                tabLogin.classList.replace('tab-inactive', 'tab-active');
+                tabRegister.classList.replace('tab-active', 'tab-inactive');
+                title.innerText = "IDENTIFY YOURSELF";
+                sub.innerText = "Secure Access Required";
             } else {
                 loginForm.classList.add('hidden');
                 registerForm.classList.remove('hidden');
-                tabRegister.classList.replace('text-slate-400', 'text-slate-900');
-                tabLogin.classList.replace('text-slate-900', 'text-slate-400');
-                indicator.style.left = 'calc(50% + 0px)';
-                title.innerText = "Create Account";
-                sub.innerText = "Register your team for the next season.";
+                tabRegister.classList.replace('tab-inactive', 'tab-active');
+                tabLogin.classList.replace('tab-active', 'tab-inactive');
+                title.innerText = "NEW SQUADRON";
+                sub.innerText = "Register Team Protocol";
             }
         }
 
@@ -218,26 +224,23 @@
             const btnAdmin = document.getElementById('roleAdmin');
 
             if (r === 'team') {
-                btnTeam.className = 'flex-1 py-2 px-3 rounded-xl border-2 border-slate-900 bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider transition-all';
-                btnAdmin.className = 'flex-1 py-2 px-3 rounded-xl border-2 border-slate-100 bg-white text-slate-400 text-[11px] font-black uppercase tracking-wider transition-all hover:border-slate-200';
+                btnTeam.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all';
+                btnAdmin.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
             } else {
-                btnAdmin.className = 'flex-1 py-2 px-3 rounded-xl border-2 border-slate-900 bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider transition-all';
-                btnTeam.className = 'flex-1 py-2 px-3 rounded-xl border-2 border-slate-100 bg-white text-slate-400 text-[11px] font-black uppercase tracking-wider transition-all hover:border-slate-200';
+                btnAdmin.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all';
+                btnTeam.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
             }
         }
 
         function previewImage(input) {
             const preview = document.getElementById('logoPreview');
-            const text = document.getElementById('logoText');
+            const img = document.getElementById('logoImg');
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    preview.style.backgroundImage = `url(${e.target.result})`;
-                    preview.style.backgroundSize = 'contain';
-                    preview.style.backgroundPosition = 'center';
-                    preview.style.backgroundRepeat = 'no-repeat';
-                    text.classList.add('hidden');
-                    preview.querySelector('i').classList.add('hidden');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    preview.classList.add('hidden');
                 }
                 reader.readAsDataURL(input.files[0]);
             }
@@ -261,11 +264,11 @@
             text.innerText = msg;
 
             if (type === 'success') {
-                box.className = 'flex items-center gap-3 p-4 rounded-xl text-[13px] font-bold bg-emerald-50 text-emerald-700 border-emerald-100';
+                box.className = 'flex items-center gap-3 p-3 border-l-4 bg-[#1fa474]/10 border-[#1fa474] text-[#1fa474]';
                 icon.className = 'fa-solid fa-circle-check';
             } else {
-                box.className = 'flex items-center gap-3 p-4 rounded-xl text-[13px] font-bold bg-rose-50 text-rose-700 border-rose-100';
-                icon.className = 'fa-solid fa-circle-exclamation';
+                box.className = 'flex items-center gap-3 p-3 border-l-4 bg-[#ff4655]/10 border-[#ff4655] text-[#ff4655]';
+                icon.className = 'fa-solid fa-triangle-exclamation';
             }
         }
 
@@ -273,11 +276,13 @@
             const btn = document.getElementById(btnId);
             if (isLoading) {
                 btn.dataset.old = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> PROCESSING';
                 btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
             } else {
                 btn.innerHTML = btn.dataset.old;
                 btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         }
 
@@ -296,7 +301,7 @@
                 const d = await res.json();
                 
                 if (res.ok) {
-                    showMessage('Redirecting...', 'success');
+                    showMessage('ACCESS GRANTED', 'success');
                     localStorage.setItem('token', d.token);
                     localStorage.setItem('id', d.id);
                     localStorage.setItem('role', d.role);
@@ -304,11 +309,11 @@
                         location.href = d.role === 'admin' ? '/admin.html' : '/team-dashboard.html';
                     }, 1000);
                 } else {
-                    showMessage(d.msg || 'Authentication failed');
+                    showMessage(d.msg || 'ACCESS DENIED');
                     setLoading('btnLogin', false);
                 }
             } catch (e) {
-                showMessage("Connection error");
+                showMessage("CONNECTION ERROR");
                 setLoading('btnLogin', false);
             }
         }
@@ -323,7 +328,7 @@
             const logo = document.getElementById('rLogo').files[0];
 
             if (!username || !name || !shortName || !password) {
-                showMessage("Please fill all fields.");
+                showMessage("FIELDS REQUIRED");
                 setLoading('btnRegister', false);
                 return;
             }
@@ -338,18 +343,18 @@
                 const res = await fetch(`${API_BASE}/api/register`, { method: 'POST', body: fd });
                 const d = await res.json();
                 if (res.ok) {
-                    showMessage('Success! Now sign in.', 'success');
+                    showMessage('REGISTRATION COMPLETE', 'success');
                     setTimeout(() => {
                         setTab('login');
                         document.getElementById('lUser').value = username;
                         setLoading('btnRegister', false);
                     }, 1500);
                 } else {
-                    showMessage(d.msg || 'Error occurred');
+                    showMessage(d.msg || 'ERROR');
                     setLoading('btnRegister', false);
                 }
             } catch (e) {
-                showMessage("Connection error");
+                showMessage("CONNECTION ERROR");
                 setLoading('btnRegister', false);
             }
         }

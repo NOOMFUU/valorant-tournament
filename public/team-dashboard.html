@@ -199,6 +199,8 @@
                 <button onclick="nav('roster')" id="nav-roster" class="nav-link h-full flex items-center font-header text-xl tracking-wider">ROSTER</button>
                 <button onclick="nav('history')" id="nav-history" class="nav-link h-full flex items-center font-header text-xl tracking-wider">HISTORY</button>
                 <a href="/lti class="fa-solid fa-external-link-alt ml-2 text-xs"></i>
+                <a href="/tournament_view.html" target="_blank" class="nav-link h-full flex items-center font-header text-xl tracking-wider">
+                    PUBLIC VIEW <i class="fa-solid fa-external-link-alt ml-2 text-xs"></i>
                 </a>
             </nav>
 
@@ -231,6 +233,7 @@
             <button onclick="nav('roster'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">ROSTER</button>
             <button onclick="nav('history'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">HISTORY</button>
             <a href="/tournament_view.html" target="_blank" class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i cltcrd
+            <a href="/tournament_view.html" target="_blank" class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i class="fa-solid fa-external-link-alt ml-2"></i></a>
         </div>
 
         <section id="view-dashboard" class="animate-slide-up space-y-10">
@@ -546,12 +549,7 @@
             if (m.status === 'live') {
                 statusBadge = `<span class="text-[#ff4655] bg-[#ff4655]/10 px-3 py-1 text-[10px] font-bold border border-[#ff4655]/30 animate-pulse tracking-widest rounded-sm">LIVE</span>`;
                 
-                let pauseBtn = `<button onclick="requestPause('${m._id}')" class="btn-secondary text-center py-3 text-sm flex-1 hover:bg-yellow-500 hover:text-black hover:border-yellow-500 font-bold text-yellow-500 border-yellow-500/50"><i class="fa-solid fa-pause"></i> PAUSE</button>`;
-                if (m.pauseRequest && m.pauseRequest.status === 'pending') {
-                    pauseBtn = `<div class="flex-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 text-[10px] font-bold uppercase flex items-center justify-center animate-pulse">PAUSE PENDING</div>`;
-                }
-
-                actionBtn = `<div class="flex gap-2 w-full">${pauseBtn}<a href="/veto.html?match=${m._id}" class="btn-secondary text-center py-3 text-sm flex-1 hover:bg-white hover:text-black font-bold">LOBBY</a></div><button onclick="openScoreModal('${m._id}')" class="btn-primary w-full py-3 text-sm shadow-lg">REPORT SCORE</button>`;
+                actionBtn = `<a href="/veto.html?match=${m._id}" class="btn-secondary text-center py-3 text-sm w-full hover:bg-white hover:text-black font-bold block mb-2">LOBBY</a><button onclick="openScoreModal('${m._id}')" class="btn-primary w-full py-3 text-sm shadow-lg">REPORT SCORE</button>`;
             } else if (m.status === 'pending_approval') {
                 statusBadge = `<span class="text-yellow-500 bg-yellow-500/10 px-3 py-1 text-[10px] font-bold border border-yellow-500/30 tracking-widest rounded-sm">VERIFYING</span>`;
                 if(m.scoreSubmission.status === 'rejected') {

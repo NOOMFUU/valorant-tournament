@@ -89,6 +89,11 @@
         .team-card:hover { background: #25282e; }
         .roster-row { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .roster-row.open { max-height: 300px; overflow-y: auto; }
+
+        /* Liquipedia Style Overrides */
+        .lp-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
+        @media (min-width: 640px) { .lp-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .lp-grid { grid-template-columns: repeat(4, 1fr); } }
     </style>
 </head>
 <body class="flex flex-col h-screen">
@@ -100,6 +105,7 @@
             <h1 class="text-xl font-header tracking-wide text-white" id="tourneyTitle">LOADING...</h1>
         </div>
         <nav id="stageTabs" class="flex h-full overflow-x-auto no-scrollbar"></nav>
+        <button onclick="toggleFullScreen()" class="ml-auto text-gray-500 hover:text-white transition px-8"><i class="fa-solid fa-expand text-xl"></i></button>
     </header>
 
     <!-- Main Content -->
@@ -181,6 +187,14 @@
             renderContent();
         }
 
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
         function renderContent() {
             const container = document.getElementById('contentArea');
             if (activeView === 'overview') renderOverview(container);
@@ -225,54 +239,112 @@
         // --- TEAMS ---
         function renderTeams(container) {
             container.innerHTML = `
-                <div class="max-w-6xl mx-auto animate-enter">
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-l-4 border-[#ff4655] pl-3 gap-4">
-                        <h3 class="font-header text-2xl text-white">All Teams <span class="text-gray-500 text-lg ml-2" id="teamCount">(${teamsData.length})</span></h3>
-                        <div class="relative w-full md:w-auto">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
-                            <input type="text" id="teamSearchInput" oninput="filterTeams()" placeholder="Search teams..." class="bg-[#1a1d21] border border-[#333] text-white text-sm pl-9 pr-4 py-2 rounded focus:border-[#ff4655] outline-none placeholder-gray-600 font-mono w-full md:w-64 transition-colors">
+                <div class="max-w-7xl mx-auto animate-enter">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-6 border-b border-[#333] pb-4">
+                        <div class="flex items-baseline gap-4">
+                            <h2 class="text-3xl font-header text-white tracking-wide">PARTICIPANTS</h2>
+                            <span class="text-xs text-[#ff4655] font-bold uppercase tracking-widest cursor-pointer hover:text-white transition">[EDIT]</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="toggleAllRosters()" id="btnShowPlayers" class="bg-[#1a1d21] border border-[#333] text-gray-400 hover:text-white hover:border-[#ff4655] px-4 py-1.5 rounded text-xs font-bold uppercase transition">Show Players</button>
+                            <button class="bg-[#1a1d21] border border-[#333] text-gray-400 hover:text-white hover:border-[#ff4655] px-4 py-1.5 rounded text-xs font-bold uppercase transition">Player Info</button>
                         </div>
                     </div>
-                    <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+                    <!-- Sub Header -->
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-1 h-4 bg-[#ff4655]"></div>
+                        <h3 class="text-white text-sm font-bold uppercase tracking-widest">Invited Teams</h3>
+                    </div>
+
+                    <!-- Grid Container -->
+                    <div class="lp-grid">
+                        ${teamsData.map(t => createLiquipediaCard(t)).join('')}
+                    </div>
                 </div>
             `;
-            filterTeams();
         }
 
-        function filterTeams() {
-            const query = document.getElementById('teamSearchInput')?.value.toLowerCase() || '';
-            const filtered = teamsData.filter(t => t.name.toLowerCase().includes(query) || t.shortName.toLowerCase().includes(query));
-            
-            const grid = document.getElementById('teamsGrid');
-            if(grid) {
-                grid.innerHTML = filtered.map(t => `
-                    <div class="bg-[#1a1d21] border border-[#333] rounded overflow-hidden">
-                        <div class="p-4 flex items-center gap-4 team-card" onclick="toggleRoster('${t._id}')">
-                            <img src="${t.logo || 'https://via.placeholder.com/50'}" class="w-12 h-12 object-contain">
-                            <div class="flex-1">
-                                <div class="font-header text-xl text-white">${t.name}</div>
-                                <div class="text-xs text-gray-500 font-mono">${t.shortName}</div>
-                            </div>
-                            <i class="fa-solid fa-chevron-down text-gray-500 transition-transform" id="icon-${t._id}"></i>
+        function createLiquipediaCard(t) {
+            return `
+                <div class="bg-[#1a1d21] border border-[#333] flex flex-col h-full shadow-lg hover:border-[#ff4655] transition-colors group">
+                    <!-- Top: Name -->
+                    <div class="bg-[#222] border-b border-[#333] p-2 text-center h-10 flex items-center justify-center">
+                        <a href="#" class="text-white font-bold hover:text-[#ff4655] text-sm truncate px-2 transition-colors">${t.name}</a>
+                    </div>
+                    
+                    <!-- Middle: Logo/Roster (Interactive) -->
+                    <div class="relative h-64 bg-[#0f1113] border-b border-[#333] cursor-pointer overflow-hidden" onclick="toggleLPRoster('${t._id}')">
+                        <!-- Logo View -->
+                        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300" id="lp-logo-${t._id}">
+                            <img src="${t.logo || 'https://via.placeholder.com/100'}" class="max-h-[70%] max-w-[70%] object-contain opacity-80 group-hover:opacity-100 transition-opacity">
                         </div>
-                        <div id="roster-${t._id}" class="roster-row bg-[#0f1113]">
-                            <div class="p-4 grid grid-cols-2 gap-2">
-                                ${(t.members || []).map(m => `<div class="flex items-center gap-2 text-sm text-gray-300"><i class="fa-solid fa-user text-[10px] text-[#ff4655]"></i> ${m.name}</div>`).join('')}
+                        
+                        <!-- Roster View -->
+                        <div class="absolute inset-0 flex flex-col bg-[#0f1113] opacity-0 transition-opacity duration-300 pointer-events-none" id="lp-roster-${t._id}">
+                            <div class="flex-1 overflow-y-auto">
+                                ${(t.members || []).map(m => {
+                                    let roleColor = 'text-gray-500'; let roleText = 'M';
+                                    if(m.role === 'Main') { roleColor = 'text-[#1fa474]'; roleText = 'M'; }
+                                    else if(m.role === 'Sub') { roleColor = 'text-[#dda828]'; roleText = 'S'; }
+                                    else if(m.role === 'Coach') { roleColor = 'text-[#ff4655]'; roleText = 'C'; }
+                                    return `<div class="flex items-center px-3 py-1.5 border-b border-[#222] hover:bg-[#1a1d21] transition-colors w-full"><span class="${roleColor} font-bold text-[9px] w-4 text-center mr-2 bg-[#1a1d21] rounded-sm border border-[#333]">${roleText}</span><span class="text-gray-300 text-[10px] font-bold truncate">${m.name}</span></div>`;
+                                }).join('')}
+                                ${(t.members || []).length === 0 ? '<div class="text-center text-gray-600 text-xs italic py-8">No Roster</div>' : ''}
+                            </div>
+                            <div class="p-1 text-center text-[9px] text-gray-600 bg-[#15171a] border-t border-[#222]">
+                                <i class="fa-solid fa-rotate-left"></i> Tap to see logo
                             </div>
                         </div>
                     </div>
-                `).join('');
-            }
-            
-            const countEl = document.getElementById('teamCount');
-            if(countEl) countEl.innerText = `(${filtered.length})`;
+
+                    <!-- Bottom: Info -->
+                    <div class="bg-[#222] p-1 text-center text-[10px] text-gray-500 h-8 flex items-center justify-center font-mono uppercase tracking-wider">
+                        ${t.shortName || 'INVITED'}
+                    </div>
+                </div>
+            `;
         }
 
-        function toggleRoster(tid) {
-            const el = document.getElementById(`roster-${tid}`);
-            const icon = document.getElementById(`icon-${tid}`);
-            if (el.classList.contains('open')) { el.classList.remove('open'); icon.style.transform = 'rotate(0deg)'; } 
-            else { el.classList.add('open'); icon.style.transform = 'rotate(180deg)'; }
+        function toggleLPRoster(tid) {
+            const logo = document.getElementById(`lp-logo-${tid}`);
+            const roster = document.getElementById(`lp-roster-${tid}`);
+            
+            if (logo.classList.contains('opacity-0')) {
+                logo.classList.remove('opacity-0');
+                roster.classList.add('opacity-0');
+                roster.classList.add('pointer-events-none');
+            } else {
+                logo.classList.add('opacity-0');
+                roster.classList.remove('opacity-0');
+                roster.classList.remove('pointer-events-none');
+            }
+        }
+
+        let areRostersVisible = false;
+        function toggleAllRosters() {
+            areRostersVisible = !areRostersVisible;
+            const btn = document.getElementById('btnShowPlayers');
+            if(btn) {
+                btn.innerText = areRostersVisible ? "Hide Players" : "Show Players";
+                btn.classList.toggle('text-white', areRostersVisible);
+                btn.classList.toggle('border-[#ff4655]', areRostersVisible);
+            }
+
+            teamsData.forEach(t => {
+                const logo = document.getElementById(`lp-logo-${t._id}`);
+                const roster = document.getElementById(`lp-roster-${t._id}`);
+                if(logo && roster) {
+                    if (areRostersVisible) {
+                        logo.classList.add('opacity-0');
+                        roster.classList.remove('opacity-0', 'pointer-events-none');
+                    } else {
+                        logo.classList.remove('opacity-0');
+                        roster.classList.add('opacity-0', 'pointer-events-none');
+                    }
+                }
+            });
         }
 
         // --- STAGE RENDERER ---
@@ -282,18 +354,31 @@
 
             container.innerHTML = '';
 
-            if (stage.type === 'round_robin' || stage.type === 'swiss' || stage.type === 'gsl') {
+            if (stage.type === 'round_robin' || stage.type === 'swiss' || stage.type === 'cross_group') {
+                if (stage.type === 'cross_group') {
+                    renderCrossGroupStage(container, stage, stageMatches);
+                    return;
+                }
                 renderGroupStage(container, stage, stageMatches);
+            } else if (stage.type === 'gsl') {
+                renderGSLStage(container, stage, stageMatches);
             } else {
                 renderBracketStage(container, stage, stageMatches);
             }
         }
 
-        // --- GROUP STAGE VIEW ---
-        function renderGroupStage(container, stage, matches) {
-            // 1. Calculate Standings
+        // --- CROSS GROUP STAGE VIEW ---
+        function renderCrossGroupStage(container, stage, matches) {
             const stats = {};
-            stage.stageParticipants.forEach(tid => {
+            const teamIds = new Set();
+            
+            if (stage.stageParticipants) stage.stageParticipants.forEach(tid => teamIds.add(tid));
+            matches.forEach(m => {
+                if(m.teamA) teamIds.add(m.teamA._id || m.teamA);
+                if(m.teamB) teamIds.add(m.teamB._id || m.teamB);
+            });
+
+            teamIds.forEach(tid => {
                 const t = teamsData.find(x => x._id === tid);
                 if(t) stats[tid] = { id: tid, name: t.name, short: t.shortName, logo: t.logo, w:0, l:0, mapW:0, mapL:0, diff:0 };
             });
@@ -306,105 +391,403 @@
                     if(stats[wId]) stats[wId].w++;
                     if(stats[lId]) stats[lId].l++;
 
-                    let sA = 0, sB = 0;
-                    m.scores.forEach(s => { sA += parseInt(s.teamAScore)||0; sB += parseInt(s.teamBScore)||0; });
-                    
-                    // Map counts (simplified based on score comparison)
-                    let mapsA = 0, mapsB = 0;
-                    m.scores.forEach(s => { if(parseInt(s.teamAScore) > parseInt(s.teamBScore)) mapsA++; else mapsB++; });
+                    let sA = 0, sB = 0, mapsA = 0, mapsB = 0;
+                    m.scores.forEach(s => { 
+                        const scA = parseInt(s.teamAScore)||0; const scB = parseInt(s.teamBScore)||0;
+                        sA += scA; sB += scB; 
+                        if (scA > scB) mapsA++; else if (scB > scA) mapsB++; 
+                    });
 
-                    const tA = m.teamA._id || m.teamA;
-                    const tB = m.teamB._id || m.teamB;
-
+                    const tA = m.teamA._id || m.teamA; const tB = m.teamB._id || m.teamB;
                     if(stats[tA]) { stats[tA].mapW += mapsA; stats[tA].mapL += mapsB; stats[tA].diff += (sA - sB); }
                     if(stats[tB]) { stats[tB].mapW += mapsB; stats[tB].mapL += mapsA; stats[tB].diff += (sB - sA); }
                 }
             });
 
-            const sortedStats = Object.values(stats).sort((a,b) => (b.w - a.w) || ((b.mapW-b.mapL) - (a.mapW-a.mapL)) || (b.diff - a.diff));
+            const participants = stage.stageParticipants || [];
+            const mid = Math.ceil(participants.length / 2);
+            const alphaIds = participants.slice(0, mid);
+            const omegaIds = participants.slice(mid);
 
-            // 2. Render HTML
-            const tableHtml = `
-                <div class="mb-8 bg-[#1a1d21] border border-[#333] rounded overflow-hidden">
-                    <div class="p-4 bg-[#111] border-b border-[#333] font-header text-lg text-white">Standings</div>
-                    <table class="vlr-table w-full">
-                        <thead><tr><th>Team</th><th class="text-center">W</th><th class="text-center">L</th><th class="text-center">Maps</th><th class="text-center">Diff</th></tr></thead>
-                        <tbody>
-                            ${sortedStats.map(s => `
-                                <tr>
-                                    <td class="font-bold flex items-center gap-3">
-                                        <img src="${s.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain">
-                                        <span>${s.name}</span>
-                                    </td>
-                                    <td class="text-center text-green-400">${s.w}</td>
-                                    <td class="text-center text-red-400">${s.l}</td>
-                                    <td class="text-center text-gray-400">${s.mapW}-${s.mapL}</td>
-                                    <td class="text-center font-mono ${s.diff>0?'text-green-400':(s.diff<0?'text-red-400':'text-gray-500')}">${s.diff>0?'+':''}${s.diff}</td>
-                                </tr>
-                            `).join('')}
+            const getSortedStats = (ids) => ids.map(id => stats[id]).filter(s => s).sort((a,b) => (b.w - a.w) || ((b.mapW-b.mapL) - (a.mapW-a.mapL)) || (b.diff - a.diff));
+            const alphaStats = getSortedStats(alphaIds);
+            const omegaStats = getSortedStats(omegaIds);
+
+            const renderTable = (title, sortedStats, colorClass) => `
+                <div class="bg-[#1a1d21] border border-[#333] rounded overflow-hidden h-fit shadow-lg mb-6">
+                    <div class="px-4 py-3 bg-[#111] border-b border-[#333] flex justify-between items-center">
+                        <span class="font-header text-lg text-white tracking-wide ${colorClass}">${title}</span>
+                        <i class="fa-solid fa-list-ol text-gray-600"></i>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#15171a] border-b border-[#333]">
+                            <tr><th class="px-4 py-3 font-bold w-12 text-center">#</th><th class="px-4 py-3 font-bold">Team</th><th class="px-4 py-3 font-bold text-center">W</th><th class="px-4 py-3 font-bold text-center">L</th><th class="px-4 py-3 font-bold text-center">Maps</th><th class="px-4 py-3 font-bold text-center">Diff</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#222]">
+                            ${sortedStats.map((s, idx) => `
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-4 py-3 text-center font-mono text-gray-500">${idx + 1}</td>
+                                    <td class="px-4 py-3 font-bold text-white flex items-center gap-3"><img src="${s.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain"><span class="truncate">${s.name}</span></td>
+                                    <td class="px-4 py-3 text-center text-green-400 font-bold">${s.w}</td>
+                                    <td class="px-4 py-3 text-center text-red-400 font-bold">${s.l}</td>
+                                    <td class="px-4 py-3 text-center text-gray-400 font-mono">${s.mapW}-${s.mapL}</td>
+                                    <td class="px-4 py-3 text-center font-mono font-bold ${s.diff>0?'text-green-400':(s.diff<0?'text-red-400':'text-gray-500')}">${s.diff>0?'+':''}${s.diff}</td>
+                                </tr>`).join('')}
+                            ${sortedStats.length === 0 ? '<tr><td colspan="6" class="text-center text-gray-500 py-8 italic">No teams</td></tr>' : ''}
                         </tbody>
                     </table>
-                </div>
-            `;
+                </div>`;
 
-            const matchesHtml = `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    ${matches.map(m => createMatchCard(m)).join('')}
-                </div>
-            `;
+            const rounds = {};
+            matches.forEach(m => { const r = m.round || 1; if(!rounds[r]) rounds[r] = []; rounds[r].push(m); });
+            let matchesHtml = '';
+            Object.keys(rounds).sort((a,b)=>a-b).forEach(r => {
+                matchesHtml += `
+                    <div class="mb-8 last:mb-0">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="bg-[#333] text-white text-xs font-bold px-3 py-1 rounded uppercase tracking-widest shadow-md">Round ${r}</div>
+                            <div class="h-px bg-gradient-to-r from-[#333] to-transparent flex-1"></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${rounds[r].map(m => createMatchCard(m)).join('')}</div>
+                    </div>`;
+            });
 
-            container.innerHTML = `<div class="max-w-5xl mx-auto">${tableHtml}<div class="font-header text-lg text-white mb-4 border-l-4 border-[#ff4655] pl-3">Match Schedule</div>${matchesHtml}</div>`;
+            container.innerHTML = `
+                <div class="max-w-7xl mx-auto">
+                    <div class="mb-16 relative bg-[#15171a]/50 border border-white/5 rounded-xl p-8 backdrop-blur-sm shadow-xl animate-enter">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-[#ff4655] rounded-l-xl"></div>
+                        <div class="flex items-center gap-4 mb-8"><h3 class="font-header text-5xl text-white drop-shadow-lg">CROSS GROUP</h3><div class="h-px bg-gradient-to-r from-[#ff4655] to-transparent flex-1 opacity-50"></div></div>
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                            <div>${renderTable('GROUP ALPHA', alphaStats, 'text-[#ff4655]')}</div>
+                            <div>${renderTable('GROUP OMEGA', omegaStats, 'text-[#00d4ff]')}</div>
+                        </div>
+                        <div class="bg-[#1a1d21] border border-[#333] rounded p-6">
+                            <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-[#ff4655]"></i> Schedule</h4>
+                            <div class="space-y-2">${matchesHtml}</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- GROUP STAGE VIEW ---
+        function renderGroupStage(container, stage, matches) {
+            const groups = {};
+            const getGroupName = (name) => {
+                const match = name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                return match ? `Group ${match[1].toUpperCase()}` : 'General';
+            };
+
+            matches.forEach(m => {
+                const gName = getGroupName(m.name);
+                if (!groups[gName]) groups[gName] = [];
+                groups[gName].push(m);
+            });
+
+            let html = '';
+            const sortedGroups = Object.keys(groups).sort();
+
+            html += `<div class="flex justify-end mb-6 animate-enter gap-4">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                    <input type="text" oninput="filterGroupMatches(this.value)" placeholder="Search matches..." class="bg-[#1a1d21] border border-[#333] text-white text-xs pl-9 pr-4 py-2 rounded-full focus:border-[#ff4655] outline-none placeholder-gray-600 font-mono w-48 transition-colors">
+                </div>`;
+
+            if (sortedGroups.length > 1) {
+                html += `
+                    <div class="flex items-center gap-3 bg-[#1a1d21] px-4 py-2 rounded-full border border-[#333] shadow-lg hover:border-[#ff4655] transition-colors">
+                        <i class="fa-solid fa-filter text-[#ff4655] text-sm"></i>
+                        <select onchange="filterGroups(this.value)" class="bg-transparent text-white text-xs font-bold uppercase outline-none cursor-pointer tracking-wider appearance-none pr-2">
+                            <option value="all" class="bg-[#1a1d21]">Show All Groups</option>
+                            ${sortedGroups.map(g => `<option value="${g}" class="bg-[#1a1d21]">${g}</option>`).join('')}
+                        </select>
+                        <i class="fa-solid fa-chevron-down text-gray-500 text-[10px]"></i>
+                    </div>
+                `;
+            }
+            html += `</div>`;
+
+            sortedGroups.forEach(groupName => {
+                const groupMatches = groups[groupName];
+                const stats = {};
+                const teamIds = new Set();
+                
+                groupMatches.forEach(m => {
+                    if(m.teamA) teamIds.add(m.teamA._id || m.teamA);
+                    if(m.teamB) teamIds.add(m.teamB._id || m.teamB);
+                });
+                
+                teamIds.forEach(tid => {
+                    const t = teamsData.find(x => x._id === tid);
+                    if(t) stats[tid] = { id: tid, name: t.name, short: t.shortName, logo: t.logo, w:0, l:0, mapW:0, mapL:0, diff:0 };
+                });
+
+                groupMatches.forEach(m => {
+                    if (m.status === 'finished' && m.winner) {
+                        const wId = m.winner._id || m.winner;
+                        const lId = (m.teamA._id === wId || m.teamA === wId) ? (m.teamB._id || m.teamB) : (m.teamA._id || m.teamA);
+                        
+                        if(stats[wId]) stats[wId].w++;
+                        if(stats[lId]) stats[lId].l++;
+
+                        let sA = 0, sB = 0;
+                        m.scores.forEach(s => { sA += parseInt(s.teamAScore)||0; sB += parseInt(s.teamBScore)||0; });
+                        
+                        let mapsA = 0, mapsB = 0;
+                        m.scores.forEach(s => { if(parseInt(s.teamAScore) > parseInt(s.teamBScore)) mapsA++; else mapsB++; });
+
+                        const tA = m.teamA._id || m.teamA;
+                        const tB = m.teamB._id || m.teamB;
+
+                        if(stats[tA]) { stats[tA].mapW += mapsA; stats[tA].mapL += mapsB; stats[tA].diff += (sA - sB); }
+                        if(stats[tB]) { stats[tB].mapW += mapsB; stats[tB].mapL += mapsA; stats[tB].diff += (sB - sA); }
+                    }
+                });
+
+                const sortedStats = Object.values(stats).sort((a,b) => (b.w - a.w) || ((b.mapW-b.mapL) - (a.mapW-a.mapL)) || (b.diff - a.diff));
+
+                const tableHtml = `
+                    <div class="bg-[#1a1d21] border border-[#333] rounded overflow-hidden h-fit shadow-lg">
+                        <div class="px-4 py-3 bg-[#111] border-b border-[#333] flex justify-between items-center">
+                            <span class="font-header text-lg text-white tracking-wide">STANDINGS</span>
+                            <i class="fa-solid fa-list-ol text-[#ff4655]"></i>
+                        </div>
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-500 uppercase bg-[#15171a] border-b border-[#333]">
+                                <tr>
+                                    <th class="px-4 py-3 font-bold w-12 text-center">#</th>
+                                    <th class="px-4 py-3 font-bold">Team</th>
+                                    <th class="px-4 py-3 font-bold text-center">W</th>
+                                    <th class="px-4 py-3 font-bold text-center">L</th>
+                                    <th class="px-4 py-3 font-bold text-center">Maps</th>
+                                    <th class="px-4 py-3 font-bold text-center">Diff</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[#222]">
+                                ${sortedStats.map((s, idx) => `
+                                    <tr class="hover:bg-white/5 transition-colors">
+                                        <td class="px-4 py-3 text-center font-mono text-gray-500">${idx + 1}</td>
+                                        <td class="px-4 py-3 font-bold text-white flex items-center gap-3">
+                                            <img src="${s.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain">
+                                            <span class="truncate">${s.name}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-green-400 font-bold">${s.w}</td>
+                                        <td class="px-4 py-3 text-center text-red-400 font-bold">${s.l}</td>
+                                        <td class="px-4 py-3 text-center text-gray-400 font-mono">${s.mapW}-${s.mapL}</td>
+                                        <td class="px-4 py-3 text-center font-mono font-bold ${s.diff>0?'text-green-400':(s.diff<0?'text-red-400':'text-gray-500')}">${s.diff>0?'+':''}${s.diff}</td>
+                                    </tr>
+                                `).join('')}
+                                ${sortedStats.length === 0 ? '<tr><td colspan="6" class="text-center text-gray-500 py-8 italic">No teams in this group</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                const rounds = {};
+                groupMatches.forEach(m => {
+                    const r = m.round || 1;
+                    if(!rounds[r]) rounds[r] = [];
+                    rounds[r].push(m);
+                });
+
+                let matchesHtml = '';
+                Object.keys(rounds).sort((a,b)=>a-b).forEach(r => {
+                    matchesHtml += `
+                        <div class="mb-8 last:mb-0">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="bg-[#333] text-white text-xs font-bold px-3 py-1 rounded uppercase tracking-widest shadow-md">Round ${r}</div>
+                                <div class="h-px bg-gradient-to-r from-[#333] to-transparent flex-1"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${rounds[r].map(m => createMatchCard(m)).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                    <div class="mb-16 relative bg-[#15171a]/50 border border-white/5 rounded-xl p-8 backdrop-blur-sm shadow-xl group-container animate-enter" data-group="${groupName}">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-[#ff4655] rounded-l-xl"></div>
+                        <div class="flex items-center gap-4 mb-8"><h3 class="font-header text-5xl text-white drop-shadow-lg">${groupName}</h3><div class="h-px bg-gradient-to-r from-[#ff4655] to-transparent flex-1 opacity-50"></div></div>
+                        <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                            <div class="xl:col-span-5">${tableHtml}</div>
+                            <div class="xl:col-span-7">
+                                <div class="bg-[#1a1d21] border border-[#333] rounded p-6 h-full"><h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-[#ff4655]"></i> Schedule</h4><div class="space-y-2">${matchesHtml}</div></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `<div class="max-w-6xl mx-auto">${html}</div>`;
+        }
+
+        // --- GSL STAGE VIEW ---
+        function renderGSLStage(container, stage, matches) {
+            const groups = {};
+            const getGroupName = (name) => {
+                const match = name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                return match ? `Group ${match[1].toUpperCase()}` : 'General';
+            };
+
+            matches.forEach(m => {
+                const gName = getGroupName(m.name);
+                if (!groups[gName]) groups[gName] = [];
+                groups[gName].push(m);
+            });
+
+            let html = '';
+            const sortedGroups = Object.keys(groups).sort();
+            
+            // Filter UI
+            html += `<div class="flex justify-end mb-6 animate-enter gap-4"><div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i><input type="text" oninput="filterGroupMatches(this.value)" placeholder="Search matches..." class="bg-[#1a1d21] border border-[#333] text-white text-xs pl-9 pr-4 py-2 rounded-full focus:border-[#ff4655] outline-none placeholder-gray-600 font-mono w-48 transition-colors"></div>`;
+            if (sortedGroups.length > 1) {
+                html += `<div class="flex items-center gap-3 bg-[#1a1d21] px-4 py-2 rounded-full border border-[#333] shadow-lg hover:border-[#ff4655] transition-colors"><i class="fa-solid fa-filter text-[#ff4655] text-sm"></i><select onchange="filterGroups(this.value)" class="bg-transparent text-white text-xs font-bold uppercase outline-none cursor-pointer tracking-wider appearance-none pr-2"><option value="all" class="bg-[#1a1d21]">Show All Groups</option>${sortedGroups.map(g => `<option value="${g}" class="bg-[#1a1d21]">${g}</option>`).join('')}</select><i class="fa-solid fa-chevron-down text-gray-500 text-[10px]"></i></div>`;
+            }
+            html += `</div>`;
+
+            sortedGroups.forEach(groupName => {
+                const gMatches = groups[groupName];
+                const openA = gMatches.find(m => m.name.includes('Opening A'));
+                const openB = gMatches.find(m => m.name.includes('Opening B'));
+                const winners = gMatches.find(m => m.name.includes('Winners'));
+                const elim = gMatches.find(m => m.name.includes('Elimination'));
+                const decider = gMatches.find(m => m.name.includes('Decider'));
+
+                const mCard = (m) => m ? createMatchCard(m) : '<div class="h-24 bg-[#1a1d21] border border-[#333] rounded flex items-center justify-center text-gray-600 text-xs font-bold uppercase tracking-widest">TBD</div>';
+
+                html += `
+                    <div class="mb-16 relative bg-[#15171a]/50 border border-white/5 rounded-xl p-8 backdrop-blur-sm shadow-xl group-container animate-enter" data-group="${groupName}">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-[#ff4655] rounded-l-xl"></div>
+                        <div class="flex items-center gap-4 mb-8"><h3 class="font-header text-5xl text-white drop-shadow-lg">${groupName}</h3><div class="h-px bg-gradient-to-r from-[#ff4655] to-transparent flex-1 opacity-50"></div></div>
+                        
+                        <div class="flex flex-col lg:flex-row gap-8 overflow-x-auto pb-4">
+                            <div class="flex flex-col gap-4 min-w-[300px] flex-1">
+                                <div class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-[#333] pb-1">Opening Matches</div>
+                                ${mCard(openA)}
+                                ${mCard(openB)}
+                            </div>
+                            <div class="flex flex-col justify-between min-w-[300px] flex-1">
+                                <div>
+                                    <div class="text-xs font-bold text-[#1fa474] uppercase tracking-widest mb-2 border-b border-[#1fa474]/30 pb-1">Winners Match</div>
+                                    ${mCard(winners)}
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-[#ff4655] uppercase tracking-widest mb-2 border-b border-[#ff4655]/30 pb-1">Elimination Match</div>
+                                    ${mCard(elim)}
+                                </div>
+                            </div>
+                            <div class="flex flex-col justify-center min-w-[300px] flex-1">
+                                <div class="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-2 border-b border-yellow-500/30 pb-1">Decider Match</div>
+                                ${mCard(decider)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `<div class="max-w-7xl mx-auto">${html}</div>`;
+        }
+
+        function filterGroups(group) {
+            document.querySelectorAll('.group-container').forEach(el => {
+                if (group === 'all' || el.dataset.group === group) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+        }
+
+        function filterGroupMatches(query) {
+            const term = query.toLowerCase();
+            document.querySelectorAll('.match-card-item').forEach(el => {
+                const searchData = el.dataset.search || '';
+                if (searchData.includes(term)) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
         }
 
         // --- BRACKET STAGE VIEW ---
         function renderBracketStage(container, stage, matches) {
-            // Separate brackets
-            const upper = [], lower = [], final = [];
+            // 1. Group matches by Group Name (e.g., "Group A", "Group B")
+            const groups = {};
             matches.forEach(m => {
-                if (m.matchOrder === 999 || m.round === 999) final.push(m);
-                else if (m.round >= 100) lower.push(m);
-                else upper.push(m);
+                const matchGroup = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                const gName = matchGroup ? `Group ${matchGroup[1].toUpperCase()}` : 'Main Bracket';
+                if (!groups[gName]) groups[gName] = [];
+                groups[gName].push(m);
             });
 
-            // Group by round
-            const groupRounds = (arr) => {
-                const map = {};
-                arr.forEach(m => {
-                    if(!map[m.round]) map[m.round] = [];
-                    map[m.round].push(m);
+            const sortedGroups = Object.keys(groups).sort();
+            let html = '';
+
+            sortedGroups.forEach((gName, idx) => {
+                const groupMatches = groups[gName];
+                const upper = [], lower = [], final = [];
+                
+                groupMatches.forEach(m => {
+                    if (m.matchOrder === 999 || m.round === 999) final.push(m);
+                    else if (m.round >= 100) lower.push(m);
+                    else upper.push(m);
                 });
-                return Object.keys(map).sort((a,b)=>a-b).map(k => map[k].sort((a,b)=>a.matchOrder-b.matchOrder));
-            };
 
-            const ubRounds = groupRounds(upper);
-            const lbRounds = groupRounds(lower);
-            const finalRounds = groupRounds(final);
+                const groupRounds = (arr) => {
+                    const map = {};
+                    arr.forEach(m => {
+                        if(!map[m.round]) map[m.round] = [];
+                        map[m.round].push(m);
+                    });
+                    return Object.keys(map).sort((a,b)=>a-b).map(k => map[k].sort((a,b)=>a.matchOrder-b.matchOrder));
+                };
 
-            // Render Container
-            container.innerHTML = `
-                <div class="relative min-w-max pb-20">
-                    <svg id="bracketSvg"></svg>
-                    <div class="flex flex-col gap-16 p-10">
-                        ${ubRounds.length ? `<div class="flex gap-16" id="upperBracket">${renderRoundColumns(ubRounds, 'UB')}</div>` : ''}
-                        ${lbRounds.length ? `<div class="flex gap-16 mt-8" id="lowerBracket">${renderRoundColumns(lbRounds, 'LB')}</div>` : ''}
-                        ${finalRounds.length ? `<div class="flex gap-16 mt-8 border-t border-[#333] pt-8" id="finalBracket">${renderRoundColumns(finalRounds, 'GF')}</div>` : ''}
+                const ubRounds = groupRounds(upper);
+                const lbRounds = groupRounds(lower);
+                const finalRounds = groupRounds(final);
+                const svgId = `bracketSvg-${idx}`;
+
+                html += `
+                    <div class="mb-20 relative group-bracket">
+                        ${sortedGroups.length > 1 ? `<h3 class="font-header text-3xl text-white mb-8 border-l-4 border-[#ff4655] pl-4">${gName}</h3>` : ''}
+                        <div class="relative min-w-max pb-10">
+                            <svg id="${svgId}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
+                            <div class="flex flex-col gap-16 p-4">
+                                <div class="flex gap-16" id="upperBracket-${idx}">
+                                    ${ubRounds.length ? renderRoundColumns(ubRounds, 'UB') : ''}
+                                    ${finalRounds.length ? renderRoundColumns(finalRounds, 'GF') : ''}
+                                </div>
+                                ${lbRounds.length ? `<div class="flex gap-16 mt-8" id="lowerBracket-${idx}">${renderRoundColumns(lbRounds, 'LB')}</div>` : ''}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            });
+
+            container.innerHTML = html;
 
             // Draw Lines after render
-            setTimeout(() => drawBracketLines(matches), 100);
+            setTimeout(() => {
+                sortedGroups.forEach((gName, idx) => {
+                    drawBracketLines(groups[gName], `bracketSvg-${idx}`);
+                });
+            }, 100);
         }
 
         function renderRoundColumns(rounds, prefix) {
-            return rounds.map((matches, i) => `
+            return rounds.map((matches, i) => {
+                let label = `${prefix} Round ${i+1}`;
+                if (prefix === 'GF') label = (rounds.length > 1) ? `Grand Final R${i+1}` : 'Grand Final';
+                
+                return `
                 <div class="bracket-column">
                     <div class="absolute -top-6 left-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest w-full text-center">
-                        ${prefix} Round ${i+1}
+                        ${label}
                     </div>
                     ${matches.map(m => createBracketNode(m)).join('')}
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function createBracketNode(m) {
@@ -450,9 +833,10 @@
             const sA = calculateScore(m, 'A');
             const sB = calculateScore(m, 'B');
             const isLive = m.status === 'live';
+            const searchTerms = `${m.name} ${m.teamA?.name || ''} ${m.teamA?.shortName || ''} ${m.teamB?.name || ''} ${m.teamB?.shortName || ''}`.toLowerCase();
             
             return `
-                <div class="bg-[#1a1d21] border border-[#333] rounded p-3 hover:border-[#ff4655] transition group cursor-pointer" onclick="openMatchDetail('${m._id}')">
+                <div class="bg-[#1a1d21] border border-[#333] rounded p-3 hover:border-[#ff4655] transition group cursor-pointer match-card-item" data-search="${searchTerms}" onclick="openMatchDetail('${m._id}')">
                     <div class="flex justify-between items-center mb-2 text-[10px] text-gray-500 font-bold uppercase">
                         <span>${isLive ? '<span class="text-[#ff4655] animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleString() : 'TBD')}</span>
                         <span>${m.name}</span>
@@ -604,13 +988,13 @@
         window.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeMatchModal(); });
 
         // --- SVG LINE DRAWING ---
-        function drawBracketLines(matches) {
-            const svg = document.getElementById('bracketSvg');
+        function drawBracketLines(matches, svgId = 'bracketSvg') {
+            const svg = document.getElementById(svgId);
             if(!svg) return;
             svg.innerHTML = '';
             
             // Resize SVG to fit container
-            const container = document.querySelector('.relative.min-w-max');
+            const container = svg.parentElement;
             svg.setAttribute('width', container.scrollWidth);
             svg.setAttribute('height', container.scrollHeight);
 
@@ -621,8 +1005,6 @@
                 // Draw line to Next Match (Winner)
                 if(m.nextMatchId) {
                     const targetMatch = matchesData.find(x => x._id === m.nextMatchId);
-                    // Skip lines to Grand Final (Round 999)
-                    if (targetMatch && (targetMatch.round === 999 || targetMatch.matchOrder === 999)) return;
 
                     const targetEl = document.getElementById(`match-${m.nextMatchId}`);
                     if(targetEl) drawPath(svg, sourceEl, targetEl, false);
@@ -675,7 +1057,18 @@
             const activeStage = tournamentData?.stages[activeStageIndex];
             if(activeStage && activeStage.type !== 'round_robin' && activeStage.type !== 'swiss') {
                 const stageMatches = activeStage.matches.map(mid => matchesData.find(m => m._id === mid)).filter(m => m);
-                drawBracketLines(stageMatches);
+                
+                // Re-draw for all groups
+                const groups = {};
+                stageMatches.forEach(m => {
+                    const matchGroup = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
+                    const gName = matchGroup ? `Group ${matchGroup[1].toUpperCase()}` : 'Main Bracket';
+                    if (!groups[gName]) groups[gName] = [];
+                    groups[gName].push(m);
+                });
+                Object.keys(groups).sort().forEach((gName, idx) => {
+                    drawBracketLines(groups[gName], `bracketSvg-${idx}`);
+                });
             }
         });
 
