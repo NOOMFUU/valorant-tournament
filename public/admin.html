@@ -159,6 +159,30 @@
         .bracket-node.highlight-team > div { border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.4); }
         path.connector.dimmed { opacity: 0.1; }
         path.connector.highlight-path { stroke: #ff4655; opacity: 1; stroke-width: 3; }
+
+        .modal-content {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+            transition: opacity 0.2s ease, transform 0.25s ease;
+        }
+        #modalBackdrop.modal-open .modal-content[data-open="true"] {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #171a1f 25%, #21252b 37%, #171a1f 63%);
+            background-size: 400% 100%;
+            animation: shimmer 1.2s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 100% 50%; }
+            100% { background-position: 0 50%; }
+        }
+        .btn-loading {
+            pointer-events: none;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body class="flex h-screen w-full">
@@ -177,21 +201,21 @@
         
         <nav class="flex-1 py-8 space-y-2 px-4">
             <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-4 mb-3">Main Menu</p>
-            <button onclick="nav('dashboard')" id="nav-dashboard" class="nav-btn active w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+            <button data-action="nav" data-view="dashboard" id="nav-dashboard" class="nav-btn active w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-chart-line w-5 text-center"></i> DASHBOARD
             </button>
-            <button onclick="nav('requests')" id="nav-requests" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+            <button data-action="nav" data-view="requests" id="nav-requests" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-inbox w-5 text-center"></i> REQUESTS
                 <span id="navBadgeReq" class="nav-badge hidden">0</span>
             </button>
-            <button onclick="nav('structure')" id="nav-structure" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+            <button data-action="nav" data-view="structure" id="nav-structure" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-sitemap w-5 text-center"></i> TOURNAMENTS
             </button>
-            <button onclick="nav('teams')" id="nav-teams" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+            <button data-action="nav" data-view="teams" id="nav-teams" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-users-gear w-5 text-center"></i> TEAMS
                 <span id="navBadgeTeams" class="nav-badge hidden">0</span>
             </button>
-            <button onclick="nav('logs')" id="nav-logs" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
+            <button data-action="nav" data-view="logs" id="nav-logs" class="nav-btn w-full flex items-center gap-4 px-4 py-3.5 rounded-md text-base">
                 <i class="fa-solid fa-clipboard-list w-5 text-center"></i> LOGS
             </button>
         </nav>
@@ -200,7 +224,7 @@
             <a href="/tournament_view.html" target="_blank" class="flex items-center gap-3 text-sm text-gray-500 hover:text-white transition p-3 rounded hover:bg-[#222] mb-3">
                 <i class="fa-solid fa-sitemap"></i> Open Bracket View
             </a>
-            <button onclick="logout()" class="w-full py-3 border border-[#333] hover:border-[#ff4655] hover:text-[#ff4655] text-gray-400 text-xs font-bold uppercase tracking-widest transition rounded-md">
+            <button data-action="logout" class="w-full py-3 border border-[#333] hover:border-[#ff4655] hover:text-[#ff4655] text-gray-400 text-xs font-bold uppercase tracking-widest transition rounded-md">
                 System Logout
             </button>
         </div>
@@ -229,13 +253,13 @@
                 </div>
             </div>
             <div class="flex gap-3">
-                <button onclick="clearSelection()" class="px-6 py-2 border border-gray-600 text-gray-400 hover:text-white rounded font-bold text-xs uppercase transition">Cancel</button>
-                <button onclick="applyBulkTime()" class="btn-val px-8 py-2 rounded font-bold text-xs uppercase">APPLY SCHEDULE</button>
+                <button data-action="clear-selection" class="px-6 py-2 border border-gray-600 text-gray-400 hover:text-white rounded font-bold text-xs uppercase transition">Cancel</button>
+                <button data-action="apply-bulk-time" data-loading="Applying..." class="btn-val px-8 py-2 rounded font-bold text-xs uppercase">APPLY SCHEDULE</button>
             </div>
         </div>
 
-        <div class="relative z-10 p-10 max-w-[1920px] mx-auto min-h-screen flex flex-col">
-            <header class="flex justify-between items-end mb-10 border-b border-white/5 pb-8">
+        <div class="relative z-10 p-6 lg:p-10 max-w-[1920px] mx-auto min-h-screen flex flex-col">
+            <header class="flex justify-between items-end mb-8 border-b border-white/5 pb-8">
                 <div>
                     <h2 class="text-4xl font-header font-bold text-white tracking-tight" id="pageTitle">DASHBOARD</h2>
                     <p class="text-sm text-gray-400 mt-2 font-mono">SYSTEM STATUS: <span class="text-[#22c55e] font-bold">ONLINE</span></p>
@@ -248,7 +272,7 @@
                 </div>
             </header>
 
-            <section id="view-dashboard" class="animate-slide-up space-y-6">
+            <section id="view-dashboard" class="animate-slide-up space-y-8">
                 <!-- SYSTEM VITALS -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-[#1a1d21] p-4 rounded border border-[#2d3139] flex flex-col relative overflow-hidden">
@@ -279,7 +303,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
                     <div class="md:col-span-8 bg-[#15171a] border border-[#ff4655] rounded-lg p-6 relative overflow-hidden group shadow-lg shadow-red-900/10">
                         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
                             <i class="fa-solid fa-tower-broadcast text-9xl text-[#ff4655]"></i>
@@ -292,13 +316,13 @@
                             <div class="text-6xl font-header text-white font-bold tracking-tighter" id="stat-live">0</div>
                             <p class="text-gray-400 text-sm mt-2 font-mono">ACTIVE MATCHES IN PROGRESS</p>
                             <div class="mt-6 flex gap-3">
-                                <button onclick="nav('structure')" class="btn-val px-4 py-2 text-xs rounded">MANAGE MATCHES</button>
+                                <button data-action="nav" data-view="structure" class="btn-val px-4 py-2 text-xs rounded">MANAGE MATCHES</button>
                                 <a href="/tournament_view.html" target="_blank" class="px-4 py-2 border border-[#333] hover:bg-[#333] text-gray-300 text-xs rounded transition font-bold uppercase">View Bracket</a>
                             </div>
                         </div>
                     </div>
 
-                    <div onclick="nav('requests')" class="md:col-span-4 bg-[#1a1d21] border-l-4 border-yellow-500 rounded-r-lg p-6 cursor-pointer hover:bg-[#222] transition relative">
+                    <div data-action="nav" data-view="requests" class="md:col-span-4 bg-[#1a1d21] border-l-4 border-yellow-500 rounded-r-lg p-6 cursor-pointer hover:bg-[#222] transition relative">
                         <div class="flex justify-between items-start">
                             <div>
                                 <div class="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">Attention Needed</div>
@@ -314,7 +338,7 @@
                         </div>
                     </div>
 
-                    <div onclick="nav('teams')" class="md:col-span-2 bg-[#1a1d21] border border-[#2d3139] rounded-lg p-5 cursor-pointer hover:border-blue-500 transition">
+                    <div data-action="nav" data-view="teams" class="md:col-span-2 bg-[#1a1d21] border border-[#2d3139] rounded-lg p-5 cursor-pointer hover:border-blue-500 transition">
                         <div class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Total Teams</div>
                         <div class="text-3xl font-header text-white" id="stat-teams">0</div>
                     </div>
@@ -330,8 +354,8 @@
                             <i class="fa-solid fa-chart-line text-[#ff4655]"></i> LIVE FEED
                         </h3>
                         <div class="flex items-center gap-2">
-                            <select id="dashStageFilter" onchange="renderDashboard(allMatches)" class="bg-[#0f1113] border border-[#333] text-xs px-3 py-2 rounded text-white focus:border-[#ff4655] outline-none font-mono max-w-[200px]"><option value="all">All Stages</option></select>
-                            <input id="dashSearch" oninput="renderDashboard(allMatches)" placeholder="Search match..." class="bg-[#0f1113] border border-[#333] text-sm px-4 py-2 rounded text-white focus:border-[#ff4655] outline-none w-64 placeholder-gray-600 font-mono">
+                            <select id="dashStageFilter" class="js-dashboard-filter bg-[#0f1113] border border-[#333] text-xs px-3 py-2 rounded text-white focus:border-[#ff4655] outline-none font-mono max-w-[200px]"><option value="all">All Stages</option></select>
+                            <input id="dashSearch" placeholder="Search match..." class="js-dashboard-filter bg-[#0f1113] border border-[#333] text-sm px-4 py-2 rounded text-white focus:border-[#ff4655] outline-none w-64 placeholder-gray-600 font-mono">
                         </div>
                     </div>
                     <div id="liveMatches" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
@@ -357,20 +381,20 @@
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6 bg-[#15171a] p-6 rounded-lg border border-[#2d3139]">
                     <div class="flex items-center gap-4">
                         <h2 class="text-2xl font-header text-white">REGISTERED TEAMS</h2>
-                        <button onclick="resetTeamStats()" class="px-3 py-1.5 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Reset Wins/Losses for ALL teams">
+                        <button data-action="reset-team-stats" data-loading="Resetting..." class="px-3 py-1.5 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Reset Wins/Losses for ALL teams">
                             <i class="fa-solid fa-rotate-left mr-1"></i> Reset W/L
                         </button>
-                        <button onclick="document.getElementById('csvInput').click()" class="px-3 py-1.5 border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Import Teams (CSV)">
+                        <button data-action="pick-csv" class="px-3 py-1.5 border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Import Teams (CSV)">
                             <i class="fa-solid fa-file-csv mr-1"></i> Import CSV
                         </button>
-                        <button onclick="downloadCsvTemplate()" class="px-3 py-1.5 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Download CSV Template">
+                        <button data-action="download-csv-template" class="px-3 py-1.5 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-white rounded text-[10px] font-bold uppercase transition" title="Download CSV Template">
                             <i class="fa-solid fa-file-arrow-down mr-1"></i> Template
                         </button>
-                        <input type="file" id="csvInput" class="hidden" accept=".csv" onchange="importTeamsCSV(this)">
+                        <input type="file" id="csvInput" class="hidden js-import-csv" accept=".csv">
                     </div>
                     <div class="relative w-full md:w-80">
                         <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
-                        <input type="text" id="teamSearch" oninput="renderTeams(allTeams)" placeholder="Search team..." class="w-full bg-[#0f1113] border border-[#2d3139] pl-10 pr-4 py-3 rounded text-sm focus:border-[#ff4655] outline-none transition text-white placeholder-gray-500">
+                        <input type="text" id="teamSearch" placeholder="Search team..." class="js-team-search w-full bg-[#0f1113] border border-[#2d3139] pl-10 pr-4 py-3 rounded text-sm focus:border-[#ff4655] outline-none transition text-white placeholder-gray-500">
                     </div>
                 </div>
                 <div id="teamGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
@@ -384,7 +408,7 @@
                     </div>
                     <div class="relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
-                        <input id="logSearch" oninput="filterLogs()" placeholder="Search logs..." class="bg-[#0f1113] border border-[#2d3139] text-sm pl-9 pr-4 py-2 rounded text-white focus:border-blue-500 outline-none w-64 placeholder-gray-600 font-mono transition-colors">
+                        <input id="logSearch" placeholder="Search logs..." class="js-log-search bg-[#0f1113] border border-[#2d3139] text-sm pl-9 pr-4 py-2 rounded text-white focus:border-blue-500 outline-none w-64 placeholder-gray-600 font-mono transition-colors">
                     </div>
                 </div>
                 <div class="bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden">
@@ -404,37 +428,37 @@
     <!-- QUICK ACTION CONTEXT MENU -->
     <div id="matchCtxMenu" class="fixed z-[500] bg-[#1a1d21] border border-[#333] rounded shadow-2xl hidden flex-col w-48 py-1 transform scale-95 opacity-0 transition-all duration-100 origin-top-right">
         <div class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-[#333] mb-1">Quick Actions</div>
-        <button onclick="quickAction('winA')" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameA" class="truncate">A</span></button>
-        <button onclick="quickAction('winB')" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameB" class="truncate">B</span></button>
+        <button data-action="quick-action" data-quick="winA" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameA" class="truncate">A</span></button>
+        <button data-action="quick-action" data-quick="winB" class="text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#222] hover:text-green-400 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-trophy w-4"></i> Win: <span id="ctxNameB" class="truncate">B</span></button>
         <div class="h-[1px] bg-[#333] my-1"></div>
-        <button onclick="quickAction('copyPass')" class="text-left px-4 py-2.5 text-xs text-blue-400 hover:bg-blue-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-key w-4"></i> Copy Password</button>
-        <button onclick="quickAction('reset')" class="text-left px-4 py-2.5 text-xs text-yellow-500 hover:bg-yellow-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-rotate-left w-4"></i> Reset Match</button>
+        <button data-action="quick-action" data-quick="copyPass" class="text-left px-4 py-2.5 text-xs text-blue-400 hover:bg-blue-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-key w-4"></i> Copy Password</button>
+        <button data-action="quick-action" data-quick="reset" class="text-left px-4 py-2.5 text-xs text-yellow-500 hover:bg-yellow-500/10 transition font-bold uppercase w-full flex items-center gap-2"><i class="fa-solid fa-rotate-left w-4"></i> Reset Match</button>
     </div>
 
     <div id="modalBackdrop" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm transition-opacity duration-300">
         <div id="roundSchedulerModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
             <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]">
                 <h3 class="text-base font-header text-white">ROUND SCHEDULER</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="p-8 space-y-6">
                 <p class="text-sm text-gray-400">Set start time for <span id="rsCount" class="text-[#ff4655] font-bold text-lg">0</span> matches.</p>
                 <input type="datetime-local" id="rsTime" class="w-full input-dark [color-scheme:dark]">
-                <button onclick="submitRoundSchedule()" class="btn-val w-full py-4 rounded font-bold text-sm tracking-wider">APPLY SCHEDULE</button>
+                <button data-action="submit-round-schedule" data-loading="Applying..." class="btn-val w-full py-4 rounded font-bold text-sm tracking-wider">APPLY SCHEDULE</button>
             </div>
         </div>
 
         <div id="editMatchModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-2xl border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#21252b]">
                 <h3 class="text-base font-header text-white">MATCH CONTROL</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="flex border-b border-[#333] bg-[#15171a]">
-                <button onclick="switchMatchTab('overview')" id="tab-overview" class="tab-btn active flex-1 py-3 text-xs font-bold uppercase">Overview</button>
-                <button onclick="switchMatchTab('scoreboard')" id="tab-scoreboard" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Scoreboard</button>
-                <button onclick="switchMatchTab('veto')" id="tab-veto" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Veto Log</button>
-                <button onclick="switchMatchTab('chat')" id="tab-chat" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Live Chat</button>
-                <button onclick="switchMatchTab('admin')" id="tab-admin" class="tab-btn flex-1 py-3 text-xs font-bold uppercase text-red-500">Danger Zone</button>
+                <button data-action="switch-match-tab" data-tab="overview" id="tab-overview" class="tab-btn active flex-1 py-3 text-xs font-bold uppercase">Overview</button>
+                <button data-action="switch-match-tab" data-tab="scoreboard" id="tab-scoreboard" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Scoreboard</button>
+                <button data-action="switch-match-tab" data-tab="veto" id="tab-veto" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Veto Log</button>
+                <button data-action="switch-match-tab" data-tab="chat" id="tab-chat" class="tab-btn flex-1 py-3 text-xs font-bold uppercase">Live Chat</button>
+                <button data-action="switch-match-tab" data-tab="admin" id="tab-admin" class="tab-btn flex-1 py-3 text-xs font-bold uppercase text-red-500">Danger Zone</button>
             </div>
             <div class="p-8 overflow-y-auto flex-1 custom-scroll">
                 <div id="view-tab-overview" class="space-y-6">
@@ -442,78 +466,78 @@
                         <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Match Name</label><input id="emName" class="w-full input-dark font-bold text-lg"></div>
                         <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Status</label><select id="emStatus" class="w-full bg-[#1a1d21] border-b-2 border-[#2d3139] text-white text-base py-2.5 outline-none"><option value="scheduled">SCHEDULED</option><option value="live">LIVE</option><option value="finished">FINISHED</option></select></div>
                     </div>
-                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Time</label><div class="flex gap-4"><input type="datetime-local" id="emTime" class="flex-1 input-dark [color-scheme:dark]"><button onclick="adjustTime(15)" class="px-4 bg-[#222] border border-[#333] text-gray-400 text-xs rounded hover:text-white font-bold">+15m</button></div></div>
+                    <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Time</label><div class="flex gap-4"><input type="datetime-local" id="emTime" class="flex-1 input-dark [color-scheme:dark]"><button data-action="adjust-time" data-minutes="15" class="px-4 bg-[#222] border border-[#333] text-gray-400 text-xs rounded hover:text-white font-bold">+15m</button></div></div>
                     <div class="flex gap-3 mt-4">
-                        <button onclick="openVetoPage()" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase">Open Veto Interface</button>
-                        <button onclick="openOverlayPage()" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase bg-blue-600 hover:bg-blue-500">Open Overlay</button>
+                        <button data-action="open-veto-page" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase">Open Veto Interface</button>
+                        <button data-action="open-overlay-page" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase bg-blue-600 hover:bg-blue-500">Open Overlay</button>
                     </div>
                 </div>
                 <div id="view-tab-scoreboard" class="hidden space-y-6">
-                    <div class="flex justify-between items-center"><label class="text-xs text-[#ff4655] font-bold uppercase">Manual Scores</label><select id="emFormat" onchange="updateScoreInputs()" class="bg-[#0f1113] text-white text-xs p-2 border border-[#333] rounded"><option value="BO1">BO1</option><option value="BO3">BO3</option><option value="BO5">BO5</option></select></div>
+                    <div class="flex justify-between items-center"><label class="text-xs text-[#ff4655] font-bold uppercase">Manual Scores</label><select id="emFormat" class="js-em-format bg-[#0f1113] text-white text-xs p-2 border border-[#333] rounded"><option value="BO1">BO1</option><option value="BO3">BO3</option><option value="BO5">BO5</option></select></div>
                     <div id="manualScoreInputs" class="space-y-3 bg-black/20 p-4 rounded border border-[#333]"></div>
                 </div>
                 <div id="view-tab-veto" class="hidden space-y-6">
                     <div id="vetoSummaryContent" class="space-y-4"></div>
-                    <button onclick="resetVeto()" class="w-full py-3 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-xs font-bold uppercase">RESET VETO STATE</button>
+                    <button data-action="reset-veto" data-loading="Resetting..." class="w-full py-3 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white rounded text-xs font-bold uppercase">RESET VETO STATE</button>
                 </div>
                 <div id="view-tab-chat" class="hidden h-full flex flex-col">
                     <div id="adminChatBox" class="flex-1 bg-black/20 border border-[#333] rounded p-4 overflow-y-auto custom-scroll space-y-2 mb-4 min-h-[300px]"></div>
                     <div class="flex gap-2">
-                        <input id="adminChatInput" class="flex-1 bg-[#0f1113] border border-[#333] text-white text-sm px-4 py-2 rounded focus:border-[#ff4655] outline-none" placeholder="Type message as ADMIN..." onkeypress="if(event.key==='Enter') sendAdminChat()">
-                        <button onclick="sendAdminChat()" class="btn-val px-6 py-2 rounded text-xs font-bold">SEND</button>
+                        <input id="adminChatInput" class="js-admin-chat-input flex-1 bg-[#0f1113] border border-[#333] text-white text-sm px-4 py-2 rounded focus:border-[#ff4655] outline-none" placeholder="Type message as ADMIN...">
+                        <button data-action="send-admin-chat" class="btn-val px-6 py-2 rounded text-xs font-bold">SEND</button>
                     </div>
                 </div>
                 <div id="view-tab-admin" class="hidden space-y-6">
-                    <button onclick="rematchMatch()" class="w-full py-3 mb-2 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500 hover:text-[#111] rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-rotate-left mr-2"></i> RESET & REMATCH</button>
+                    <button data-action="rematch-match" data-loading="Resetting..." class="w-full py-3 mb-2 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500 hover:text-[#111] rounded text-xs font-bold uppercase transition"><i class="fa-solid fa-rotate-left mr-2"></i> RESET & REMATCH</button>
                     <div class="bg-blue-900/5 border border-blue-500/20 p-4 rounded">
                         <label class="text-xs text-blue-400 font-bold uppercase mb-3 block">Audio System Test</label>
                         <div class="grid grid-cols-2 gap-2">
-                            <button onclick="testAudio('ready')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Match Ready</button>
-                            <button onclick="testAudio('turn')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Turn Change</button>
-                            <button onclick="testAudio('action')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Action</button>
-                            <button onclick="testAudio('tick')" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Timer Tick</button>
+                            <button data-action="test-audio" data-sound="ready" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Match Ready</button>
+                            <button data-action="test-audio" data-sound="turn" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Turn Change</button>
+                            <button data-action="test-audio" data-sound="action" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Action</button>
+                            <button data-action="test-audio" data-sound="tick" class="bg-blue-900/10 hover:bg-blue-500 hover:text-white text-blue-400 border border-blue-500/30 py-2 rounded text-[10px] font-bold uppercase">Timer Tick</button>
                         </div>
                     </div>
                     <div class="bg-red-900/5 border border-red-500/20 p-4 rounded">
                         <label class="text-xs text-red-400 font-bold uppercase mb-3 block">Force Result</label>
-                        <div class="flex gap-3"><button onclick="forceWinner('teamA')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameA">A</span></button><button onclick="forceWinner('teamB')" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameB">B</span></button></div>
+                        <div class="flex gap-3"><button data-action="force-winner" data-side="teamA" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameA">A</span></button><button data-action="force-winner" data-side="teamB" class="flex-1 bg-red-900/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 py-3 rounded text-xs font-bold uppercase">Win: <span id="forceNameB">B</span></button></div>
                     </div>
-                    <button onclick="deleteMatch()" class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase">DELETE MATCH</button>
+                    <button data-action="delete-match" data-loading="Deleting..." class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase">DELETE MATCH</button>
                 </div>
             </div>
-            <div class="p-6 border-t border-[#333] bg-[#21252b]"><button onclick="saveMatchEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm tracking-widest">SAVE CHANGES</button></div>
+            <div class="p-6 border-t border-[#333] bg-[#21252b]"><button data-action="save-match-edit" data-loading="Saving..." class="btn-val w-full py-3.5 rounded font-bold text-sm tracking-widest">SAVE CHANGES</button></div>
         </div>
 
         <div id="stageModal" class="modal-content hidden bg-[#1a1d21] w-full h-full border-none rounded-none shadow-none animate-slide-up flex flex-col">
             <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#222]">
                 <h3 class="text-base font-header text-white">CONFIGURE STAGE</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="flex flex-1 overflow-hidden">
                 <!-- Format Selection Sidebar -->
                 <div class="w-80 shrink-0 bg-[#15171a] border-r border-[#333] overflow-y-auto custom-scroll p-4 space-y-2">
                     <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Format</div>
-                    <button onclick="selectFormat('single_elim')" id="btn-fmt-single_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="single_elim" id="btn-fmt-single_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">Single Elimination</div>
                         <div class="text-[10px] text-gray-500 mt-1">Standard knockout bracket. Winners advance, losers eliminated.</div>
                     </button>
-                    <button onclick="selectFormat('double_elim')" id="btn-fmt-double_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="double_elim" id="btn-fmt-double_elim" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">Double Elimination</div>
                         <div class="text-[10px] text-gray-500 mt-1">Winners and Losers brackets. Second chance for players.</div>
                     </button>
-                    <button onclick="selectFormat('round_robin')" id="btn-fmt-round_robin" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="round_robin" id="btn-fmt-round_robin" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">Round Robin</div>
                         <div class="text-[10px] text-gray-500 mt-1">League style. Everyone plays everyone.</div>
                     </button>
-                    <button onclick="selectFormat('swiss')" id="btn-fmt-swiss" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="swiss" id="btn-fmt-swiss" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">Swiss System</div>
                         <div class="text-[10px] text-gray-500 mt-1">Non-elimination. Pair by record.</div>
                     </button>
-                    <button onclick="selectFormat('gsl')" id="btn-fmt-gsl" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="gsl" id="btn-fmt-gsl" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">GSL Groups</div>
                         <div class="text-[10px] text-gray-500 mt-1">Dual Tournament group stage.</div>
                     </button>
-                    <button onclick="selectFormat('cross_group')" id="btn-fmt-cross_group" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
+                    <button data-action="select-format" data-format="cross_group" id="btn-fmt-cross_group" class="format-btn w-full text-left p-3 rounded border border-[#333] hover:bg-[#222] hover:border-[#ff4655] transition group">
                         <div class="font-bold text-white group-hover:text-[#ff4655]">Cross-Group</div>
                         <div class="text-[10px] text-gray-500 mt-1">Split 2 groups. A plays B.</div>
                     </button>
@@ -557,38 +581,38 @@
                                 <label class="text-xs text-[#ff4655] font-bold uppercase">Participants</label>
                                 <div class="flex gap-2">
                                     <select id="impStage" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none"></select>
-                                    <select id="impType" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none" onchange="toggleImpInput()">
+                                    <select id="impType" class="js-imp-type bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none">
                                         <option value="all">All Participants</option>
                                         <option value="top_n">Top N (Standings)</option>
                                         <option value="gsl">GSL Qualified (Top 2)</option>
                                     </select>
                                     <input type="number" id="impCount" value="4" class="w-16 bg-[#1a1d21] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500" placeholder="N">
-                                    <button onclick="runImport()" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
+                                    <button data-action="run-import" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
                                 </div>
                             </div>
 
                             <div id="manualSelectUI" class="grid grid-cols-2 gap-6 h-[500px]">
                                 <div class="flex flex-col bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
                                     <div class="p-2 bg-[#222] text-xs font-bold text-gray-500 uppercase flex justify-between items-center"><span>Pool</span><span id="availCount">0</span></div>
-                                    <div class="px-2 py-1 border-b border-[#333]"><input id="poolSearch" oninput="renderStageLists()" class="w-full bg-[#0f1113] border border-[#333] text-[10px] px-2 py-1 rounded text-white focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Search team..."></div>
+                                    <div class="px-2 py-1 border-b border-[#333]"><input id="poolSearch" class="js-pool-search w-full bg-[#0f1113] border border-[#333] text-[10px] px-2 py-1 rounded text-white focus:border-[#ff4655] outline-none placeholder-gray-600" placeholder="Search team..."></div>
                                     <div id="poolList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'pool')"></div>
                                 </div>
                                 <div class="flex flex-col bg-[#1a1d21] border border-[#ff4655]/30 rounded overflow-hidden">
                                     <div class="p-2 bg-[#222] text-xs font-bold text-[#ff4655] uppercase flex justify-between"><span>Selected</span><span id="selCount">0</span></div>
                                     <div id="selectedList" class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#ff4655]/5 custom-scroll transition-colors" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'selected')"></div>
-                                    <button onclick="clearStageSelection()" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
+                                    <button data-action="clear-stage-selection" class="p-1.5 bg-[#222] border-t border-[#333] text-[10px] text-gray-500 hover:text-white uppercase font-bold w-full">Clear All</button>
                                 </div>
                             </div>
                         </div>
 
-                        <button onclick="generateStage()" class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
+                        <button data-action="generate-stage" data-loading="Generating..." class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <div id="createTourneyModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-lg border border-[#333] rounded-lg shadow-2xl animate-slide-up">
-            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">NEW SYSTEM</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">NEW SYSTEM</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Name</label><input id="tnName" class="w-full input-dark text-lg" placeholder="Tournament Name"></div>
                 
@@ -601,12 +625,12 @@
                     <p class="text-[10px] text-gray-600 italic text-right">* Required exactly 7 maps</p>
                 </div>
                 
-                <button onclick="createTournament()" class="btn-val w-full py-3.5 rounded font-bold text-sm">INITIALIZE SYSTEM</button>
+                <button data-action="create-tournament" data-loading="Creating..." class="btn-val w-full py-3.5 rounded font-bold text-sm">INITIALIZE SYSTEM</button>
             </div>
         </div>
 
         <div id="tourneySettingsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-lg border border-[#333] rounded-lg shadow-2xl animate-slide-up">
-            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">SETTINGS</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">SETTINGS</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="tsId"><input id="tsName" class="w-full input-dark text-lg font-bold">
                 
@@ -622,14 +646,14 @@
                     <p class="text-[10px] text-gray-600 italic text-right">* Changing this affects all pending matches</p>
                 </div>
                 
-                <div class="pt-4 flex flex-col gap-3"><button onclick="updateTourneyName()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SYSTEM</button><button onclick="deleteTourney()" class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase transition">DELETE SYSTEM</button></div>
+                <div class="pt-4 flex flex-col gap-3"><button data-action="update-tourney-name" data-loading="Updating..." class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SYSTEM</button><button data-action="delete-tourney" data-loading="Deleting..." class="w-full py-3 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white rounded text-xs font-bold uppercase transition">DELETE SYSTEM</button></div>
             </div>
         </div>
 
         <div id="stageSettingsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
                 <h3 class="text-base font-header text-white">STAGE SETTINGS</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="ssTourneyId"><input type="hidden" id="ssStageIndex">
@@ -637,36 +661,36 @@
                     <label class="text-xs text-gray-500 font-bold uppercase">Tiebreaker Priority</label>
                     <div class="flex flex-col gap-2"><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">1.</span><select id="ssTb1" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">2.</span><select id="ssTb2" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div><div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-4">3.</span><select id="ssTb3" class="bg-[#0f1113] border border-[#333] text-white text-xs p-2 rounded flex-1 outline-none focus:border-[#ff4655]"><option value="h2h">Head to Head</option><option value="map_diff">Map Diff</option><option value="round_diff">Round Diff</option></select></div></div>
                 </div>
-                <button onclick="saveStageSettings()" class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SETTINGS</button>
+                <button data-action="save-stage-settings" data-loading="Saving..." class="btn-val w-full py-3 rounded font-bold text-sm">UPDATE SETTINGS</button>
             </div>
         </div>
         
         <div id="manageTeamsModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-4xl border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
                 <h3 class="text-base font-header text-white">MANAGE STAGE TEAMS</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="manageTeamsContent" class="p-8 overflow-y-auto custom-scroll flex-1"></div>
         </div>
 
-        <div id="rosterModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-3xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
-            <div class="p-5 border-b border-[#333] flex justify-between bg-[#222]"><h3 class="text-base font-header text-white">ROSTER MANAGEMENT</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+        <div id="rosterModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-4xl border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between bg-[#222]"><h3 class="text-base font-header text-white">ROSTER MANAGEMENT</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div id="rosterModalContent" class="p-8"></div>
         </div>
         <div id="teamEditModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
-             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button onclick="closeModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="teId"><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Team Name</label><input id="teName" class="w-full input-dark text-base"></div><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tag (Short Name)</label><input id="teShort" class="w-full input-dark text-base uppercase"></div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Wins</label><input type="number" id="teWins" class="w-full input-dark text-base"></div>
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Losses</label><input type="number" id="teLosses" class="w-full input-dark text-base"></div>
                 </div>
-                <button onclick="saveTeamEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm mt-2">SAVE CHANGES</button>
+                <button data-action="save-team-edit" data-loading="Saving..." class="btn-val w-full py-3.5 rounded font-bold text-sm mt-2">SAVE CHANGES</button>
             </div>
         </div>
     </div>
     
-    <div id="imageViewerModal" class="fixed inset-0 z-[300] bg-black/95 hidden items-center justify-center backdrop-blur-xl" onclick="this.classList.add('hidden'); this.classList.remove('flex')">
+    <div id="imageViewerModal" class="fixed inset-0 z-[300] bg-black/95 hidden items-center justify-center backdrop-blur-xl" data-action="close-image-viewer">
         <div class="relative max-w-[90vw] max-h-[90vh]">
             <img id="imageViewerSrc" src="" class="max-w-full max-h-[90vh] rounded shadow-2xl border border-white/10">
         </div>
@@ -709,6 +733,212 @@
         let vetoTimerInt = null;
         let stageGroupNames = {}; // Store custom group names
         let swapSourceIndex = null; // For click-to-swap
+        let activeModalId = null;
+
+        function renderSkeletonCards(count = 6) {
+            return Array.from({ length: count }, () => `
+                <div class="bg-[#15171a] border border-[#2d3139] rounded-lg p-4 space-y-3">
+                    <div class="skeleton h-3 w-1/3 rounded"></div>
+                    <div class="skeleton h-8 w-full rounded"></div>
+                    <div class="skeleton h-8 w-full rounded"></div>
+                </div>
+            `).join('');
+        }
+
+        function showSectionSkeletons() {
+            const live = document.getElementById('liveMatches');
+            const pending = document.getElementById('pendingScores');
+            const teams = document.getElementById('teamGrid');
+            const stages = document.getElementById('stageList');
+            if (live) live.innerHTML = renderSkeletonCards(8);
+            if (pending) pending.innerHTML = renderSkeletonCards(4);
+            if (teams) teams.innerHTML = renderSkeletonCards(6);
+            if (stages) stages.innerHTML = renderSkeletonCards(3);
+        }
+
+        async function withButtonLoading(el, task) {
+            if (!el) return task();
+            const restoreText = el.dataset.loadingRestore || el.innerHTML;
+            el.dataset.loadingRestore = restoreText;
+            const loadingText = el.dataset.loading || 'Loading...';
+            el.classList.add('btn-loading');
+            el.setAttribute('disabled', 'disabled');
+            el.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i>${loadingText}`;
+            try {
+                return await task();
+            } finally {
+                el.classList.remove('btn-loading');
+                el.removeAttribute('disabled');
+                el.innerHTML = restoreText;
+            }
+        }
+
+        function createRoundSection(label, matchIds, cardsHtml) {
+            return `<div class="mb-8 last:mb-0"><div class="flex justify-between items-center bg-[#1a1d21] px-4 py-2.5 rounded border border-[#2d3139] mb-3"><span class="text-xs font-bold text-white uppercase tracking-widest">${label}</span><button data-action="open-round-scheduler" data-ids="${matchIds}" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${cardsHtml}</div></div>`;
+        }
+
+        function createStandingsRows(standings) {
+            return standings.map((st, i) => `
+                <tr class="hover:bg-[#222] transition-colors border-b border-[#222] last:border-0">
+                    <td class="py-3 px-4 text-center font-mono text-gray-500 border-r border-[#222]">${i+1}</td>
+                    <td class="py-3 px-4 font-bold text-white">${st.name}</td>
+                    <td class="py-3 px-4 text-center text-gray-300">${st.played}</td>
+                    <td class="py-3 px-4 text-center font-bold text-green-400 bg-green-500/5">${st.wins}</td>
+                    <td class="py-3 px-4 text-center font-bold text-red-400 bg-red-500/5">${st.losses}</td>
+                    <td class="py-3 px-4 text-center font-mono text-gray-400 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td>
+                    <td class="py-3 px-4 text-center font-mono font-bold ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td>
+                    <td class="py-3 px-4 text-center font-mono font-bold ${st.diff>0?'text-green-400':(st.diff<0?'text-red-400':'text-gray-500')} border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td>
+                </tr>
+            `).join('');
+        }
+
+        function migrateInlineEvents(root = document) {
+            const eventAttrs = [
+                'onclick', 'onchange', 'oninput', 'onkeypress',
+                'ondragstart', 'ondragover', 'ondragleave', 'ondrop', 'ondragend',
+                'onmouseenter', 'onmouseleave'
+            ];
+
+            eventAttrs.forEach((attr) => {
+                const eventName = attr.slice(2);
+                if (root.nodeType === 1 && root.hasAttribute && root.hasAttribute(attr)) {
+                    const code = root.getAttribute(attr);
+                    const bindFlag = `data-bound-${attr}`;
+                    if (code && root.getAttribute(bindFlag) !== '1') {
+                        const handler = new Function('event', code);
+                        root.addEventListener(eventName, function(event) {
+                            return handler.call(root, event);
+                        });
+                        root.setAttribute(bindFlag, '1');
+                    }
+                    root.removeAttribute(attr);
+                }
+                const nodes = root.querySelectorAll ? root.querySelectorAll(`[${attr}]`) : [];
+                nodes.forEach((node) => {
+                    const code = node.getAttribute(attr);
+                    if (!code) return;
+                    const bindFlag = `data-bound-${attr}`;
+                    if (node.getAttribute(bindFlag) === '1') {
+                        node.removeAttribute(attr);
+                        return;
+                    }
+                    const handler = new Function('event', code);
+                    node.addEventListener(eventName, function(event) {
+                        return handler.call(node, event);
+                    });
+                    node.setAttribute(bindFlag, '1');
+                    node.removeAttribute(attr);
+                });
+            });
+        }
+
+        function bindUIEvents() {
+            migrateInlineEvents(document);
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) {
+                            migrateInlineEvents(node);
+                        }
+                    });
+                });
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            document.addEventListener('click', async (event) => {
+                const trigger = event.target.closest('[data-action]');
+                if (!trigger) return;
+
+                const action = trigger.dataset.action;
+                const run = async () => {
+                    switch (action) {
+                        case 'nav': return nav(trigger.dataset.view);
+                        case 'logout': return logout();
+                        case 'clear-selection': return clearSelection();
+                        case 'apply-bulk-time': return applyBulkTime();
+                        case 'reset-team-stats': return resetTeamStats();
+                        case 'pick-csv': return document.getElementById('csvInput').click();
+                        case 'download-csv-template': return downloadCsvTemplate();
+                        case 'quick-action': return quickAction(trigger.dataset.quick);
+                        case 'close-modal': return closeModal();
+                        case 'submit-round-schedule': return submitRoundSchedule();
+                        case 'switch-match-tab': return switchMatchTab(trigger.dataset.tab);
+                        case 'adjust-time': return adjustTime(parseInt(trigger.dataset.minutes || '15', 10));
+                        case 'open-veto-page': return openVetoPage();
+                        case 'open-overlay-page': return openOverlayPage();
+                        case 'reset-veto': return resetVeto();
+                        case 'send-admin-chat': return sendAdminChat();
+                        case 'rematch-match': return rematchMatch();
+                        case 'clear-stage-selection': return clearStageSelection();
+                        case 'generate-stage': return generateStage();
+                        case 'create-tournament': return createTournament();
+                        case 'update-tourney-name': return updateTourneyName();
+                        case 'delete-tourney': return deleteTourney();
+                        case 'save-stage-settings': return saveStageSettings();
+                        case 'save-team-edit': return saveTeamEdit();
+                        case 'open-edit-match': return openEditMatch(trigger.dataset.id);
+                        case 'resolve-pause': return resolvePause(trigger.dataset.id);
+                        case 'admin-pause-match': return adminPauseMatch(trigger.dataset.id);
+                        case 'test-audio': return testAudio(trigger.dataset.sound);
+                        case 'force-winner': return forceWinner(trigger.dataset.side);
+                        case 'delete-match': return deleteMatch();
+                        case 'save-match-edit': return saveMatchEdit();
+                        case 'select-format': return selectFormat(trigger.dataset.format);
+                        case 'run-import': return runImport();
+                        case 'open-match-context-menu':
+                            event.stopPropagation();
+                            return openMatchContextMenu(event, trigger.dataset.id);
+                        case 'reset-veto-timer': return resetVetoTimer();
+                        case 'close-image-viewer':
+                            if (event.target.id === 'imageViewerModal') {
+                                trigger.classList.add('hidden');
+                                trigger.classList.remove('flex');
+                            }
+                            return;
+                        case 'open-round-scheduler':
+                            return openRoundScheduler(trigger.dataset.ids || '');
+                        default:
+                            return;
+                    }
+                };
+
+                if (trigger.dataset.loading) {
+                    await withButtonLoading(trigger, run);
+                    return;
+                }
+                await run();
+            });
+
+            document.addEventListener('change', (event) => {
+                if (event.target.matches('.js-dashboard-filter')) renderDashboard(allMatches);
+                if (event.target.matches('.js-import-csv')) importTeamsCSV(event.target);
+                if (event.target.matches('.js-em-format')) updateScoreInputs();
+                if (event.target.matches('.js-imp-type')) toggleImpInput();
+                if (event.target.matches('[data-action=\"toggle-match-select\"]')) toggleMatchSelect(event.target.dataset.id);
+            });
+
+            document.addEventListener('input', (event) => {
+                if (event.target.matches('.js-dashboard-filter')) renderDashboard(allMatches);
+                if (event.target.matches('.js-team-search')) renderTeams(allTeams);
+                if (event.target.matches('.js-log-search')) filterLogs();
+                if (event.target.matches('.js-pool-search')) renderStageLists();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !document.getElementById('modalBackdrop').classList.contains('hidden')) {
+                    closeModal();
+                }
+                if (event.key === 'Enter' && event.target.matches('.js-admin-chat-input')) {
+                    event.preventDefault();
+                    sendAdminChat();
+                }
+            });
+
+            const backdrop = document.getElementById('modalBackdrop');
+            backdrop.addEventListener('click', (event) => {
+                if (event.target.id === 'modalBackdrop') closeModal();
+            });
+        }
 
         setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('th-TH', {hour12:false}), 1000);
 
@@ -762,6 +992,7 @@
 
         async function init(silent=false) {
             try {
+                if (!silent) showSectionSkeletons();
                 const ts = Date.now();
                 const [rT, rM, rTr, rL] = await Promise.all([
                     fetch(`${API_BASE}/api/teams?t=${ts}`), 
@@ -846,7 +1077,7 @@
         function renderMatchCard(m) {
             const [sA, sB] = calculateMatchScore(m.scores);
             const isSel = selectedMatches.has(m._id);
-            const check = bulkMode ? `<div class="absolute top-3 left-3 z-20" onclick="event.stopPropagation()"><input type="checkbox" class="chk-match w-4 h-4 accent-[#ff4655] cursor-pointer" onchange="toggleMatchSelect('${m._id}')" ${isSel?'checked':''}></div>` : '';
+            const check = bulkMode ? `<div class="absolute top-3 left-3 z-20"><input type="checkbox" data-action="toggle-match-select" data-id="${m._id}" class="chk-match w-4 h-4 accent-[#ff4655] cursor-pointer" ${isSel?'checked':''}></div>` : '';
             const dateObj = m.scheduledTime ? new Date(m.scheduledTime) : null;
             const timeStr = dateObj ? dateObj.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : 'TBA';
             const dateStr = dateObj ? dateObj.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'}) : '';
@@ -865,8 +1096,8 @@
 
             let pauseAlert = '';
             if (m.pauseRequest && m.pauseRequest.status === 'pending') {
-                pauseAlert = `<div class="absolute inset-0 bg-yellow-500/90 z-30 flex flex-col items-center justify-center text-black animate-pulse cursor-default" onclick="event.stopPropagation()">
-                    <i class="fa-solid fa-pause text-3xl mb-2"></i><div class="font-bold text-xs uppercase tracking-widest">PAUSE REQUESTED</div><div class="text-[10px] font-mono mb-3">"${m.pauseRequest.reason}"</div><button onclick="resolvePause('${m._id}')" class="bg-black text-white px-4 py-1 rounded text-[10px] font-bold hover:bg-gray-800">RESOLVE</button></div>`;
+                pauseAlert = `<div class="absolute inset-0 bg-yellow-500/90 z-30 flex flex-col items-center justify-center text-black animate-pulse cursor-default">
+                    <i class="fa-solid fa-pause text-3xl mb-2"></i><div class="font-bold text-xs uppercase tracking-widest">PAUSE REQUESTED</div><div class="text-[10px] font-mono mb-3">"${m.pauseRequest.reason}"</div><button data-action="resolve-pause" data-id="${m._id}" class="bg-black text-white px-4 py-1 rounded text-[10px] font-bold hover:bg-gray-800">RESOLVE</button></div>`;
             }
 
             let statusText = isLive ? 'LIVE' : m.status.substring(0,3);
@@ -877,7 +1108,7 @@
 
             if (compactMode) {
                 return `
-                <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="${cardClass.replace('p-3', 'p-2')} text-xs">
+                <div ${!bulkMode ? `data-action="open-edit-match" data-id="${m._id}"` : ''} class="${cardClass.replace('p-3', 'p-2')} text-xs">
                     ${pauseAlert}
                     ${check}
                     <div class="flex justify-between items-center mb-1">
@@ -920,7 +1151,6 @@
                     ondragover="allowDrop(event)" 
                     ondragleave="handleTeamDragLeave(event)"
                     ondrop="handleTeamDrop(event, '${m._id}', '${slot}')" 
-                    onclick="event.stopPropagation()"
                     onmouseenter="highlightTeam('${teamId}')" 
                     onmouseleave="resetHighlight()"
                     class="flex justify-between items-center text-sm font-medium ${textColor} transition-colors p-1.5 -mx-1.5 rounded hover:bg-white/5 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 group/team">
@@ -935,7 +1165,7 @@
 
             const menuBtn = !bulkMode ? `
             <div class="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                <button onclick="event.stopPropagation(); openMatchContextMenu(event, '${m._id}')" class="w-6 h-6 bg-[#1a1d21] border border-[#333] hover:border-gray-400 text-gray-400 hover:text-white rounded flex items-center justify-center shadow-lg">
+                <button data-action="open-match-context-menu" data-id="${m._id}" class="w-6 h-6 bg-[#1a1d21] border border-[#333] hover:border-gray-400 text-gray-400 hover:text-white rounded flex items-center justify-center shadow-lg">
                     <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
                 </button>
             </div>` : '';
@@ -967,8 +1197,8 @@
                 }
 
                 const btnAction = v.status === 'paused' 
-                    ? `<button onclick="event.stopPropagation(); resolvePause('${m._id}')" class="px-2 py-0.5 bg-green-500/20 text-green-500 border border-green-500/50 rounded text-[9px] font-bold uppercase hover:bg-green-500 hover:text-white transition">RESUME</button>`
-                    : `<button onclick="event.stopPropagation(); adminPauseMatch('${m._id}')" class="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 rounded text-[9px] font-bold uppercase hover:bg-yellow-500 hover:text-black transition">PAUSE</button>`;
+                    ? `<button data-action="resolve-pause" data-id="${m._id}" class="px-2 py-0.5 bg-green-500/20 text-green-500 border border-green-500/50 rounded text-[9px] font-bold uppercase hover:bg-green-500 hover:text-white transition">RESUME</button>`
+                    : `<button data-action="admin-pause-match" data-id="${m._id}" class="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 rounded text-[9px] font-bold uppercase hover:bg-yellow-500 hover:text-black transition">PAUSE</button>`;
 
                 vetoUI = `
                 <div class="mt-2 pt-2 border-t border-white/5 flex justify-between items-center bg-black/20 p-1.5 rounded">
@@ -978,7 +1208,7 @@
             }
 
             return `
-            <div onclick="${!bulkMode ? `openEditMatch('${m._id}')` : ''}" class="${cardClass}">
+            <div ${!bulkMode ? `data-action="open-edit-match" data-id="${m._id}"` : ''} class="${cardClass}">
                 ${pauseAlert}
                 ${check}
                 <div class="flex justify-between items-center mb-2">
@@ -1134,7 +1364,7 @@
                         let matchesListHtml = '';
                         Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(r => {
                             const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
-                            matchesListHtml += `<div class="mb-6 last:mb-0"><div class="flex justify-between items-center bg-[#1a1d21] px-3 py-2 rounded border-l-4 border-[#ff4655] border-y border-r border-y-[#2d3139] border-r-[#2d3139] mb-3 shadow-sm"><span class="text-xs font-bold text-white uppercase tracking-widest">${label}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2"><i class="fa-regular fa-clock"></i> Set Time</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${roundMatches.map(m => renderMatchCard(m)).join('')}</div></div>`;
+                            matchesListHtml += createRoundSection(label, matchIds, roundMatches.map(m => renderMatchCard(m)).join(''));
                         });
 
                         contentHtml += `<div class="animate-slide-up">${stageControls}<div class="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8"><div class="xl:col-span-5">${renderAdminTable('GROUP ALPHA', alphaStandings, 'text-[#ff4655]')}${renderAdminTable('GROUP OMEGA', omegaStandings, 'text-[#00d4ff]')}</div><div class="xl:col-span-7"><div class="flex items-center justify-between mb-4"><span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Match Schedule</span></div><div class="max-h-[600px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div></div>`;
@@ -1194,17 +1424,7 @@
                             const groupParticipants = new Set();
                             gMatches.forEach(m => { if(m.teamA) groupParticipants.add(m.teamA._id || m.teamA); if(m.teamB) groupParticipants.add(m.teamB._id || m.teamB); });
                             const standings = calculateStandings(gMatches, Array.from(groupParticipants), s.settings);
-                            const rows = standings.map((st, i) => `
-                                <tr class="hover:bg-[#222] transition-colors border-b border-[#222] last:border-0">
-                                    <td class="py-3 px-4 text-center font-mono text-gray-500 border-r border-[#222]">${i+1}</td>
-                                    <td class="py-3 px-4 font-bold text-white">${st.name}</td>
-                                    <td class="py-3 px-4 text-center text-gray-300">${st.played}</td>
-                                    <td class="py-3 px-4 text-center font-bold text-green-400 bg-green-500/5">${st.wins}</td>
-                                    <td class="py-3 px-4 text-center font-bold text-red-400 bg-red-500/5">${st.losses}</td>
-                                    <td class="py-3 px-4 text-center font-mono text-gray-400 border-l border-[#222]">${st.mapsWon}-${st.mapsLost}</td>
-                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.mapDiff>0?'text-green-400':(st.mapDiff<0?'text-red-400':'text-gray-500')}">${st.mapDiff>0?'+':''}${st.mapDiff}</td>
-                                    <td class="py-3 px-4 text-center font-mono font-bold ${st.diff>0?'text-green-400':(st.diff<0?'text-red-400':'text-gray-500')} border-l border-[#222]">${st.diff>0?'+':''}${st.diff}</td>
-                                </tr>`).join('');
+                            const rows = createStandingsRows(standings);
                             
                             const tableHtml = `
                                 <div class="bg-[#15171a] border border-[#2d3139] rounded-lg overflow-hidden shadow-sm">
@@ -1233,19 +1453,7 @@
                             let matchesListHtml = '';
                             Object.keys(rounds).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(r => {
                                 const roundMatches = rounds[r]; const matchIds = roundMatches.map(m => m._id).join(','); const label = `Round ${r}`;
-                                matchesListHtml += `
-                                    <div class="mb-6 last:mb-0">
-                                        <div class="flex justify-between items-center bg-[#1a1d21] px-3 py-2 rounded border-l-4 border-[#ff4655] border-y border-r border-y-[#2d3139] border-r-[#2d3139] mb-3 shadow-sm">
-                                            <span class="text-xs font-bold text-white uppercase tracking-widest">${label}</span>
-                                            <button onclick="openRoundScheduler('${matchIds}')" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-400 px-3 py-1 rounded transition font-bold border border-[#333] flex items-center gap-2">
-                                                <i class="fa-regular fa-clock"></i> Set Time
-                                            </button>
-                                        </div>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            ${roundMatches.map(m => renderMatchCard(m)).join('')}
-                                        </div>
-                                    </div>
-                                `;
+                                matchesListHtml += createRoundSection(label, matchIds, roundMatches.map(m => renderMatchCard(m)).join(''));
                             });
                             groupContent = `<div class="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8"><div class="xl:col-span-5">${tableHtml}</div><div class="xl:col-span-7"><div class="flex items-center justify-between mb-4"><span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Match Schedule</span></div><div class="max-h-[600px] overflow-y-auto custom-scroll pr-2">${matchesListHtml}</div></div></div>`;
                         }
@@ -1298,7 +1506,7 @@
                                 else if (parseInt(r) >= 100) displayRound = `Round ${r - 100}`;
                                 
                                 const widthStyle = compactMode ? 'min-width: 200px;' : '';
-                                return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>${displayRound}</span><button onclick="openRoundScheduler('${matchIds}')" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col justify-around flex-1">${roundMatches.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m)}</div>`).join('')}</div></div>`;
+                                return `<div class="bracket-round" style="${widthStyle}"><div class="bracket-header"><span>${displayRound}</span><button data-action="open-round-scheduler" data-ids="${matchIds}" class="text-gray-500 hover:text-white transition" title="Set Time"><i class="fa-regular fa-clock"></i></button></div><div class="flex flex-col justify-around flex-1">${roundMatches.map(m => `<div id="bracket-match-${m._id}" class="relative z-10 bracket-node">${renderMatchCard(m)}</div>`).join('')}</div></div>`;
                             }).join('');
                             return `<div class="mb-8 relative z-10"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container" style="overflow: visible">${columnsHtml}</div></div>`;
                         };
@@ -1545,8 +1753,118 @@
                 return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden shadow-xl hover:border-gray-500 transition group"><div class="bg-[#1a1d21] px-6 py-4 flex justify-between items-center border-b border-[#2d3139]"><div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div><h4 class="text-xs font-bold text-gray-300 uppercase tracking-widest">${m.name}</h4></div><span class="text-xs font-mono text-gray-500">${new Date(m.scheduledTime).toLocaleDateString()}</span></div><div class="p-6"><div class="flex justify-between items-end mb-6 px-4"><div class="text-center"><div class="text-xl font-header font-bold text-white">${m.teamA.name}</div><div class="text-[10px] text-gray-500 font-bold uppercase">Score: <span class="text-white text-lg ml-1">${winsA}</span></div></div><div class="text-gray-700 font-header text-lg pb-1">VS</div><div class="text-center"><div class="text-xl font-header font-bold text-white">${m.teamB.name}</div><div class="text-[10px] text-gray-500 font-bold uppercase">Score: <span class="text-white text-lg ml-1">${winsB}</span></div></div></div><div class="bg-[#0f1113] rounded p-3 mb-5 border border-white/5">${mapsHtml}</div><div class="grid grid-cols-2 gap-3"><button onclick="approveScore('${m._id}')" class="bg-green-500/10 hover:bg-green-600 hover:text-white text-green-500 border border-green-500/20 py-3 rounded text-xs font-bold uppercase transition">Approve</button><button onclick="rejectScore('${m._id}')" class="bg-red-500/10 hover:bg-red-600 hover:text-white text-red-500 border border-red-500/20 py-3 rounded text-xs font-bold uppercase transition">Reject</button></div></div></div>`;
             }).join('');
         }
-        function renderMemberRow(tid, m) { if (m.status === 'pending' && m.pendingUpdate) return `<div class="bg-[#1a1d21] border border-orange-500/50 rounded p-4 mb-3 relative group shadow-lg shadow-orange-900/10"><div class="flex justify-between items-center mb-3"><span class="text-[9px] font-bold bg-orange-500 text-black px-2 py-0.5 rounded uppercase tracking-widest">Name Change Request</span><div class="text-[10px] text-gray-500 font-mono">ID: ${m.pendingUpdate.riotId || 'N/A'}</div></div><div class="flex items-center gap-4 mb-4 bg-black/20 p-2 rounded"><div class="flex-1 text-right opacity-60"><div class="text-[8px] text-gray-500 uppercase font-bold mb-0.5">Current</div><div class="font-bold text-white text-sm line-through decoration-red-500">${m.name}</div><div class="font-mono text-[10px] text-gray-500">#${m.tag}</div></div><div class="text-orange-500 text-sm"><i class="fa-solid fa-arrow-right"></i></div><div class="flex-1 text-left"><div class="text-[8px] text-orange-500 uppercase font-bold mb-0.5">New Name</div><div class="font-bold text-white text-sm text-shadow-glow">${m.pendingUpdate.name}</div><div class="font-mono text-[10px] text-orange-200">#${m.pendingUpdate.tag}</div></div></div><div class="flex gap-2 border-t border-white/5 pt-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="flex-1 bg-green-600/20 hover:bg-green-600 hover:text-white text-green-400 border border-green-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-check mr-1"></i> Approve Change</button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="flex-1 bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 border border-red-600/40 py-2 rounded text-[10px] font-bold uppercase transition"><i class="fa-solid fa-xmark mr-1"></i> Reject</button></div></div>`; else if (m.status === 'pending') return `<div class="bg-[#1a1d21] border border-blue-500/30 rounded p-3 mb-2 flex justify-between items-center relative overflow-hidden"><div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div><div class="pl-4"><div class="flex items-center gap-2"><span class="text-white font-bold text-base leading-none">${m.name}</span><span class="bg-blue-500/20 text-blue-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-500/20">NEW</span></div><div class="text-xs font-mono text-gray-500 mt-1">#${m.tag} • ${m.role}</div></div><div class="flex gap-2"><button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-green-500 hover:bg-green-600 hover:text-white hover:border-green-600 transition"><i class="fa-solid fa-check text-sm"></i></button><button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="w-8 h-8 rounded bg-[#0f1113] border border-[#333] text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 transition"><i class="fa-solid fa-xmark text-sm"></i></button></div></div>`; return `<div class="group flex justify-between items-center p-3 rounded hover:bg-[#15171a] border border-transparent hover:border-[#333] transition mb-1"><div class="flex items-center gap-4"><div class="w-2 h-2 rounded-full ${m.status==='rejected'?'bg-red-500':'bg-[#1fa474]'}"></div><div><div class="text-sm font-bold text-gray-300 group-hover:text-white transition">${m.name}</div><div class="text-[10px] font-mono text-gray-600">#${m.tag} <span class="text-gray-700">|</span> ${m.role}</div></div></div><button onclick="deleteMember('${tid}', '${m._id}')" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition px-2"><i class="fa-solid fa-trash-can text-sm"></i></button></div>`; }
-        function openRosterModal(teamId) { const team = allTeams.find(t => t._id === teamId); if(!team) return; document.getElementById('rosterModalContent').innerHTML = `<div class="mb-6 flex items-center gap-5 border-b border-[#333] pb-6 bg-[#21252b] p-6 -m-8 rounded-t-lg"><img src="${team.logo || DEFAULT_LOGO}" class="w-20 h-20 rounded bg-black object-cover border border-[#333]"><div><h2 class="text-3xl font-header text-white leading-none mb-1">${team.name}</h2><div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><span class="text-[#ff4655]">[${team.shortName}]</span> ROSTER MANAGEMENT</div></div></div><div class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scroll mt-6">${team.members.map(m => renderMemberRow(team._id, m)).join('')}</div>`; openModal('rosterModal'); }
+        function renderMemberRow(tid, m) {
+            const statusColor = m.status === 'rejected' ? 'text-red-400' : (m.status === 'pending' ? 'text-blue-400' : 'text-emerald-400');
+            const statusDot = m.status === 'rejected' ? 'bg-red-500' : (m.status === 'pending' ? 'bg-blue-500' : 'bg-emerald-500');
+            const safeRole = m.role || 'player';
+            const safeTag = m.tag || '-';
+
+            if (m.status === 'pending' && m.pendingUpdate) {
+                return `
+                <div class="bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/40 rounded-xl p-4 mb-3 shadow-lg shadow-orange-900/10">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[10px] font-bold bg-orange-500 text-black px-2 py-0.5 rounded uppercase tracking-widest">Name Change Request</span>
+                        <div class="text-[10px] text-gray-500 font-mono">ID: ${m.pendingUpdate.riotId || 'N/A'}</div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-center bg-black/20 border border-white/5 rounded-lg p-3 mb-3">
+                        <div class="text-right">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Current</div>
+                            <div class="font-bold text-white text-sm line-through decoration-red-500">${m.name}</div>
+                            <div class="font-mono text-[10px] text-gray-500">#${safeTag}</div>
+                        </div>
+                        <div class="text-orange-400 text-sm text-center"><i class="fa-solid fa-arrow-right"></i></div>
+                        <div class="text-left">
+                            <div class="text-[10px] text-orange-400 uppercase font-bold">New Name</div>
+                            <div class="font-bold text-white text-sm">${m.pendingUpdate.name}</div>
+                            <div class="font-mono text-[10px] text-orange-200">#${m.pendingUpdate.tag || '-'}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="bg-green-600/15 hover:bg-green-600 hover:text-white text-green-400 border border-green-600/40 py-2.5 rounded-lg text-[10px] font-bold uppercase transition"><i class="fa-solid fa-check mr-1"></i> Approve Change</button>
+                        <button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="bg-red-600/15 hover:bg-red-600 hover:text-white text-red-400 border border-red-600/40 py-2.5 rounded-lg text-[10px] font-bold uppercase transition"><i class="fa-solid fa-xmark mr-1"></i> Reject</button>
+                    </div>
+                </div>`;
+            }
+
+            if (m.status === 'pending') {
+                return `
+                <div class="bg-gradient-to-r from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl p-3.5 mb-2 flex justify-between items-center">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-user-plus text-xs"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-white font-bold text-sm truncate">${m.name}</span>
+                                <span class="bg-blue-500/20 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30">NEW</span>
+                            </div>
+                            <div class="text-[10px] font-mono text-gray-500 mt-0.5">#${safeTag} • ${safeRole}</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="updateMemberStatus('${tid}', '${m._id}', 'approved')" class="w-8 h-8 rounded-lg bg-[#0f1113] border border-[#333] text-green-500 hover:bg-green-600 hover:text-white hover:border-green-600 transition"><i class="fa-solid fa-check text-sm"></i></button>
+                        <button onclick="updateMemberStatus('${tid}', '${m._id}', 'rejected')" class="w-8 h-8 rounded-lg bg-[#0f1113] border border-[#333] text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 transition"><i class="fa-solid fa-xmark text-sm"></i></button>
+                    </div>
+                </div>`;
+            }
+
+            return `
+            <div class="group bg-[#14171b] border border-[#272b31] hover:border-[#3a404a] rounded-xl p-3.5 mb-2 transition">
+                <div class="flex justify-between items-center gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-black/30 border border-white/10 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-user text-[11px] ${statusColor}"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-bold text-gray-200 group-hover:text-white truncate">${m.name}</div>
+                            <div class="text-[10px] font-mono text-gray-500">#${safeTag} <span class="text-gray-700 mx-1">|</span> ${safeRole}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <div class="text-[10px] uppercase font-bold tracking-wider text-gray-500 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>${m.status}
+                        </div>
+                        <button onclick="deleteMember('${tid}', '${m._id}')" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition px-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function openRosterModal(teamId) {
+            const team = allTeams.find(t => t._id === teamId);
+            if(!team) return;
+
+            const total = team.members.length;
+            const pending = team.members.filter(m => m.status === 'pending').length;
+            const nameChanges = team.members.filter(m => m.pendingUpdate).length;
+            const approved = Math.max(0, total - pending - team.members.filter(m => m.status === 'rejected').length);
+
+            const membersHtml = team.members.length
+                ? team.members.map(m => renderMemberRow(team._id, m)).join('')
+                : `<div class="text-center text-gray-600 text-sm py-10 border border-dashed border-[#333] rounded-lg">No roster members</div>`;
+
+            document.getElementById('rosterModalContent').innerHTML = `
+                <div class="-m-8 mb-6 p-7 bg-gradient-to-r from-[#1f232a] via-[#1a1d21] to-[#16181c] border-b border-[#2f343d] rounded-t-lg">
+                    <div class="flex items-start gap-5">
+                        <img src="${team.logo || DEFAULT_LOGO}" class="w-20 h-20 rounded-xl bg-black object-cover border border-[#3a3f49] shadow-lg">
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-3xl font-header text-white leading-none mb-1 truncate">${team.name}</h2>
+                            <div class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-4"><span class="text-[#ff4655]">[${team.shortName}]</span> Roster Management</div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div class="bg-[#121417] border border-[#2d3139] rounded-lg px-3 py-2"><div class="text-[9px] text-gray-500 uppercase font-bold">Total</div><div class="text-lg font-header text-white">${total}</div></div>
+                                <div class="bg-[#121417] border border-emerald-500/30 rounded-lg px-3 py-2"><div class="text-[9px] text-emerald-400 uppercase font-bold">Approved</div><div class="text-lg font-header text-emerald-300">${approved}</div></div>
+                                <div class="bg-[#121417] border border-blue-500/30 rounded-lg px-3 py-2"><div class="text-[9px] text-blue-400 uppercase font-bold">Pending</div><div class="text-lg font-header text-blue-300">${pending}</div></div>
+                                <div class="bg-[#121417] border border-orange-500/30 rounded-lg px-3 py-2"><div class="text-[9px] text-orange-400 uppercase font-bold">Name Changes</div><div class="text-lg font-header text-orange-300">${nameChanges}</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto pr-2 custom-scroll">
+                    ${membersHtml}
+                </div>
+            `;
+            openModal('rosterModal');
+        }
         async function updateMemberStatus(tid, mid, status) { await fetch(`${API_BASE}/api/teams/${tid}/members/${mid}/status`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); await init(true); openRosterModal(tid); showToast(status === 'approved' ? 'Action Completed' : 'Rejected / Reverted'); }
         async function deleteMember(tid, mid) { if(!confirm("Kick Member?")) return; await fetch(`${API_BASE}/api/teams/${tid}/members/${mid}`, { method: 'DELETE', headers: { 'Authorization': token } }); await init(true); openRosterModal(tid); showToast('Member Removed'); }
         
@@ -1924,10 +2242,36 @@
         function toggleRoundCount() { const type = document.getElementById('stType').value; const div = document.getElementById('stRoundCountContainer'); if(type==='round_robin') div.classList.remove('hidden'); else div.classList.add('hidden'); }
         function calculateMatchScore(scores) { if (!scores) return [0,0]; let a=0,b=0; scores.forEach(s=>{ if(parseInt(s.teamAScore)>parseInt(s.teamBScore)) a++; else if(parseInt(s.teamBScore)>parseInt(s.teamAScore)) b++; }); return [a,b]; }
         function updateStats(teams, matches) { document.getElementById('stat-live').innerText=matches.filter(m=>m.status==='live').length; document.getElementById('stat-pending').innerText=matches.filter(m=>m.status==='pending_approval').length; document.getElementById('stat-teams').innerText=teams.length; document.getElementById('stat-finished').innerText=matches.filter(m=>m.status==='finished').length; }
-        function openModal(id) { document.getElementById('modalBackdrop').classList.remove('hidden', 'flex'); document.getElementById('modalBackdrop').classList.add('flex'); document.querySelectorAll('.modal-content').forEach(e=>e.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+        function openModal(id) {
+            const backdrop = document.getElementById('modalBackdrop');
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            activeModalId = id;
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex', 'modal-open');
+            document.querySelectorAll('.modal-content').forEach(e => {
+                e.classList.add('hidden');
+                e.dataset.open = 'false';
+            });
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => { modal.dataset.open = 'true'; });
+        }
         function closeModal() { 
             if(vetoTimerInt) clearInterval(vetoTimerInt);
-            document.getElementById('modalBackdrop').classList.add('hidden'); document.getElementById('modalBackdrop').classList.remove('flex'); 
+            const backdrop = document.getElementById('modalBackdrop');
+            if (activeModalId) {
+                const modal = document.getElementById(activeModalId);
+                if (modal) modal.dataset.open = 'false';
+            }
+            setTimeout(() => {
+                document.querySelectorAll('.modal-content').forEach(e => {
+                    e.classList.add('hidden');
+                    e.dataset.open = 'false';
+                });
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex', 'modal-open');
+                activeModalId = null;
+            }, 180);
         }
         
         function showToast(msg, type='success') { 
@@ -2025,7 +2369,7 @@
                         const deadline = new Date(v.currentTurnDeadline).getTime();
                         timerHtml = `<div class="text-right">
                             <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Time</div>
-                            <div class="flex items-center gap-2 justify-end"><button onclick="resetVetoTimer()" class="w-6 h-6 flex items-center justify-center bg-[#333] hover:bg-white hover:text-black text-gray-400 border border-gray-600 rounded transition" title="Reset Timer"><i class="fa-solid fa-rotate-right text-[10px]"></i></button><div id="adminVetoTimer" class="text-3xl font-mono font-bold text-white leading-none">--</div></div>
+                            <div class="flex items-center gap-2 justify-end"><button data-action="reset-veto-timer" class="w-6 h-6 flex items-center justify-center bg-[#333] hover:bg-white hover:text-black text-gray-400 border border-gray-600 rounded transition" title="Reset Timer"><i class="fa-solid fa-rotate-right text-[10px]"></i></button><div id="adminVetoTimer" class="text-3xl font-mono font-bold text-white leading-none">--</div></div>
                         </div>`;
                         
                         vetoTimerInt = setInterval(() => {
@@ -2567,7 +2911,7 @@
             if(!m) return;
 
             const menu = document.getElementById('matchCtxMenu');
-            const rect = e.target.getBoundingClientRect();
+            const rect = (e.currentTarget || e.target).getBoundingClientRect();
             
             document.getElementById('ctxNameA').innerText = m.teamA ? m.teamA.shortName : 'Team A';
             document.getElementById('ctxNameB').innerText = m.teamB ? m.teamB.shortName : 'Team B';
@@ -2619,7 +2963,10 @@
         }, 1000);
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => { renderMapCheckboxes('create'); });
+        document.addEventListener('DOMContentLoaded', () => {
+            bindUIEvents();
+            renderMapCheckboxes('create');
+        });
         init();
 
         // --- BRACKET LINES UTILS ---

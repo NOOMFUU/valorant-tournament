@@ -134,7 +134,7 @@
 
         // --- INITIALIZATION ---
         async function init() {
-            try {
+            try {                
                 const [tRes, mRes, tmRes] = await Promise.all([
                     fetch(`${API_BASE}/api/tournaments`),
                     fetch(`${API_BASE}/api/matches`),
@@ -1074,5 +1074,6 @@
 
         init();
     </script>
+
 </body>
 </html>
