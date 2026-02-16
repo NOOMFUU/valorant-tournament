@@ -1,56 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VCT Command Center | Pro Dashboard</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Oswald:wght@400;500;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Oswald:wght@400;500;700&family=Inter:wght@300;400;600;800&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <style>
-        /* --- VALORANT DESIGN SYSTEM --- */
         :root {
-            --val-red: #ff4655;
-            --val-dark: #0f1923;
-            --val-black: #000000;
-            --val-white: #ece8e1;
-            --val-gray: #768079;
-            --bg-card: #15171a;
+            --primary: #ff4655;
+            --primary-hover: #ff5d6a;
+            --bg-main: #09090b;
+            --bg-card: #18181b;
+            --border: #27272a;
+            --text-muted: #a1a1aa;
         }
 
         body {
-            background-color: var(--val-dark);
-            color: var(--val-white);
+            background-color: var(--bg-main);
+            color: #fafafa;
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Typography */
-        .font-header { font-family: 'Tungsten', 'Oswald', sans-serif; text-transform: uppercase; }
-        .font-tech { font-family: 'Rajdhani', sans-serif; text-transform: uppercase; }
-
-        /* Backgrounds & Textures */
-        .bg-vct {
-            background-color: #0f1923;
-            background-image: 
-                radial-gradient(circle at 50% 0%, #2a2e35 0%, transparent 70%),
-                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        .font-header {
+            font-family: 'Tungsten', 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
         }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f1923; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--val-red); }
-
-        /* Utility Components */
-        .clipped-box {
-            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-        
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+        }
+
         .clipped-box-r {
             clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
         }
@@ -61,15 +71,27 @@
             color: rgba(236, 232, 225, 0.6);
             transition: all 0.3s ease;
         }
-        .nav-link:hover, .nav-link.active {
+
+        .nav-link:hover,
+        .nav-link.active {
             color: white;
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
+
         .nav-link::after {
-            content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 2px;
-            background: var(--val-red); transition: width 0.3s ease;
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--val-red);
+            transition: width 0.3s ease;
         }
-        .nav-link.active::after { width: 100%; }
+
+        .nav-link.active::after {
+            width: 100%;
+        }
 
         /* Buttons */
         .btn-primary {
@@ -82,21 +104,26 @@
             transition: all 0.2s;
             clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
         }
+
         .btn-primary:hover {
             filter: brightness(1.2);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(255, 70, 85, 0.4);
         }
-        .btn-primary:active { transform: translateY(0); }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
 
         .btn-secondary {
             background: transparent;
-            border: 1px solid rgba(255,255,255,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             color: var(--val-white);
             font-family: 'Tungsten', sans-serif;
             letter-spacing: 2px;
             transition: all 0.3s;
         }
+
         .btn-secondary:hover {
             background: white;
             color: black;
@@ -110,26 +137,38 @@
             backdrop-filter: blur(10px);
             position: relative;
         }
+
         .glass-panel::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 0;
-            background: var(--val-red); transition: height 0.3s ease;
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 0;
+            background: var(--val-red);
+            transition: height 0.3s ease;
         }
-        .glass-panel:hover::before { height: 100%; }
+
+        .glass-panel:hover::before {
+            height: 100%;
+        }
 
         /* Input Fields */
         .input-vct {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
             font-family: 'Rajdhani', sans-serif;
             font-weight: 600;
             transition: 0.3s;
         }
+
         .input-vct:focus {
             outline: none;
             border-color: var(--val-red);
-            background: rgba(0,0,0,0.6);
+            background: rgba(0, 0, 0, 0.6);
         }
+
         .input-vct:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -137,17 +176,47 @@
         }
 
         /* Animations */
-        .animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(20px); }
-        @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
-        
-        .animate-glitch { animation: glitch 1s infinite; }
+        .animate-slide-up {
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-glitch {
+            animation: glitch 1s infinite;
+        }
+
         @keyframes glitch {
-            0% { transform: translate(0) }
-            20% { transform: translate(-2px, 2px) }
-            40% { transform: translate(-2px, -2px) }
-            60% { transform: translate(2px, 2px) }
-            80% { transform: translate(2px, -2px) }
-            100% { transform: translate(0) }
+            0% {
+                transform: translate(0)
+            }
+
+            20% {
+                transform: translate(-2px, 2px)
+            }
+
+            40% {
+                transform: translate(-2px, -2px)
+            }
+
+            60% {
+                transform: translate(2px, 2px)
+            }
+
+            80% {
+                transform: translate(2px, -2px)
+            }
+
+            100% {
+                transform: translate(0)
+            }
         }
 
         /* Loader */
@@ -157,49 +226,82 @@
         }
 
         /* New Card Styles */
-        .match-card-hover:hover { border-color: var(--val-red); box-shadow: 0 10px 30px -10px rgba(255, 70, 85, 0.15); }
-        .roster-card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.3); }
-        .text-shadow-glow { text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
-        .input-underline { background: transparent; border: none; border-bottom: 1px solid #333; transition: 0.3s; }
-        .input-underline:focus { border-bottom-color: var(--val-red); outline: none; }
+        .match-card-hover:hover {
+            border-color: var(--val-red);
+            box-shadow: 0 10px 30px -10px rgba(255, 70, 85, 0.15);
+        }
+
+        .roster-card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .text-shadow-glow {
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .input-underline {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333;
+            transition: 0.3s;
+        }
+
+        .input-underline:focus {
+            border-bottom-color: var(--val-red);
+            outline: none;
+        }
     </style>
 </head>
+
 <body class="bg-vct min-h-screen flex flex-col">
 
     <div id="loader" class="fixed inset-0 flex items-center justify-center transition-opacity duration-700">
         <div class="text-center">
             <div class="w-20 h-20 border-l-4 border-r-4 border-[#ff4655] rounded-full animate-spin mx-auto mb-6"></div>
-            <h1 class="font-header text-5xl tracking-widest text-white">SYSTEM <span class="text-[#ff4655]">BOOT</span></h1>
+            <h1 class="font-header text-5xl tracking-widest text-white">SYSTEM <span class="text-[#ff4655]">BOOT</span>
+            </h1>
             <p class="font-mono text-xs text-gray-500 mt-2 tracking-[0.3em]">ESTABLISHING SECURE UPLINK</p>
         </div>
     </div>
 
     <header class="h-20 border-b border-white/10 bg-[#0f1923]/90 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-[1600px] mx-auto h-full px-6 flex justify-between items-center">
-            
+
             <div class="flex items-center gap-6">
-                <div class="relative group cursor-pointer w-12 h-12" onclick="document.getElementById('logoInput').click()">
-                    <div class="w-full h-full bg-black/50 border border-white/20 flex items-center justify-center overflow-hidden transition group-hover:border-[#ff4655]">
-                        <img id="teamLogo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23333'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='12' fill='%23666' text-anchor='middle' dy='.3em'%3ELOGO%3C/text%3E%3C/svg%3E" class="w-full h-full object-cover group-hover:opacity-50 transition">
-                        <i class="fa-solid fa-camera absolute text-white opacity-0 group-hover:opacity-100 transition"></i>
+                <div class="relative group cursor-pointer w-12 h-12"
+                    onclick="document.getElementById('logoInput').click()">
+                    <div
+                        class="w-full h-full bg-black/50 border border-white/20 flex items-center justify-center overflow-hidden transition group-hover:border-[#ff4655]">
+                        <img id="teamLogo"
+                            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23333'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='12' fill='%23666' text-anchor='middle' dy='.3em'%3ELOGO%3C/text%3E%3C/svg%3E"
+                            class="w-full h-full object-cover group-hover:opacity-50 transition">
+                        <i
+                            class="fa-solid fa-camera absolute text-white opacity-0 group-hover:opacity-100 transition"></i>
                     </div>
                     <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="uploadLogo(this)">
                 </div>
                 <div>
-                    <h2 id="teamHeader" class="font-header text-3xl leading-none tracking-wide text-white">LOADING...</h2>
+                    <h2 id="teamHeader" class="font-header text-3xl leading-none tracking-wide text-white">LOADING...
+                    </h2>
                     <div class="flex items-center gap-2">
                         <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                        <span class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Captain Access Granted</span>
+                        <span class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Captain Access
+                            Granted</span>
                     </div>
                 </div>
             </div>
 
             <nav class="hidden md:flex gap-12 h-full">
-                <button onclick="nav('dashboard')" id="nav-dashboard" class="nav-link h-full flex items-center font-header text-xl tracking-wider active">DASHBOARD</button>
-                <button onclick="nav('roster')" id="nav-roster" class="nav-link h-full flex items-center font-header text-xl tracking-wider">ROSTER</button>
-                <button onclick="nav('history')" id="nav-history" class="nav-link h-full flex items-center font-header text-xl tracking-wider">HISTORY</button>
-                <a href="/lti class="fa-solid fa-external-link-alt ml-2 text-xs"></i>
-                <a href="/tournament_view.html" target="_blank" class="nav-link h-full flex items-center font-header text-xl tracking-wider">
+                <button onclick="nav('dashboard')" id="nav-dashboard"
+                    class="nav-link h-full flex items-center font-header text-xl tracking-wider active">DASHBOARD</button>
+                <button onclick="nav('roster')" id="nav-roster"
+                    class="nav-link h-full flex items-center font-header text-xl tracking-wider">ROSTER</button>
+                <button onclick="nav('history')" id="nav-history"
+                    class="nav-link h-full flex items-center font-header text-xl tracking-wider">HISTORY</button>
+                <a href="/tournament_view.html" target="_blank"
+                    class="nav-link h-full flex items-center font-header text-xl tracking-wider">
                     PUBLIC VIEW <i class="fa-solid fa-external-link-alt ml-2 text-xs"></i>
                 </a>
             </nav>
@@ -208,7 +310,8 @@
                 <i class="fa-solid fa-bars text-2xl"></i>
             </button>
 
-            <button onclick="logout()" class="text-xs font-bold text-gray-500 hover:text-[#ff4655] uppercase tracking-widest transition-colors flex items-center gap-2">
+            <button onclick="logout()"
+                class="text-xs font-bold text-gray-500 hover:text-[#ff4655] uppercase tracking-widest transition-colors flex items-center gap-2">
                 <i class="fa-solid fa-power-off"></i> Disconnect
             </button>
         </div>
@@ -216,69 +319,53 @@
 
     <main class="flex-1 p-6 md:p-10 max-w-[1600px] mx-auto w-full relative z-10">
 
-        <div id="toast" class="fixed top-24 right-5 z-[100] translate-x-[200%] transition-transform duration-500 ease-out">
-            <div class="bg-[#ece8e1] text-[#0f1923] pl-4 pr-8 py-3 border-l-4 border-[#ff4655] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] clipped-box-r flex items-center gap-4">
+        <div id="toast"
+            class="fixed top-24 right-5 z-[100] translate-x-[200%] transition-transform duration-500 ease-out">
+            <div
+                class="bg-[#ece8e1] text-[#0f1923] pl-4 pr-8 py-3 border-l-4 border-[#ff4655] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] clipped-box-r flex items-center gap-4">
                 <div class="bg-[#ff4655] w-8 h-8 flex items-center justify-center text-white text-sm font-bold">!</div>
                 <div>
                     <h4 class="font-header text-xl leading-none">NOTIFICATION</h4>
-                    <p class="text-xs font-bold text-gray-600 font-mono mt-0.5 uppercase" id="toastMsg">Action Completed</p>
+                    <p class="text-xs font-bold text-gray-600 font-mono mt-0.5 uppercase" id="toastMsg">Action Completed
+                    </p>
                 </div>
             </div>
         </div>
 
         <!-- MOBILE MENU OVERLAY -->
-        <div id="mobileMenu" class="fixed inset-0 z-[200] bg-[#0f1923]/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center gap-8">
-            <button onclick="toggleMobileMenu()" class="absolute top-6 right-6 text-gray-500 hover:text-white text-3xl transition"><i class="fa-solid fa-xmark"></i></button>
-            <button onclick="nav('dashboard'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">DASHBOARD</button>
-            <button onclick="nav('roster'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">ROSTER</button>
-            <button onclick="nav('history'); toggleMobileMenu()" class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">HISTORY</button>
-            <a href="/tournament_view.html" target="_blank" class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i cltcrd
-            <a href="/tournament_view.html" target="_blank" class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i class="fa-solid fa-external-link-alt ml-2"></i></a>
+        <div id="mobileMenu"
+            class="fixed inset-0 z-[200] bg-[#0f1923]/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center gap-8">
+            <button onclick="toggleMobileMenu()"
+                class="absolute top-6 right-6 text-gray-500 hover:text-white text-3xl transition"><i
+                    class="fa-solid fa-xmark"></i></button>
+            <button onclick="nav('dashboard'); toggleMobileMenu()"
+                class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">DASHBOARD</button>
+            <button onclick="nav('roster'); toggleMobileMenu()"
+                class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">ROSTER</button>
+            <button onclick="nav('history'); toggleMobileMenu()"
+                class="font-header text-4xl text-white hover:text-[#ff4655] tracking-widest">HISTORY</button>
+            <a href="/tournament_view.html" target="_blank"
+                class="font-header text-2xl text-gray-500 hover:text-white tracking-widest">PUBLIC VIEW <i
+                    class="fa-solid fa-external-link-alt ml-2"></i></a>
         </div>
 
         <section id="view-dashboard" class="animate-slide-up space-y-10">
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <div class="lg:col-span-2 space-y-6">
-                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
-                        <div class="flex items-center gap-4">
-                            <h3 class="text-3xl font-header text-white"><i class="fa-solid fa-crosshairs text-[#ff4655] mr-2"></i> Deployments</h3>
-                            <input id="matchSearch" oninput="renderMatchList()" placeholder="Search match / team..." class="bg-black/30 border border-white/10 text-xs px-3 py-1.5 rounded text-white focus:border-[#ff4655] outline-none w-48 placeholder-gray-600 font-mono transition-colors">
-                        </div>
-                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest hidden md:block">Active Operations</span>
-                    </div>
-                    <div id="matchList" class="space-y-3">
-                        </div>
-                </div>
+
+            <div class="grid grid-cols-1 gap-8">
 
                 <div class="space-y-6">
-                    <div class="glass-panel p-6 clipped-box">
-                        <h3 class="text-gray-400 text-sm font-tech tracking-widest mb-4 border-b border-white/5 pb-2 uppercase">Team Status</h3>
-                        
-                        <div class="flex justify-between items-center py-3">
-                            <span class="text-sm text-gray-300 font-bold uppercase">Roster State</span>
-                            <span class="text-xs font-bold px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 tracking-wider">OPERATIONAL</span>
+                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                        <div class="flex items-center gap-4">
+                            <h3 class="text-3xl font-header text-white"><i
+                                    class="fa-solid fa-crosshairs text-[#ff4655] mr-2"></i> Deployments</h3>
+                            <input id="matchSearch" oninput="renderMatchList()" placeholder="Search match / team..."
+                                class="bg-black/30 border border-white/10 text-xs px-3 py-1.5 rounded text-white focus:border-[#ff4655] outline-none w-48 placeholder-gray-600 font-mono transition-colors">
                         </div>
-                        <div class="flex justify-between items-center py-3">
-                            <span class="text-sm text-gray-300 font-bold uppercase">Region</span>
-                            <span class="text-xs font-bold text-gray-500">TH-BKK</span>
-                        </div>
-                        
-                        <div class="py-4 border-t border-white/5 mt-2">
-                            <div class="flex justify-between items-end mb-2">
-                                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Season Performance</span>
-                                <span class="text-xs font-mono text-white" id="statsText">0W - 0L</span>
-                            </div>
-                            <div class="w-full h-1.5 bg-[#1a1d21] rounded-full overflow-hidden flex">
-                                <div id="statsBarWin" class="h-full bg-[#1fa474]" style="width: 50%"></div>
-                                <div id="statsBarLoss" class="h-full bg-[#ff4655]" style="width: 50%"></div>
-                            </div>
-                        </div>
-
-                        <button onclick="copyRosterToClipboard()" class="w-full mt-6 btn-secondary py-3 text-sm flex items-center justify-center gap-2 group hover:border-[#5865F2] hover:text-[#5865F2]">
-                            <i class="fa-brands fa-discord group-hover:animate-bounce"></i> Copy Discord Roster
-                        </button>
+                        <span
+                            class="text-[10px] text-gray-500 font-mono uppercase tracking-widest hidden md:block">Active
+                            Operations</span>
+                    </div>
+                    <div id="matchList" class="space-y-3">
                     </div>
                 </div>
             </div>
@@ -293,9 +380,10 @@
                         <p class="text-gray-400 text-sm font-mono tracking-widest">MANAGE ACTIVE LINEUP</p>
                     </div>
                 </div>
-                
+
                 <div class="flex items-center gap-4">
-                    <div id="lockStatus" class="px-4 py-2 border border-white/10 bg-black/40 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <div id="lockStatus"
+                        class="px-4 py-2 border border-white/10 bg-black/40 text-xs font-bold text-gray-400 uppercase tracking-widest">
                         Initializing...
                     </div>
                     <button onclick="toggleRosterEdit()" id="btn-edit-roster" class="btn-secondary px-6 py-2 text-sm">
@@ -303,8 +391,8 @@
                     </button>
                 </div>
             </div>
-        
-            <form id="rosterForm" onsubmit="saveRoster(event)"> 
+
+            <form id="rosterForm" onsubmit="saveRoster(event)">
                 <div class="mb-12">
                     <div class="flex items-center gap-4 mb-6">
                         <span class="text-[#ff4655] font-header text-5xl opacity-50">01</span>
@@ -313,19 +401,19 @@
                     </div>
                     <div id="mainRoster" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
                 </div>
-                
+
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div class="lg:col-span-2">
-                         <div class="flex items-center gap-4 mb-6 opacity-60">
+                        <div class="flex items-center gap-4 mb-6 opacity-60">
                             <span class="text-gray-600 font-header text-5xl opacity-50">02</span>
                             <h3 class="text-2xl font-header text-gray-300 tracking-wide">RESERVES</h3>
                             <div class="h-[1px] bg-white/10 flex-1"></div>
                         </div>
                         <div id="subRoster" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                     </div>
-                    
+
                     <div>
-                         <div class="flex items-center gap-4 mb-6 opacity-60">
+                        <div class="flex items-center gap-4 mb-6 opacity-60">
                             <span class="text-gray-600 font-header text-5xl opacity-50">03</span>
                             <h3 class="text-2xl font-header text-gray-300 tracking-wide">TACTICAL</h3>
                             <div class="h-[1px] bg-white/10 flex-1"></div>
@@ -333,12 +421,14 @@
                         <div id="coachRoster" class="grid grid-cols-1 gap-4"></div>
                     </div>
                 </div>
-        
-                <div id="rosterActions" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#0f1923]/95 backdrop-blur-xl border border-[#ff4655] p-4 z-40 flex items-center gap-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm min-w-[300px] justify-center clipped-box">
+
+                <div id="rosterActions"
+                    class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#0f1923]/95 backdrop-blur-xl border border-[#ff4655] p-4 z-40 flex items-center gap-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm min-w-[300px] justify-center clipped-box">
                     <div class="hidden md:flex items-center gap-2 text-yellow-500 text-xs font-mono uppercase mr-4">
                         <i class="fa-solid fa-triangle-exclamation animate-pulse"></i> Unsaved Changes
                     </div>
-                    <button type="button" onclick="location.reload()" class="text-gray-400 hover:text-white font-header text-lg uppercase tracking-wider transition">DISCARD</button>
+                    <button type="button" onclick="location.reload()"
+                        class="text-gray-400 hover:text-white font-header text-lg uppercase tracking-wider transition">DISCARD</button>
                     <button type="submit" class="btn-primary px-8 py-2 text-xl">
                         CONFIRM PROTOCOL
                     </button>
@@ -365,62 +455,80 @@
 
     </main>
 
-    <div id="scoreModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
-        <div class="bg-[#1a1d21] w-full max-w-2xl border border-white/10 relative animate-slide-up shadow-2xl clipped-box">
+    <div id="scoreModal"
+        class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
+        <div
+            class="bg-[#1a1d21] w-full max-w-2xl border border-white/10 relative animate-slide-up shadow-2xl clipped-box">
             <div class="p-6 border-b border-white/10 flex justify-between items-start bg-[#0f1923]">
                 <div>
                     <h3 class="text-4xl font-header text-white mb-1">MISSION REPORT</h3>
                     <p class="text-xs text-[#ff4655] font-mono uppercase tracking-widest">Enter Match Results</p>
                 </div>
-                <button onclick="closeModal('scoreModal')" class="text-gray-500 hover:text-white transition text-2xl"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('scoreModal')" class="text-gray-500 hover:text-white transition text-2xl"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="scoreForm" onsubmit="submitScore(event)" class="p-8 space-y-6">
                 <div id="rejectAlert" class="hidden bg-red-900/20 border-l-4 border-red-500 p-4 mb-4">
                     <h4 class="text-red-500 font-bold uppercase text-xs mb-1">Previous Submission Rejected</h4>
                     <p id="rejectReasonText" class="text-gray-300 text-sm font-mono">...</p>
                 </div>
-                
+
                 <div id="mapInputs" class="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scroll">
-                    </div>
-                
+                </div>
+
                 <button type="submit" class="btn-primary w-full py-4 text-2xl mt-4 shadow-lg">TRANSMIT DATA</button>
             </form>
         </div>
     </div>
 
-    <div id="forfeitModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
-        <div class="bg-[#1a1d21] w-full max-w-md border border-yellow-600/30 relative animate-slide-up shadow-[0_0_50px_rgba(234,179,8,0.05)] clipped-box">
+    <div id="forfeitModal"
+        class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
+        <div
+            class="bg-[#1a1d21] w-full max-w-md border border-yellow-600/30 relative animate-slide-up shadow-[0_0_50px_rgba(234,179,8,0.05)] clipped-box">
             <div class="p-6 border-b border-yellow-600/10 flex justify-between items-center bg-[#0f1923]">
                 <div>
                     <h3 class="text-3xl font-header text-yellow-500">CLAIM VICTORY</h3>
                     <p class="text-xs text-yellow-700 font-mono uppercase tracking-widest">Opponent No-Show</p>
                 </div>
-                <button onclick="closeModal('forfeitModal')" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('forfeitModal')" class="text-gray-500 hover:text-white transition"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="forfeitForm" onsubmit="submitForfeit(event)" class="p-8 space-y-6">
-                <div class="p-4 bg-yellow-500/5 border border-yellow-500/20 text-[10px] text-yellow-200 font-mono uppercase">
+                <div
+                    class="p-4 bg-yellow-500/5 border border-yellow-500/20 text-[10px] text-yellow-200 font-mono uppercase">
                     WARNING: Submitting false claims will result in immediate disqualification.
                 </div>
                 <div class="relative group">
-                    <input type="file" id="forfeitProofImg" class="hidden" onchange="document.getElementById('ffFileName').innerText = this.files[0].name; document.getElementById('ffFileName').classList.add('text-yellow-500')">
-                    <label for="forfeitProofImg" class="block w-full border-2 border-dashed border-gray-700 rounded-none p-10 text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-500/5 transition">
-                        <i class="fa-solid fa-camera text-3xl text-gray-600 mb-3 group-hover:text-yellow-500 transition"></i>
-                        <div id="ffFileName" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Upload Lobby Screenshot</div>
+                    <input type="file" id="forfeitProofImg" class="hidden"
+                        onchange="document.getElementById('ffFileName').innerText = this.files[0].name; document.getElementById('ffFileName').classList.add('text-yellow-500')">
+                    <label for="forfeitProofImg"
+                        class="block w-full border-2 border-dashed border-gray-700 rounded-none p-10 text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-500/5 transition">
+                        <i
+                            class="fa-solid fa-camera text-3xl text-gray-600 mb-3 group-hover:text-yellow-500 transition"></i>
+                        <div id="ffFileName" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Upload
+                            Lobby Screenshot</div>
                     </label>
                 </div>
-                <button type="submit" class="btn-secondary w-full py-3 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500 hover:text-black font-bold text-xl">SUBMIT CLAIM</button>
+                <button type="submit"
+                    class="btn-secondary w-full py-3 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500 hover:text-black font-bold text-xl">SUBMIT
+                    CLAIM</button>
             </form>
         </div>
     </div>
 
-    <div id="matchStatsModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
-        <div class="bg-[#1a1d21] w-full max-w-4xl border border-white/10 relative animate-slide-up shadow-2xl clipped-box flex flex-col max-h-[90vh]">
+    <div id="matchStatsModal"
+        class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
+        <div
+            class="bg-[#1a1d21] w-full max-w-4xl border border-white/10 relative animate-slide-up shadow-2xl clipped-box flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#0f1923]">
                 <div>
                     <h3 class="text-3xl font-header text-white">MATCH STATISTICS</h3>
-                    <p class="text-xs text-gray-500 font-mono uppercase tracking-widest" id="statsMatchName">LOADING...</p>
+                    <p class="text-xs text-gray-500 font-mono uppercase tracking-widest" id="statsMatchName">LOADING...
+                    </p>
                 </div>
-                <button onclick="closeModal('matchStatsModal')" class="text-gray-500 hover:text-white transition text-2xl"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('matchStatsModal')"
+                    class="text-gray-500 hover:text-white transition text-2xl"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-8 overflow-y-auto custom-scroll space-y-8" id="statsContent">
                 <!-- Content injected via JS -->
@@ -428,15 +536,19 @@
         </div>
     </div>
 
-    <div id="rescheduleModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
-        <div class="bg-[#1a1d21] w-full max-w-md border border-white/10 relative animate-slide-up shadow-2xl clipped-box">
+    <div id="rescheduleModal"
+        class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[200] backdrop-blur-sm p-4">
+        <div
+            class="bg-[#1a1d21] w-full max-w-md border border-white/10 relative animate-slide-up shadow-2xl clipped-box">
             <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#0f1923]">
                 <h3 class="text-2xl font-header text-white">REQUEST RESCHEDULE</h3>
-                <button onclick="closeModal('rescheduleModal')" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('rescheduleModal')" class="text-gray-500 hover:text-white"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-8 space-y-6">
                 <p class="text-sm text-gray-400">Propose a new time for this match. The opponent must accept.</p>
-                <input type="datetime-local" id="rescheduleTime" class="w-full bg-black/30 border border-white/10 text-white p-3 rounded focus:border-[#ff4655] outline-none [color-scheme:dark]">
+                <input type="datetime-local" id="rescheduleTime"
+                    class="w-full bg-black/30 border border-white/10 text-white p-3 rounded focus:border-[#ff4655] outline-none [color-scheme:dark]">
                 <button onclick="submitReschedule()" class="btn-primary w-full py-3">SEND REQUEST</button>
             </div>
         </div>
@@ -444,14 +556,14 @@
 
     <script>
         const token = localStorage.getItem('token');
-        if(!token) location.href = '/login.html';
+        if (!token) location.href = '/login.html';
         const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
         const socket = io(API_BASE || undefined);
         const DEFAULT_LOGO = "https://via.placeholder.com/100?text=TEAM";
 
         let myTeamId = null;
         let isRosterLocked = true;
-        let teamMembers = []; 
+        let teamMembers = [];
         let matchData = null;
         let currentMatchId = null;
         let allMyMatches = [];
@@ -467,26 +579,18 @@
                 const savedTab = localStorage.getItem('activeTab') || 'dashboard';
                 nav(savedTab);
 
-                const team = await fetch(`${API_BASE}/api/teams/me`, { headers: {'Authorization': token} }).then(r=>r.json());
+                const team = await fetch(`${API_BASE}/api/teams/me`, { headers: { 'Authorization': token } }).then(r => r.json());
                 myTeamId = team._id;
                 socket.emit('join_team_room', myTeamId);
                 document.getElementById('teamHeader').innerText = team.name;
-                if(team.logo) document.getElementById('teamLogo').src = team.logo;
-                
+                if (team.logo) document.getElementById('teamLogo').src = team.logo;
+
                 isRosterLocked = team.rosterLocked;
                 teamMembers = team.members || [];
                 renderRoster(teamMembers);
-                
-                // Render Stats
-                const wins = team.wins || 0;
-                const losses = team.losses || 0;
-                const total = wins + losses;
-                document.getElementById('statsText').innerHTML = `<span class="text-[#1fa474]">${wins}W</span> - <span class="text-[#ff4655]">${losses}L</span>`;
-                document.getElementById('statsBarWin').style.width = total > 0 ? `${(wins/total)*100}%` : '50%';
-                document.getElementById('statsBarLoss').style.width = total > 0 ? `${(losses/total)*100}%` : '50%';
 
                 loadDashboardData();
-                
+
                 // Hide Loader
                 setTimeout(() => {
                     const loader = document.getElementById('loader');
@@ -495,7 +599,7 @@
                     setTimeout(() => loader.classList.add('hidden'), 700);
                 }, 800);
 
-            } catch(e) { console.error(e); showToast('Connection Failed', 'error'); }
+            } catch (e) { console.error(e); showToast('Connection Failed', 'error'); }
         })();
 
         function toggleMobileMenu() {
@@ -505,8 +609,8 @@
 
         // --- DASHBOARD LOGIC ---
         async function loadDashboardData() {
-            if(!myTeamId) return;
-            const res = await fetch(`${API_BASE}/api/matches/upcoming`, { headers: {'Authorization': token} });
+            if (!myTeamId) return;
+            const res = await fetch(`${API_BASE}/api/matches/upcoming`, { headers: { 'Authorization': token } });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 console.error("Failed to fetch matches:", res.status, err);
@@ -515,7 +619,7 @@
             }
             const myMatches = await res.json();
             allMyMatches = myMatches;
-            
+
             renderMatchList();
         }
 
@@ -527,7 +631,7 @@
             });
 
             const listContainer = document.getElementById('matchList');
-            if(filtered.length === 0) {
+            if (filtered.length === 0) {
                 listContainer.innerHTML = `
                 <div class="p-8 border border-dashed border-white/10 bg-white/5 text-center">
                     <i class="fa-solid fa-coffee text-3xl text-gray-600 mb-2"></i>
@@ -548,24 +652,24 @@
 
             if (m.status === 'live') {
                 statusBadge = `<span class="text-[#ff4655] bg-[#ff4655]/10 px-3 py-1 text-[10px] font-bold border border-[#ff4655]/30 animate-pulse tracking-widest rounded-sm">LIVE</span>`;
-                
+
                 actionBtn = `<a href="/veto.html?match=${m._id}" class="btn-secondary text-center py-3 text-sm w-full hover:bg-white hover:text-black font-bold block mb-2">LOBBY</a><button onclick="openScoreModal('${m._id}')" class="btn-primary w-full py-3 text-sm shadow-lg">REPORT SCORE</button>`;
             } else if (m.status === 'pending_approval') {
                 statusBadge = `<span class="text-yellow-500 bg-yellow-500/10 px-3 py-1 text-[10px] font-bold border border-yellow-500/30 tracking-widest rounded-sm">VERIFYING</span>`;
-                if(m.scoreSubmission.status === 'rejected') {
+                if (m.scoreSubmission.status === 'rejected') {
                     rejectMsg = `<div class="mt-3 p-2 bg-red-500/10 border-l-2 border-red-500 text-[10px] text-gray-300 font-mono"><strong>REJECTED:</strong> ${m.scoreSubmission.rejectReason || 'Check details'}</div>`;
                     actionBtn = `<button onclick="openScoreModal('${m._id}')" class="w-full mt-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs font-bold font-header tracking-wide transition">FIX & RESUBMIT</button>`;
                 } else actionBtn = `<div class="w-full mt-2 text-center text-[10px] text-gray-500 font-mono py-2 border border-dashed border-gray-700 uppercase">Awaiting Admin Verification</div>`;
             } else {
                 statusBadge = `<span class="text-gray-400 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest border border-white/5 rounded-sm">UPCOMING</span>`;
-                
+
                 let checkInBtn = '';
                 let forfeitBtn = '';
                 let rescheduleUI = '';
 
                 // Reschedule Logic
                 if (m.rescheduleRequest && m.rescheduleRequest.status === 'pending') {
-                    const reqTime = new Date(m.rescheduleRequest.proposedTime).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+                    const reqTime = new Date(m.rescheduleRequest.proposedTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                     if (m.rescheduleRequest.requestedBy === myTeamId) {
                         rescheduleUI = `<div class="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wider text-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Reschedule Pending (${reqTime})</div>`;
                     } else {
@@ -579,9 +683,9 @@
                         </div>`;
                     }
                 } else {
-                     rescheduleUI = `<button onclick="openRescheduleModal('${m._id}')" class="w-full mt-1 text-[10px] text-gray-500 hover:text-white uppercase font-bold tracking-wider py-1 border border-transparent hover:border-white/10 transition">Request Reschedule</button>`;
+                    rescheduleUI = `<button onclick="openRescheduleModal('${m._id}')" class="w-full mt-1 text-[10px] text-gray-500 hover:text-white uppercase font-bold tracking-wider py-1 border border-transparent hover:border-white/10 transition">Request Reschedule</button>`;
                 }
-                
+
                 if (m.scheduledTime) {
                     const now = new Date();
                     const matchTime = new Date(m.scheduledTime);
@@ -603,26 +707,26 @@
                 }
                 actionBtn = `${checkInBtn}<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a>${forfeitBtn}${rescheduleUI}`;
             }
-            const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12: false}) : 'TBD';
-            
+            const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'TBD';
+
             return `
             <div class="relative overflow-hidden bg-[#15171a] border border-white/10 match-card-hover transition-all duration-300 group rounded-sm">
-                <div class="absolute top-0 left-0 w-1 h-full ${m.status==='live'?'bg-[#ff4655]':'bg-gray-700 group-hover:bg-white'} transition-colors"></div>
+                <div class="absolute top-0 left-0 w-1 h-full ${m.status === 'live' ? 'bg-[#ff4655]' : 'bg-gray-700 group-hover:bg-white'} transition-colors"></div>
                 <div class="p-6 flex flex-col md:flex-row items-center gap-6">
                     
                     <div class="flex flex-col items-center md:items-start min-w-[120px]">
                         ${statusBadge}
                         <span class="text-2xl font-header text-white mt-2 tracking-wide">${timeDisplay}</span>
-                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Match #${String(m.matchNumber).padStart(3,'0')}</span>
+                        <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Match #${String(m.matchNumber).padStart(3, '0')}</span>
                     </div>
 
                     <div class="flex-1 flex items-center justify-center gap-8 w-full bg-black/20 p-4 rounded border border-white/5">
                         <div class="text-right hidden md:block"><div class="font-header text-xl text-gray-500">US</div></div>
                         <div class="text-2xl font-header text-[#ff4655] italic">VS</div>
                         <div class="flex items-center gap-4">
-                            <img src="${oppLogo||'https://via.placeholder.com/40'}" class="w-14 h-14 object-contain drop-shadow-lg">
+                            <img src="${oppLogo || 'https://via.placeholder.com/40'}" class="w-14 h-14 object-contain drop-shadow-lg">
                             <div class="text-left">
-                                <div class="font-header text-3xl text-white leading-none tracking-wide">${oppName||'TBD'}</div>
+                                <div class="font-header text-3xl text-white leading-none tracking-wide">${oppName || 'TBD'}</div>
                                 <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Opponent ${oppCheckIn ? '<span class="text-[#1fa474] ml-1"><i class="fa-solid fa-check-circle"></i> READY</span>' : ''}</div>
                             </div>
                         </div>
@@ -641,15 +745,15 @@
             const createPlayerCard = (role, index, label) => {
                 const member = (members && members.length > 0) ? members.filter(m => m.role === role)[index] || {} : {};
                 const hasPendingUpdate = member.status === 'pending' && member.pendingUpdate;
-                
+
                 const displayName = hasPendingUpdate ? (member.pendingUpdate.name || '') : (member.name || '');
                 const displayTag = hasPendingUpdate ? (member.pendingUpdate.tag || '') : (member.tag || '');
                 const isLocked = isRosterLocked;
-                
+
                 let statusColor = 'bg-gray-600';
                 let borderColor = 'border-white/10';
-                
-                if(member.status === 'approved') { statusColor = 'bg-[#1fa474] shadow-[0_0_10px_#1fa474]'; borderColor='border-[#1fa474]/30'; }
+
+                if (member.status === 'approved') { statusColor = 'bg-[#1fa474] shadow-[0_0_10px_#1fa474]'; borderColor = 'border-[#1fa474]/30'; }
                 else if (member.status === 'pending') { statusColor = 'bg-yellow-500 animate-pulse'; borderColor = 'border-yellow-500/50'; }
                 else if (member.status === 'rejected') { statusColor = 'bg-[#ff4655]'; borderColor = 'border-[#ff4655]'; }
 
@@ -691,18 +795,18 @@
             };
 
             let mainHtml = '', subHtml = '', coachHtml = '';
-            for(let i=0; i<5; i++) mainHtml += createPlayerCard('Main', i, `AGENT 0${i+1}`);
-            for(let i=0; i<2; i++) subHtml += createPlayerCard('Sub', i, `RESERVE 0${i+1}`);
+            for (let i = 0; i < 5; i++) mainHtml += createPlayerCard('Main', i, `AGENT 0${i + 1}`);
+            for (let i = 0; i < 2; i++) subHtml += createPlayerCard('Sub', i, `RESERVE 0${i + 1}`);
             coachHtml = createPlayerCard('Coach', 0, 'STRATEGIST');
 
-            document.getElementById('mainRoster').innerHTML = mainHtml; 
-            document.getElementById('subRoster').innerHTML = subHtml; 
+            document.getElementById('mainRoster').innerHTML = mainHtml;
+            document.getElementById('subRoster').innerHTML = subHtml;
             document.getElementById('coachRoster').innerHTML = coachHtml;
-            
+
             const lockLabel = document.getElementById('lockStatus');
             const editBtn = document.getElementById('btn-edit-roster');
-            
-            if(isRosterLocked) {
+
+            if (isRosterLocked) {
                 lockLabel.innerHTML = '<i class="fa-solid fa-lock text-gray-500 mr-2"></i> DATABASE LOCKED';
                 lockLabel.className = "px-4 py-2 bg-black/40 border border-gray-700 text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center";
                 editBtn.classList.remove('hidden');
@@ -716,7 +820,7 @@
         }
 
         function toggleRosterEdit() {
-            if(isRosterLocked) {
+            if (isRosterLocked) {
                 isRosterLocked = false;
                 renderRoster(teamMembers);
             }
@@ -724,7 +828,7 @@
 
         async function saveRoster(e) {
             if (e) e.preventDefault();
-            
+
             const updatedMembers = [];
             const roles = ['Main', 'Sub', 'Coach'];
             let hasData = false;
@@ -763,7 +867,7 @@
                 const data = await res.json();
                 if (res.ok) {
                     showToast('Roster Database Updated');
-                    const team = await fetch(`${API_BASE}/api/teams/me`, { headers: {'Authorization': token} }).then(r=>r.json());
+                    const team = await fetch(`${API_BASE}/api/teams/me`, { headers: { 'Authorization': token } }).then(r => r.json());
                     teamMembers = team.members;
                     isRosterLocked = true;
                     renderRoster(teamMembers);
@@ -778,20 +882,20 @@
                 btn.disabled = false;
             }
         }
-        
+
         async function checkInMatch(mid) {
             const res = await fetch(`${API_BASE}/api/matches/${mid}/checkin`, { method: 'POST', headers: { 'Authorization': token } });
             const d = await res.json();
-            if(res.ok) { showToast('Check-in Confirmed'); loadDashboardData(); }
+            if (res.ok) { showToast('Check-in Confirmed'); loadDashboardData(); }
             else showToast(d.msg, 'error');
         }
 
         async function loadHistoryData() {
-            if(!myTeamId) return;
-            const history = await fetch(`${API_BASE}/api/matches/history`, { headers: {'Authorization': token} }).then(r=>r.json());
-            
+            if (!myTeamId) return;
+            const history = await fetch(`${API_BASE}/api/matches/history`, { headers: { 'Authorization': token } }).then(r => r.json());
+
             const container = document.getElementById('historyList');
-            if(history.length === 0) {
+            if (history.length === 0) {
                 container.innerHTML = `<div class="p-12 border border-dashed border-white/10 text-center text-gray-500 font-mono">NO COMBAT RECORDS FOUND</div>`;
                 document.getElementById('historyWinLoss').innerText = `0W - 0L`;
                 return;
@@ -807,28 +911,28 @@
                 const myTeamName = isMeA ? (m.teamA?.name || 'My Team') : (m.teamB?.name || 'My Team');
                 const oppName = opp ? opp.name : 'Unknown';
                 const isWin = (m.winner && (m.winner === myTeamId || m.winner._id === myTeamId));
-                
-                if(isWin) wins++; else losses++;
+
+                if (isWin) wins++; else losses++;
 
                 const resultColor = isWin ? 'text-emerald-400' : 'text-red-500';
                 const borderClass = isWin ? 'border-l-4 border-emerald-500' : 'border-l-4 border-red-500';
                 const bgClass = isWin ? 'bg-emerald-500/5' : 'bg-red-500/5';
-                const dateDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : 'TBD';
+                const dateDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
 
                 // Map Scores
-                const mapScoresHtml = m.scores && m.scores.length > 0 ? 
+                const mapScoresHtml = m.scores && m.scores.length > 0 ?
                     `<div class="mt-3 pt-3 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         ${m.scores.map(s => {
-                            const sA = parseInt(s.teamAScore)||0;
-                            const sB = parseInt(s.teamBScore)||0;
-                            const myS = isMeA ? sA : sB;
-                            const oppS = isMeA ? sB : sA;
-                            const color = myS > oppS ? 'text-green-400' : (myS < oppS ? 'text-red-400' : 'text-gray-500');
-                            return `<div class="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px] font-mono">
+                        const sA = parseInt(s.teamAScore) || 0;
+                        const sB = parseInt(s.teamBScore) || 0;
+                        const myS = isMeA ? sA : sB;
+                        const oppS = isMeA ? sB : sA;
+                        const color = myS > oppS ? 'text-green-400' : (myS < oppS ? 'text-red-400' : 'text-gray-500');
+                        return `<div class="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px] font-mono">
                                 <span class="text-gray-400">${s.mapName}</span>
                                 <span class="${color} font-bold">${myS} - ${oppS}</span>
                             </div>`;
-                        }).join('')}
+                    }).join('')}
                     </div>` : '';
 
                 return `
@@ -866,13 +970,13 @@
         }
 
         function calculateTotalScore(m, side) {
-            if(!m.scores) return 0;
+            if (!m.scores) return 0;
             let wins = 0;
             m.scores.forEach(s => {
-                const sA = parseInt(s.teamAScore)||0;
-                const sB = parseInt(s.teamBScore)||0;
-                if(side === 'A' && sA > sB) wins++;
-                if(side === 'B' && sB > sA) wins++;
+                const sA = parseInt(s.teamAScore) || 0;
+                const sB = parseInt(s.teamBScore) || 0;
+                if (side === 'A' && sA > sB) wins++;
+                if (side === 'B' && sB > sA) wins++;
             });
             return wins;
         }
@@ -888,11 +992,11 @@
 
         function openScoreModal(mid) {
             currentMatchId = mid;
-            fetch(`${API_BASE}/api/matches/${mid}`).then(r=>r.json()).then(m => {
+            fetch(`${API_BASE}/api/matches/${mid}`).then(r => r.json()).then(m => {
                 matchData = m;
                 const isFinished = m.status === 'finished';
                 const alertBox = document.getElementById('rejectAlert');
-                if(m.scoreSubmission.status === 'rejected') {
+                if (m.scoreSubmission.status === 'rejected') {
                     document.getElementById('rejectReasonText').innerText = m.scoreSubmission.rejectReason || 'No reason details provided.';
                     alertBox.classList.remove('hidden');
                 } else {
@@ -943,12 +1047,12 @@
 
                     </div>`;
                 }).join('');
-                
+
                 const submitBtn = document.querySelector('#scoreForm button[type="submit"]');
                 const title = document.querySelector('#scoreModal h3');
                 const sub = document.querySelector('#scoreModal p');
 
-                if(isFinished) {
+                if (isFinished) {
                     submitBtn.classList.add('hidden');
                     title.innerText = "MATCH REPORT";
                     sub.innerText = "Final Results (Read Only)";
@@ -958,21 +1062,21 @@
                     sub.innerText = "Enter Match Results";
                 }
 
-                document.getElementById('scoreModal').classList.remove('hidden'); 
+                document.getElementById('scoreModal').classList.remove('hidden');
                 document.getElementById('scoreModal').classList.add('flex');
             });
         }
 
         async function openMatchStats(mid) {
-            const m = await fetch(`${API_BASE}/api/matches/${mid}`).then(r=>r.json());
+            const m = await fetch(`${API_BASE}/api/matches/${mid}`).then(r => r.json());
             document.getElementById('statsMatchName').innerText = m.name;
-            
+
             const isMeA = m.teamA._id === myTeamId;
             const team1 = isMeA ? m.teamA : m.teamB;
             const team2 = isMeA ? m.teamB : m.teamA;
             const score1 = isMeA ? calculateTotalScore(m, 'A') : calculateTotalScore(m, 'B');
             const score2 = isMeA ? calculateTotalScore(m, 'B') : calculateTotalScore(m, 'A');
-            
+
             let html = `
                 <div class="flex justify-between items-center bg-black/20 p-6 border border-white/5 rounded">
                     <div class="text-center w-1/3">
@@ -1018,7 +1122,7 @@
                 html += `<div><h4 class="text-white font-header text-xl mb-4 border-l-4 border-yellow-500 pl-3">VETO PROCESS</h4><div class="grid grid-cols-2 gap-4"><div class="bg-black/20 p-4 rounded"><div class="text-xs text-red-500 font-bold uppercase mb-2">BANS</div><div class="flex flex-wrap gap-2">`;
                 (m.vetoData.bannedMaps || []).forEach(map => { html += `<span class="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] rounded">${map}</span>`; });
                 html += `</div></div><div class="bg-black/20 p-4 rounded"><div class="text-xs text-[#1fa474] font-bold uppercase mb-2">PICKS</div><div class="space-y-1">`;
-                (m.vetoData.pickedMaps || []).forEach((p, i) => { html += `<div class="flex justify-between text-[10px] text-gray-300 border-b border-white/5 pb-1 last:border-0"><span>${i+1}. ${p.map}</span><span class="text-gray-500">${p.teamAStartingSide||'-'}/${p.teamBStartingSide||'-'}</span></div>`; });
+                (m.vetoData.pickedMaps || []).forEach((p, i) => { html += `<div class="flex justify-between text-[10px] text-gray-300 border-b border-white/5 pb-1 last:border-0"><span>${i + 1}. ${p.map}</span><span class="text-gray-500">${p.teamAStartingSide || '-'}/${p.teamBStartingSide || '-'}</span></div>`; });
                 html += `</div></div></div></div>`;
             }
 
@@ -1034,22 +1138,22 @@
             matchData.vetoData.pickedMaps.forEach((m, i) => {
                 scores.push({ mapName: m.map, teamAScore: document.getElementById(`scoreA_${i}`).value, teamBScore: document.getElementById(`scoreB_${i}`).value });
                 const f = document.getElementById(`proofImg_${i}`).files[0];
-                if(f) fd.append(`proof_${i}`, f);
+                if (f) fd.append(`proof_${i}`, f);
             });
             fd.append('scores', JSON.stringify(scores));
             const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
-            if(res.ok) { closeModal('scoreModal'); showToast('Score Data Transmitted'); loadDashboardData(); }
+            if (res.ok) { closeModal('scoreModal'); showToast('Score Data Transmitted'); loadDashboardData(); }
         }
 
         function openForfeitModal(mid) { currentMatchId = mid; document.getElementById('forfeitModal').classList.remove('hidden'); document.getElementById('forfeitModal').classList.add('flex'); }
         async function submitForfeit(e) {
             e.preventDefault();
             const file = document.getElementById('forfeitProofImg').files[0];
-            if(!file) return alert('Proof required.');
+            if (!file) return alert('Proof required.');
             const fd = new FormData(); fd.append('proof', file);
             const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/claim-forfeit`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
             const d = await res.json();
-            if(res.ok) { closeModal('forfeitModal'); showToast('Claim Submitted'); loadDashboardData(); } else { alert(d.msg); }
+            if (res.ok) { closeModal('forfeitModal'); showToast('Claim Submitted'); loadDashboardData(); } else { alert(d.msg); }
         }
 
         async function uploadLogo(input) {
@@ -1057,7 +1161,7 @@
             const fd = new FormData(); fd.append('logo', input.files[0]);
             const res = await fetch(`${API_BASE}/api/teams/logo`, { method: 'PUT', headers: { 'Authorization': token }, body: fd });
             const d = await res.json();
-            if(res.ok) { document.getElementById('teamLogo').src = d.logo; showToast('Identity Updated'); }
+            if (res.ok) { document.getElementById('teamLogo').src = d.logo; showToast('Identity Updated'); }
         }
 
         function openRescheduleModal(mid) {
@@ -1068,22 +1172,22 @@
 
         async function submitReschedule() {
             const time = document.getElementById('rescheduleTime').value;
-            if(!time) return showToast('Select a time', 'error');
+            if (!time) return showToast('Select a time', 'error');
             const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/reschedule`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ proposedTime: time }) });
             const d = await res.json();
-            if(res.ok) { closeModal('rescheduleModal'); showToast('Request Sent'); } else showToast(d.msg, 'error');
+            if (res.ok) { closeModal('rescheduleModal'); showToast('Request Sent'); } else showToast(d.msg, 'error');
         }
 
         async function requestPause(mid) {
             const reason = prompt("Reason for pause request (e.g. Technical Issue):");
             if (!reason) return;
             const res = await fetch(`${API_BASE}/api/matches/${mid}/pause`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ reason }) });
-            if(res.ok) showToast('Pause Requested'); else showToast('Error sending request', 'error');
+            if (res.ok) showToast('Pause Requested'); else showToast('Error sending request', 'error');
         }
 
         async function respondReschedule(mid, action) {
             const res = await fetch(`${API_BASE}/api/matches/${mid}/reschedule/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ action }) });
-            if(res.ok) showToast(action === 'accept' ? 'Reschedule Accepted' : 'Request Rejected');
+            if (res.ok) showToast(action === 'accept' ? 'Reschedule Accepted' : 'Request Rejected');
         }
 
         function nav(id) {
@@ -1092,19 +1196,19 @@
             document.getElementById(`view-${id}`).classList.remove('hidden');
             document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
             document.getElementById(`nav-${id}`).classList.add('active');
-            
-            if(id === 'history') loadHistoryData();
+
+            if (id === 'history') loadHistoryData();
         }
 
         function closeModal(id) { document.getElementById(id).classList.remove('flex'); document.getElementById(id).classList.add('hidden'); }
-        function showToast(msg, type='success') { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.style.transform = "translateX(0)"; setTimeout(() => t.style.transform = "translateX(200%)", 3000); }
-        function logout() { localStorage.removeItem('token'); location.href='/login.html'; }
+        function showToast(msg, type = 'success') { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.style.transform = "translateX(0)"; setTimeout(() => t.style.transform = "translateX(200%)", 3000); }
+        function logout() { localStorage.removeItem('token'); location.href = '/login.html'; }
 
         // --- เพิ่มฟังก์ชันนี้ลงใน script ---
         function handleScoreProof(input, index) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                
+
                 // 1. อัปเดตชื่อไฟล์แบบเดิม
                 const nameLabel = document.getElementById(`fileName_${index}`);
                 nameLabel.innerText = file.name;
@@ -1112,10 +1216,10 @@
 
                 // 2. อ่านไฟล์และแสดงรูป Preview
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     const imgEl = document.getElementById(`imgPreview_${index}`);
                     const boxEl = document.getElementById(`previewBox_${index}`);
-                    
+
                     imgEl.src = e.target.result;
                     boxEl.classList.remove('hidden'); // แสดงกล่องรูป
                 }
@@ -1124,4 +1228,5 @@
         }
     </script>
 </body>
+
 </html>
