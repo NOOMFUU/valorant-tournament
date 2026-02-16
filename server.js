@@ -1886,6 +1886,14 @@ app.post('/api/tournaments/:id/stages/generate', auth(['admin']), async (req, re
             finalParticipants = participants.map(id => teamsDb.find(t => t._id.toString() === id)).filter(t => t);
         }
 
+        // Triple Elim can be configured to use only first N selected teams.
+        if (type === 'triple_elim' && settings.teamCount) {
+            const teamCount = parseInt(settings.teamCount, 10);
+            if (!Number.isNaN(teamCount) && teamCount > 0 && finalParticipants.length >= teamCount) {
+                finalParticipants = finalParticipants.slice(0, teamCount);
+            }
+        }
+
         const matchesIds = await BracketManager.generateStage(tournament._id, name, type, finalParticipants, settings);
 
         tournament.stages.push({

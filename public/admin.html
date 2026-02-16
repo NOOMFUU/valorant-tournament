@@ -225,6 +225,9 @@
                 <i class="fa-solid fa-sitemap"></i> Open Bracket View
             </a>
             <button data-action="logout" class="w-full py-3 border border-[#333] hover:border-[#ff4655] hover:text-[#ff4655] text-gray-400 text-xs font-bold uppercase tracking-widest transition rounded-md">
+                <a href="/caster_dashboard.html" target="_blank" class="flex items-center gap-3 text-sm text-gray-500 hover:text-white transition p-3 rounded hover:bg-[#222] mb-3">
+                <i class="fa-solid fa-sitemap"></i> Open caster_dashboard.html
+             </a>
                 System Logout
             </button>
         </div>
@@ -1511,15 +1514,23 @@
                             return `<div class="mb-8 relative z-10"><div class="text-xs font-bold text-white uppercase tracking-widest mb-4 pl-1 border-l-4 ${color} py-1 bg-[#1a1d21] inline-block pr-4 rounded-r">${label}</div><div class="bracket-container" style="overflow: visible">${columnsHtml}</div></div>`;
                         };
 
+                        const upperSection = renderSection(upperAndFinal, "Upper Bracket", "border-[#ff4655]");
+                        const middleLabel = s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket";
+                        const middleColor = s.type === 'triple_elim' ? "border-[#dda828]" : "border-[#00d4ff]";
+                        const middleSection = renderSection(middle, middleLabel, middleColor);
+                        const lowerSection = s.type === 'triple_elim'
+                            ? renderSection(lower, "Lower Bracket", "border-[#00d4ff]")
+                            : '';
+
                         groupsHtml += `
                             <div class="mb-16 bg-[#15171a]/50 border border-[#333] rounded-lg p-6 relative">
                                 ${sortedGroups.length > 1 ? `<h3 class="text-xl font-header text-white mb-6 border-l-4 border-[#ff4655] pl-3">${gName}</h3>` : ''}
                                 <div class="overflow-x-auto relative">
                                     <div class="relative min-w-max">
                                         <svg id="bracketSvg-${idx}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
-                                        ${renderSection(upperAndFinal, "Upper Bracket", "border-[#ff4655]")}
-                                        ${renderSection(middle, s.type === 'triple_elim' ? "Middle Bracket" : "Lower Bracket", "border-[#dda828]")}
-                                        ${renderSection(lower, "Last Chance Bracket", "border-[#00d4ff]")}
+                                        ${upperSection}
+                                        ${middleSection}
+                                        ${lowerSection}
                                     </div>
                                 </div>
                             </div>`;
@@ -1962,6 +1973,24 @@
                         </div>
                     </div>
                     <p class="text-[10px] text-gray-500 mt-2">Players have a second chance in the Losers Bracket.</p>
+                `;
+            } else if (type === 'triple_elim') {
+                settingsDiv.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Teams to seed:</label>
+                            <input type="number" id="stTripleTeamCount" value="${Math.max(4, stageSelected.length || 8)}" min="4" class="bg-[#1a1d21] border border-[#333] text-white w-20 text-center rounded p-1">
+                            <span class="text-[10px] text-gray-500">Use first N teams from Selected list</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-500 font-bold uppercase">Final Format:</label>
+                            <select id="stFinalBO" class="bg-[#1a1d21] border border-[#333] text-white text-xs p-1.5 rounded outline-none">
+                                <option value="BO3">BO3</option>
+                                <option value="BO5" selected>BO5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2">Triple Elim generates 3 brackets: Upper, Middle, and Lower.</p>
                 `;
             } else if (type === 'round_robin') {
                 settingsDiv.innerHTML = `
@@ -2702,11 +2731,22 @@
             // Prepare group names array
             const groupNames = [];
             Object.keys(stageGroupNames).forEach(k => groupNames[parseInt(k)] = stageGroupNames[k]);
+            const stageType = document.getElementById('stType').value;
+            const tripleTeamCount = parseInt(document.getElementById('stTripleTeamCount')?.value) || 0;
+            let selectedParticipantIds = stageSelected.map(t=>t._id);
+
+            if (stageType === 'triple_elim' && tripleTeamCount > 0) {
+                if (selectedParticipantIds.length < tripleTeamCount) {
+                    showToast(`Need at least ${tripleTeamCount} selected teams for Triple Elim`, 'error');
+                    return;
+                }
+                selectedParticipantIds = selectedParticipantIds.slice(0, tripleTeamCount);
+            }
 
             const body = { 
                 name: document.getElementById('stName').value, 
-                type: document.getElementById('stType').value, 
-                participants: stageSelected.map(t=>t._id), 
+                type: stageType, 
+                participants: selectedParticipantIds, 
                 settings: { 
                     defaultFormat: document.getElementById('stDefBO').value, 
                     roundCount: parseInt(document.getElementById('stRoundCount')?.value) || 1, 
@@ -2717,6 +2757,8 @@
                     tiebreakers: [document.getElementById('tb1')?.value, document.getElementById('tb2')?.value, document.getElementById('tb3')?.value].filter(Boolean),
                     swissRounds: parseInt(document.getElementById('stSwissRounds')?.value) || 3,
                     qualifiedCount: parseInt(document.getElementById('stQualifiedCount')?.value) || 1,
+                    teamCount: tripleTeamCount || undefined,
+                    finalFormat: document.getElementById('stFinalBO')?.value || 'BO5',
                     groupNames: groupNames,
                     sourceStageIndex: -1 // Always manual mode now
                 } 
