@@ -49,6 +49,13 @@ router.get('/tournaments/:id/public', async (req, res) => {
 router.post('/tournaments', auth(['admin']), async (req, res) => {
     const { name, teamIds, mapPool } = req.body;
 
+    // [NEW] Clean up existing channels before wiping
+    const matches = await Match.find({});
+    const deleteMatchChannels = req.app.get('deleteMatchChannels');
+    if (deleteMatchChannels) {
+        for (const m of matches) await deleteMatchChannels(m);
+    }
+
     // Note: Logic in server.js cleared all tournaments/matches. Keeping it consistent.
     await Tournament.deleteMany({});
     await Match.deleteMany({});
@@ -170,7 +177,7 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
         if (createMatchChannel) {
             for (const mId of matchesIds) {
                 const m = await Match.findById(mId);
-                if (m) await createMatchChannel(m);
+                if (m) createMatchChannel(m);
             }
         }
 
@@ -299,6 +306,14 @@ router.delete('/tournaments/:id/stages/:stageIndex', auth(['admin']), async (req
 router.delete('/tournaments/:id', auth(['admin']), async (req, res) => {
     try {
         const tId = req.params.id;
+
+        // [NEW] Clean up channels
+        const matches = await Match.find({ tournament: tId });
+        const deleteMatchChannels = req.app.get('deleteMatchChannels');
+        if (deleteMatchChannels) {
+            for (const m of matches) await deleteMatchChannels(m);
+        }
+
         await Match.deleteMany({ tournament: tId });
         await Tournament.findByIdAndDelete(tId);
         res.json({ success: true });

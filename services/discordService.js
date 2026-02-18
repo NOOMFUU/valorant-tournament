@@ -39,23 +39,20 @@ class DiscordService {
     }
 
     // Wrapper for Queue
-    async createMatchChannel(match) {
-        return new Promise((resolve) => {
-            this.channelCreationQueue.push({ match, resolve });
-            this.processChannelQueue();
-        });
+    createMatchChannel(match) {
+        this.channelCreationQueue.push({ match });
+        this.processChannelQueue();
     }
 
     async processChannelQueue() {
         if (this.isProcessingChannels || this.channelCreationQueue.length === 0) return;
         this.isProcessingChannels = true;
 
-        const { match, resolve } = this.channelCreationQueue.shift();
+        const { match } = this.channelCreationQueue.shift();
         try {
             await this.createMatchChannelInternal(match);
         } catch (e) { console.error(`Queue Error for match ${match._id}:`, e); }
         
-        resolve();
         setTimeout(() => { this.isProcessingChannels = false; this.processChannelQueue(); }, 1000); // 1 sec delay
     }
 
