@@ -717,7 +717,10 @@
              <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="teId"><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Team Name</label><input id="teName" class="w-full input-dark text-base"></div><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tag (Short Name)</label><input id="teShort" class="w-full input-dark text-base uppercase"></div>
-                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Discord</label><input id="teDiscord" class="w-full input-dark text-base" placeholder="Invite Link / Username"></div>
+                <div class="space-y-2">
+                    <label class="text-xs text-gray-500 font-bold uppercase">Logo</label>
+                    <div class="flex items-center gap-4"><img id="teLogoPreview" src="" class="w-12 h-12 object-contain bg-black/30 rounded border border-white/10"><input type="file" id="teLogo" accept="image/*" onchange="if(this.files[0]) document.getElementById('teLogoPreview').src = URL.createObjectURL(this.files[0])" class="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#333] file:text-white hover:file:bg-[#444] cursor-pointer"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Wins</label><input type="number" id="teWins" class="w-full input-dark text-base"></div>
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Losses</label><input type="number" id="teLosses" class="w-full input-dark text-base"></div>
@@ -2815,20 +2818,25 @@
             document.getElementById('teId').value = id; 
             document.getElementById('teName').value = t.name; 
             document.getElementById('teShort').value = t.shortName; 
-            document.getElementById('teDiscord').value = t.discord || '';
             document.getElementById('teWins').value = t.wins || 0;
             document.getElementById('teLosses').value = t.losses || 0;
+            document.getElementById('teLogoPreview').src = t.logo || DEFAULT_LOGO;
+            document.getElementById('teLogo').value = '';
             openModal('teamEditModal'); 
         }
         async function saveTeamEdit() { 
             const id = document.getElementById('teId').value;
             const name = document.getElementById('teName').value;
             const shortName = document.getElementById('teShort').value;
-            const discord = document.getElementById('teDiscord').value;
             const wins = document.getElementById('teWins').value;
             const losses = document.getElementById('teLosses').value;
+            const logoFile = document.getElementById('teLogo').files[0];
             if(!name || !shortName) return showToast('Please fill all fields', 'error');
-            const res = await fetch(`${API_BASE}/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, discord, wins, losses }) });
+            
+            const fd = new FormData(); fd.append('name', name); fd.append('shortName', shortName); fd.append('wins', wins); fd.append('losses', losses);
+            if(logoFile) fd.append('logo', logoFile);
+
+            const res = await fetch(`${API_BASE}/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token }, body: fd });
             const data = await res.json();
             if (res.ok && data.success) { showToast('Team Updated Successfully'); closeModal(); init(); } else { showToast(data.msg || 'Update Failed', 'error'); }
         }

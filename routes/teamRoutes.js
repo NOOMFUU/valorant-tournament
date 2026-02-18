@@ -16,7 +16,6 @@ const Team = require('../models/Team');
 const auth = require('../middleware/auth');
 const { upload, getFileUrl } = require('../middleware/upload');
 const { logAdminAction, sendDiscordLog } = require('../utils/helpers');
-const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s";
 
 // --- ROUTES ---
 
@@ -44,7 +43,7 @@ router.post('/register', authLimiter, upload.single('logo'), async (req, res) =>
     try {
         const { username, name, shortName, password } = req.body;
         const cleanUsername = username.toLowerCase().trim();
-        const logo = req.file ? getFileUrl(req.file) : DEFAULT_LOGO;
+        const logo = req.file ? getFileUrl(req.file) : '';
 
         if (await Team.findOne({ username: cleanUsername })) return res.status(400).json({ msg: 'Username is already taken' });
         if (await Team.findOne({ name: name })) return res.status(400).json({ msg: 'Team Name is already registered' });
@@ -151,7 +150,50 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.put('/teams/:id', auth(['admin']), async (req, res) => {
+// Upload Logo (Team Self) - MOVED UP before /teams/:id
+router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
+        const logoPath = getFileUrl(req.file);
+        await Team.findByIdAndUpdate(req.user.id, { logo: logoPath });
+        res.json({ success: true, logo: logoPath });
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Upload Logo (Admin for any team) - MOVED UP
+router.put('/teams/:id/logo', auth(['admin']), upload.single('logo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
+        const logoPath = getFileUrl(req.file);
+        await Team.findByIdAndUpdate(req.params.id, { logo: logoPath });
+        res.json({ success: true, logo: logoPath });
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Create Team (Admin)
+router.post('/teams', auth(['admin']), upload.single('logo'), async (req, res) => {
+    try {
+        const { username, name, shortName, password } = req.body;
+        if (!username || !name || !shortName || !password) return res.status(400).json({ msg: 'Please enter all fields' });
+        
+        const cleanUsername = username.toLowerCase().trim();
+        if (await Team.findOne({ username: cleanUsername })) return res.status(400).json({ msg: 'Username taken' });
+        if (await Team.findOne({ name })) return res.status(400).json({ msg: 'Team Name taken' });
+
+        const logo = req.file ? getFileUrl(req.file) : '';
+        const newTeam = new Team({ 
+            username: cleanUsername, name, shortName: shortName.toUpperCase(), 
+            password: bcrypt.hashSync(password, 10), logo, status: 'approved' 
+        });
+        await newTeam.save();
+        
+        await logAdminAction(req, 'CREATE_TEAM', `Team ${name}`, { username });
+        req.app.get('io').emit('teams_update');
+        res.json({ success: true, team: newTeam });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+router.put('/teams/:id', auth(['admin']), upload.single('logo'), async (req, res) => {
     try {
         const { name, shortName, discord, wins, losses } = req.body;
         if (!name || !shortName) return res.status(400).json({ msg: 'Required fields missing' });
@@ -161,6 +203,7 @@ router.put('/teams/:id', auth(['admin']), async (req, res) => {
         if (discord !== undefined) updateData.discord = discord;
         if (wins !== undefined) updateData.wins = parseInt(wins);
         if (losses !== undefined) updateData.losses = parseInt(losses);
+        if (req.file) updateData.logo = getFileUrl(req.file);
 
         const updatedTeam = await Team.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (wins !== undefined || losses !== undefined) await logAdminAction(req, 'UPDATE_TEAM', `Team ${updatedTeam.name}`, { wins, losses });
@@ -221,15 +264,6 @@ router.delete('/teams/:id/members/:mid', auth(['admin']), async (req, res) => {
         req.app.get('io').emit('teams_update');
         res.json({ success: true });
     } catch (e) { res.status(500).json(e); }
-});
-
-router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res) => {
-    try {
-        if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
-        const logoPath = getFileUrl(req.file);
-        await Team.findByIdAndUpdate(req.user.id, { logo: logoPath });
-        res.json({ success: true, logo: logoPath });
-    } catch (e) { res.status(500).json({ msg: 'Error' }); }
 });
 
 module.exports = router;
