@@ -55,6 +55,7 @@ const discordClient = new Client({
 });
 
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID; // Your Server ID
+const DISCORD_SPECTATOR_ROLE_ID = process.env.DISCORD_SPECTATOR_ROLE_ID; // Spectator/Caster Role ID
 // Note: We use process.env directly for channels to support auto-creation updates
 
 discordClient.once('clientReady', async () => {
@@ -62,9 +63,43 @@ discordClient.once('clientReady', async () => {
     discordClient.user.setActivity('Valorant Comp', { type: 'COMPETING' }); //Set status to "Competing in Valorant Comp"
     discordService.init(discordClient); // Init Service
     await discordService.setupDiscordChannels(); // [UPDATED] Auto-create all necessary channels
+
+    // [NEW] Register Slash Commands
+    const commands = [
+        {
+            name: 'match-info',
+            description: 'Get details about a specific match',
+            options: [{ name: 'match_id', type: 3, description: 'The Match ID', required: true }]
+        },
+        {
+            name: 'reset-veto',
+            description: 'Reset the veto process for a match (Admin only)',
+            options: [{ name: 'match_id', type: 3, description: 'The Match ID', required: true }]
+        },
+        {
+            name: 'force-win',
+            description: 'Force a win for a team (Admin only)',
+            options: [
+                { name: 'match_id', type: 3, description: 'The Match ID', required: true },
+                { name: 'team_name', type: 3, description: 'Winning Team Name (partial match)', required: true }
+            ]
+        }
+    ];
+
+    try {
+        await discordClient.application.commands.set(commands, DISCORD_GUILD_ID);
+        console.log('✅ Slash Commands Registered');
+    } catch (error) {
+        console.error('❌ Failed to register commands:', error);
+    }
 });
 
 discordClient.on('interactionCreate', async interaction => {
+    // [NEW] Handle Slash Commands
+    if (interaction.isChatInputCommand()) {
+        return handleSlashCommand(interaction);
+    }
+
     if (!interaction.isButton()) return;
 
     // [MERGED] Logic from discordBot.js: Team Selection Buttons
@@ -76,6 +111,36 @@ discordClient.on('interactionCreate', async interaction => {
             content: `คุณได้ยืนยันตัวตนเข้าสู่ทีม **${teamName}** แล้ว! (ระบบกำลังจ่ายยศให้คุณ)`, 
             ephemeral: true 
         });
+        return;
+    }
+
+    // [NEW] Check-in Button Logic
+    if (interaction.customId.startsWith('checkin_')) {
+        const matchId = interaction.customId.replace('checkin_', '');
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        
+        if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+
+        const discordId = interaction.user.id;
+        let teamSide = null;
+
+        // Check if user belongs to Team A
+        if (match.teamA.members.some(m => m.discordId === discordId)) teamSide = 'teamA';
+        // Check if user belongs to Team B
+        else if (match.teamB.members.some(m => m.discordId === discordId)) teamSide = 'teamB';
+
+        if (!teamSide) {
+            return interaction.reply({ content: '❌ You are not a player in this match.', ephemeral: true });
+        }
+
+        if (match.checkIn[teamSide]) {
+            return interaction.reply({ content: '✅ Your team is already checked in.', ephemeral: true });
+        }
+
+        match.checkIn[teamSide] = true;
+        await match.save();
+
+        await interaction.reply({ content: `✅ **${match[teamSide].name}** Checked In!`, ephemeral: false });
         return;
     }
 
@@ -312,11 +377,100 @@ if (process.env.DISCORD_TOKEN) {
     discordClient.login(process.env.DISCORD_TOKEN);
 }
 
-// Helper: Create Private Match Channel
-async function createMatchChannel(match) {
+// [NEW] Slash Command Handler
+async function handleSlashCommand(interaction) {
+    const { commandName, options } = interaction;
+
+    // Permission Check (Simple Admin Check)
+    const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+    if (commandName === 'match-info') {
+        const matchId = options.getString('match_id');
+        try {
+            const match = await Match.findById(matchId).populate('teamA teamB');
+            if (!match) return interaction.reply({ content: 'Match not found', ephemeral: true });
+            
+            const embed = new EmbedBuilder()
+                .setTitle(`Match: ${match.name}`)
+                .addFields(
+                    { name: 'Status', value: match.status, inline: true },
+                    { name: 'Team A', value: match.teamA.name, inline: true },
+                    { name: 'Team B', value: match.teamB.name, inline: true },
+                    { name: 'Time', value: match.scheduledTime ? new Date(match.scheduledTime).toLocaleString() : 'TBD' }
+                )
+                .setColor('#ff4655');
+            
+            interaction.reply({ embeds: [embed], ephemeral: true });
+        } catch (e) { interaction.reply({ content: 'Error fetching match', ephemeral: true }); }
+    }
+
+    if (commandName === 'reset-veto') {
+        if (!isAdmin) return interaction.reply({ content: '❌ Admin only', ephemeral: true });
+        const matchId = options.getString('match_id');
+        const match = await Match.findById(matchId);
+        if (!match) return interaction.reply({ content: 'Match not found', ephemeral: true });
+        
+        await vetoMgr.resetVeto(match);
+        logToAdminChannel(`Admin ${interaction.user.tag} reset veto for Match ${match.name} (${matchId})`);
+        interaction.reply({ content: `✅ Veto reset for match ${matchId}`, ephemeral: true });
+    }
+
+    if (commandName === 'force-win') {
+        if (!isAdmin) return interaction.reply({ content: '❌ Admin only', ephemeral: true });
+        const matchId = options.getString('match_id');
+        const teamName = options.getString('team_name').toLowerCase();
+        
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        if (!match) return interaction.reply({ content: 'Match not found', ephemeral: true });
+
+        let winner = null;
+        if (match.teamA.name.toLowerCase().includes(teamName)) winner = match.teamA;
+        else if (match.teamB.name.toLowerCase().includes(teamName)) winner = match.teamB;
+
+        if (!winner) return interaction.reply({ content: 'Team not found in this match', ephemeral: true });
+
+        match.status = 'finished';
+        match.winner = winner;
+        await match.save();
+        
+        // Propagate results
+        await BracketManager.propagateMatchResult(match, winner, (winner.id === match.teamA.id ? match.teamB : match.teamA));
+        
+        logToAdminChannel(`Admin ${interaction.user.tag} forced win for ${winner.name} in Match ${match.name}`);
+        interaction.reply({ content: `✅ Forced win for **${winner.name}**`, ephemeral: true });
+    }
+}
+
+// [NEW] Admin Log Helper
+async function logToAdminChannel(message) {
+    const channelId = process.env.DISCORD_ADMIN_LOGS_CHANNEL_ID;
+    if (!channelId) return;
+    try {
+        const channel = await discordClient.channels.fetch(channelId);
+        if (channel) channel.send(`📝 **ADMIN LOG:** ${message}`);
+    } catch (e) { console.error('Failed to send admin log:', e); }
+}
+
+// [NEW] Queue System for Channel Creation (Rate Limit Handling)
+const channelCreationQueue = [];
+let isProcessingChannels = false;
+
+async function processChannelQueue() {
+    if (isProcessingChannels || channelCreationQueue.length === 0) return;
+    isProcessingChannels = true;
+
+    const { match, resolve } = channelCreationQueue.shift();
+    try {
+        await createMatchChannelInternal(match);
+    } catch (e) { console.error(`Queue Error for match ${match._id}:`, e); }
+    
+    resolve();
+    setTimeout(() => { isProcessingChannels = false; processChannelQueue(); }, 1000); // 1 sec delay
+}
+
+async function createMatchChannelInternal(match) {
     if (!match.teamA || !match.teamB) return;
     if (match.discordChannelId) return; // Already created
-
     try {
         const guild = await discordClient.guilds.fetch(DISCORD_GUILD_ID);
         if (!guild) return;
@@ -358,23 +512,26 @@ async function createMatchChannel(match) {
         const matchIdentifier = (match.matchNumber && match.matchNumber > 0) ? match.matchNumber : match._id.toString().slice(-4);
         const categoryName = `🏆 Match ${matchIdentifier}: ${teamA.shortName} vs ${teamB.shortName}`;
         
+        // Permission Overwrites
+        const overwrites = [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: teamA.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
+            { id: teamB.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
+        ];
+
+        // [NEW] Add Spectator Role
+        if (DISCORD_SPECTATOR_ROLE_ID) {
+            overwrites.push({
+                id: DISCORD_SPECTATOR_ROLE_ID,
+                allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect]
+            });
+        }
+
         const category = await guild.channels.create({
             name: categoryName,
             type: ChannelType.GuildCategory,
-            permissionOverwrites: [
-                {
-                    id: guild.id, // @everyone
-                    deny: [PermissionsBitField.Flags.ViewChannel],
-                },
-                {
-                    id: teamA.discordRoleId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect],
-                },
-                {
-                    id: teamB.discordRoleId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect],
-                },
-            ],
+            permissionOverwrites: overwrites,
+            reason: `Match Creation: ${match.name}` // [NEW] Audit Log Reason
         });
 
         // Create Text Channel inside Category
@@ -382,6 +539,7 @@ async function createMatchChannel(match) {
             name: `💬-match-${matchIdentifier}-chat`,
             type: ChannelType.GuildText,
             parent: category.id,
+            reason: `Match Text Channel`
         });
 
         // Create Voice Channel for Team A
@@ -432,11 +590,28 @@ async function createMatchChannel(match) {
         await match.save();
 
         const timeStr = match.scheduledTime ? `<t:${Math.floor(new Date(match.scheduledTime).getTime() / 1000)}:F>` : 'TBD';
-        textChannel.send(`**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: ${timeStr}`);
+        
+        // [NEW] Send Check-in Button immediately
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`checkin_${match._id}`).setLabel('✅ Check-in').setStyle(ButtonStyle.Success)
+        );
+
+        textChannel.send({
+            content: `**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: ${timeStr}\n\n**Please Check-in when ready:**`,
+            components: [row]
+        });
 
     } catch (e) {
         console.error("Error creating match channel:", e);
     }
+}
+
+// Wrapper for Queue
+async function createMatchChannel(match) {
+    return new Promise((resolve) => {
+        channelCreationQueue.push({ match, resolve });
+        processChannelQueue();
+    });
 }
 
 app.use(cors()); // Basic CORS
@@ -474,7 +649,7 @@ app.set('vetoMgr', vetoMgr);
 // [FIX] Share IO, Discord Client, and Helper Functions with Routes
 app.set('io', io);
 app.set('discordClient', discordClient);
-app.set('createMatchChannel', discordService.createMatchChannel.bind(discordService));
+app.set('createMatchChannel', createMatchChannel); // Use local queued function
 app.set('deleteMatchChannels', discordService.deleteMatchChannels.bind(discordService));
 app.set('deleteMatchVoiceChannels', discordService.deleteMatchVoiceChannels.bind(discordService));
 app.set('sendMatchResultToDiscord', discordService.sendMatchResultToDiscord.bind(discordService));

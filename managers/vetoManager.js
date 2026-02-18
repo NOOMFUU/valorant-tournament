@@ -332,6 +332,27 @@ class VetoManager {
         await this.broadcastState(match._id.toString());
     }
 
+    // [NEW] Reset Veto State
+    async resetVeto(match) {
+        this.clearTimer(match._id.toString());
+        
+        match.vetoData = {
+            status: 'pending',
+            mapPool: match.tournament?.mapPool || [], 
+            bannedMaps: [],
+            pickedMaps: [],
+            sequence: [],
+            sequenceIndex: 0,
+            teamAReady: false,
+            teamBReady: false,
+            history: []
+        };
+        
+        await this.logAction(match, 'ADMIN: Veto state has been reset.');
+        await match.save();
+        await this.broadcastState(match._id.toString());
+    }
+
     async resetTurnTimer(match) {
         if (match.vetoData.status !== 'in_progress' && match.vetoData.status !== 'decision') return;
         

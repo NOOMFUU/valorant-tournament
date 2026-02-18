@@ -413,7 +413,7 @@ router.post('/matches/:id/checkin', auth(['team']), async (req, res) => {
         const diffMinutes = (matchTime - now) / 1000 / 60;
 
         if (diffMinutes > 30 && !match.checkIn.windowOpen) return res.status(400).json({ msg: 'Check-in not open yet (Opens 30m before)' });
-        if (diffMinutes < -10 && !match.checkIn.windowOpen) return res.status(400).json({ msg: 'Check-in closed' });
+        if (diffMinutes < -15 && !match.checkIn.windowOpen) return res.status(400).json({ msg: 'Check-in closed' });
 
         const teamId = req.user.id;
         let checked = false;
@@ -453,7 +453,7 @@ router.post('/matches/:id/reschedule', auth(['team']), async (req, res) => {
                 const opponentRole = opponentTeam.discordRoleId ? `<@&${opponentTeam.discordRoleId}>` : opponentTeam.name;
                 const timeString = `<t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>`;
                 const embed = new EmbedBuilder().setColor(0xffaa00).setTitle('📅 Reschedule Requested').setDescription(`**${requesterTeam.name}** has requested to reschedule this match.`).addFields({ name: 'Proposed Time', value: timeString, inline: true }, { name: 'Reason', value: reason || 'No reason provided', inline: true }).setFooter({ text: 'Please accept or reject in the dashboard.' }).setTimestamp();
-                await channel.send({ content: `${opponentRole}`, embeds: [embed] });
+                await channel.send({ content: `${opponentRole}`, embeds: [embed], allowedMentions: { parse: ['roles'] } });
             }
         }
         res.json({ success: true });
@@ -470,10 +470,12 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
         if (match.rescheduleRequest.requestedBy.toString() === req.user.id) return res.status(400).json({ msg: 'Cannot respond to own request' });
 
         const requester = match.rescheduleRequest.requestedBy;
+        if (!requester) return res.status(400).json({ msg: 'Invalid request data' });
+
         const responderId = req.user.id;
         const requesterTeam = match.teamA._id.toString() === requester.toString() ? match.teamA : match.teamB;
         const responderTeam = match.teamA._id.toString() === responderId ? match.teamA : match.teamB;
-        const oldTime = match.rescheduleRequest.proposedTime;
+        const proposedTime = match.rescheduleRequest.proposedTime;
 
         if (action === 'accept') {
             match.scheduledTime = match.rescheduleRequest.proposedTime;
@@ -498,8 +500,8 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
             if (channel) {
                 const requesterRole = requesterTeam.discordRoleId ? `<@&${requesterTeam.discordRoleId}>` : requesterTeam.name;
                 const isAccepted = action === 'accept';
-                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\n**New Time:** <t:${Math.floor(new Date(oldTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
-                await channel.send({ content: `${requesterRole}`, embeds: [embed] });
+                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
+                await channel.send({ content: `${requesterRole}`, embeds: [embed], allowedMentions: { parse: ['roles'] } });
             }
         }
         res.json({ success: true });

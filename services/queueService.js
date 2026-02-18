@@ -12,6 +12,24 @@ const agenda = new Agenda({
     processEvery: '30 seconds'
 });
 
+// [NEW] Task: แจ้งเตือนก่อนแข่ง 1 ชั่วโมง
+agenda.define('match-reminder-1h', async (job) => {
+    const { matchId } = job.attrs.data;
+    try {
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        if (!match || match.status !== 'scheduled' || !match.discordChannelId) return;
+
+        const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
+        if (channel) {
+            const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
+            const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
+            await channel.send(`⏰ **1 HOUR REMAINING**\n${roleA} and ${roleB}, your match starts in 1 hour.`);
+        }
+    } catch (e) {
+        console.error(`Job match-reminder-1h failed for ${matchId}:`, e);
+    }
+});
+
 // 1. Task: แจ้งเตือนก่อนแข่ง 10 นาที
 agenda.define('match-notification', async (job) => {
     const { matchId } = job.attrs.data;
@@ -23,7 +41,18 @@ agenda.define('match-notification', async (job) => {
         if (channel) {
             const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
             const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
-            await channel.send(`🚨 **10 MINUTES REMAINING** 🚨\n${roleA} and ${roleB}, please prepare for your match! Check-in is open.`);
+            
+            // [NEW] Add Check-in Button
+            const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`checkin_${matchId}`)
+                        .setLabel('✅ Check-in Now')
+                        .setStyle(ButtonStyle.Success)
+                );
+
+            await channel.send({ content: `🚨 **10 MINUTES REMAINING** 🚨\n${roleA} and ${roleB}, please prepare for your match! Check-in is open.`, components: [row] });
             match.notificationSent = true;
             await match.save();
         }
@@ -90,16 +119,21 @@ agenda.scheduleMatchJobs = async (match) => {
     
     const matchTime = new Date(match.scheduledTime);
     const notifyTime = new Date(matchTime.getTime() - 10 * 60000);
+    const remind1hTime = new Date(matchTime.getTime() - 60 * 60000); // 1 hour
+    const forfeitTime = new Date(matchTime.getTime() + 15 * 60000); // [NEW] 15 mins grace period
 
     // ลบ Job เก่าของแมตช์นี้ก่อน (กรณี Reschedule)
     await agenda.cancel({ 'data.matchId': match._id });
 
     // ตั้งเวลาใหม่
+    if (remind1hTime > new Date()) {
+        await agenda.schedule(remind1hTime, 'match-reminder-1h', { matchId: match._id });
+    }
     if (notifyTime > new Date()) {
         await agenda.schedule(notifyTime, 'match-notification', { matchId: match._id });
     }
-    if (matchTime > new Date()) {
-        await agenda.schedule(matchTime, 'check-in-expiry', { matchId: match._id });
+    if (forfeitTime > new Date()) {
+        await agenda.schedule(forfeitTime, 'check-in-expiry', { matchId: match._id });
     }
 };
 
