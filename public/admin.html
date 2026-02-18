@@ -457,6 +457,33 @@
             </div>
         </div>
 
+        <!-- INSPECT SCORE MODAL (SPLIT VIEW) -->
+        <div id="inspectScoreModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-[95vw] h-[90vh] border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <div>
+                    <h3 class="text-xl font-header text-white tracking-wide">MATCH INSPECTION</h3>
+                    <div class="text-xs text-gray-500 font-mono" id="inspectMatchTitle">LOADING...</div>
+                </div>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            
+            <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                <!-- LEFT: MAPS & PROOFS -->
+                <div class="flex-1 lg:w-2/3 bg-[#0f1113] p-6 overflow-y-auto custom-scroll border-r border-[#333]" id="inspectLeftCol">
+                    <!-- Content injected via JS -->
+                </div>
+                
+                <!-- RIGHT: ROSTERS -->
+                <div class="lg:w-1/3 bg-[#15171a] p-6 overflow-y-auto custom-scroll" id="inspectRightCol">
+                    <!-- Content injected via JS -->
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-[#333] bg-[#222] flex justify-end gap-4" id="inspectActions">
+                <!-- Buttons injected via JS -->
+            </div>
+        </div>
+
         <div id="editMatchModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-2xl border border-[#333] rounded-lg shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
             <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#21252b]">
                 <h3 class="text-base font-header text-white">MATCH CONTROL</h3>
@@ -1776,17 +1803,7 @@
             if(pending.length === 0) { el.innerHTML = `<div class="col-span-2 flex flex-col items-center justify-center py-20 border-2 border-dashed border-[#333] rounded-lg text-gray-500"><i class="fa-solid fa-check-circle text-4xl mb-4 opacity-20"></i><span class="font-bold text-xs uppercase tracking-widest">All caught up</span></div>`; return; }
             el.innerHTML = pending.map(m => {
                 const [winsA, winsB] = calculateMatchScore(m.scoreSubmission.tempScores);
-                const mapsHtml = m.scoreSubmission.tempScores.map((s) => `<div class="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0 text-sm"><div class="w-1/3 truncate text-gray-300 font-bold">${s.mapName}</div><div class="flex items-center justify-center gap-4 font-mono font-bold text-white"><span class="${parseInt(s.teamAScore)>parseInt(s.teamBScore)?'text-green-400':'text-gray-500'}">${m.teamA.shortName} ${s.teamAScore}</span><span class="text-gray-700">:</span><span class="${parseInt(s.teamBScore)>parseInt(s.teamAScore)?'text-green-400':'text-gray-500'}">${s.teamBScore} ${m.teamB.shortName}</span></div><div class="w-1/3 text-right">${s.proofImage?`<button onclick="viewImage('${s.proofImage}', '${s.mapName}', '${m.teamA.shortName}', '${s.teamAScore}', '${m.teamB.shortName}', '${s.teamBScore}')" class="text-[10px] bg-[#ff4655] hover:bg-white hover:text-[#ff4655] text-white px-2 py-1 rounded transition ml-2 font-bold"><i class="fa-regular fa-image mr-1"></i> VIEW PROOF</button>`:`<span class="text-[10px] text-gray-600 italic">No Proof</span>`}</div></div>`).join('');
-                
-                const renderMembers = (team) => {
-                    if (!team || !team.members) return '';
-                    return team.members.map(mem => 
-                        `<div class="flex items-center gap-1 text-[10px] text-gray-400 bg-[#1a1d21] px-1.5 py-0.5 rounded border border-[#333]">
-                            <i class="fa-solid fa-user text-[8px] text-gray-600"></i>
-                            <span class="truncate max-w-[80px]">${mem.name}</span>
-                        </div>`
-                    ).join('');
-                };
+                const mapSummary = m.scoreSubmission.tempScores.map(s => `<span class="px-2 py-1 bg-black/30 rounded text-[10px] text-gray-400 border border-white/5">${s.mapName}</span>`).join('');
 
                 return `<div class="bg-[#15171a] rounded-lg border border-[#2d3139] overflow-hidden shadow-xl hover:border-gray-500 transition group">
                     <div class="bg-[#1a1d21] px-6 py-4 flex justify-between items-center border-b border-[#2d3139]">
@@ -1801,9 +1818,6 @@
                                     <div class="text-xl font-header font-bold text-white truncate">${m.teamA.name}</div>
                                 </div>
                                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-3">Score: <span class="text-white text-lg ml-1">${winsA}</span></div>
-                                <div class="flex flex-wrap gap-1 justify-center bg-black/20 p-2 rounded border border-white/5">
-                                    ${renderMembers(m.teamA)}
-                                </div>
                             </div>
                             <div class="text-center pl-6">
                                 <div class="flex items-center justify-center gap-3 mb-2">
@@ -1811,20 +1825,105 @@
                                     <img src="${m.teamB.logo || DEFAULT_LOGO}" class="w-10 h-10 object-contain">
                                 </div>
                                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-3">Score: <span class="text-white text-lg ml-1">${winsB}</span></div>
-                                <div class="flex flex-wrap gap-1 justify-center bg-black/20 p-2 rounded border border-white/5">
-                                    ${renderMembers(m.teamB)}
-                                </div>
                             </div>
                         </div>
-                        <div class="bg-[#0f1113] rounded p-3 mb-5 border border-white/5">${mapsHtml}</div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="approveScore('${m._id}')" class="bg-green-500/10 hover:bg-green-600 hover:text-white text-green-500 border border-green-500/20 py-3 rounded text-xs font-bold uppercase transition">Approve</button>
-                            <button onclick="rejectScore('${m._id}')" class="bg-red-500/10 hover:bg-red-600 hover:text-white text-red-500 border border-red-500/20 py-3 rounded text-xs font-bold uppercase transition">Reject</button>
-                        </div>
+                        <div class="flex flex-wrap gap-2 mb-6 justify-center">${mapSummary}</div>
+                        <button onclick="openInspectModal('${m._id}')" class="w-full bg-[#ff4655] hover:bg-white hover:text-[#ff4655] text-white py-3 rounded text-sm font-bold uppercase tracking-widest transition shadow-lg shadow-red-900/20">
+                            <i class="fa-solid fa-magnifying-glass mr-2"></i> INSPECT & VERIFY
+                        </button>
                     </div>
                 </div>`;
             }).join('');
         }
+
+        function openInspectModal(matchId) {
+            const m = allMatches.find(x => x._id === matchId);
+            if(!m) return;
+
+            document.getElementById('inspectMatchTitle').innerText = `${m.name} • ${new Date(m.scheduledTime).toLocaleString()}`;
+            
+            // --- LEFT COL: MAPS & PROOFS ---
+            const leftCol = document.getElementById('inspectLeftCol');
+            const scores = m.scoreSubmission.tempScores || [];
+            
+            leftCol.innerHTML = scores.map((s, i) => {
+                const winA = parseInt(s.teamAScore) > parseInt(s.teamBScore);
+                const winB = parseInt(s.teamBScore) > parseInt(s.teamAScore);
+                const proofImg = s.proofImage || '';
+                
+                return `
+                <div class="mb-6 bg-[#1a1d21] border border-[#333] rounded-lg overflow-hidden">
+                    <div class="px-4 py-3 bg-[#222] border-b border-[#333] flex justify-between items-center">
+                        <span class="text-sm font-bold text-white uppercase tracking-wider"><i class="fa-solid fa-map mr-2 text-gray-500"></i> ${s.mapName}</span>
+                        <div class="flex items-center gap-3 font-mono font-bold text-lg">
+                            <span class="${winA ? 'text-green-400' : 'text-gray-400'}">${m.teamA.shortName} ${s.teamAScore}</span>
+                            <span class="text-gray-600">:</span>
+                            <span class="${winB ? 'text-green-400' : 'text-gray-400'}">${s.teamBScore} ${m.teamB.shortName}</span>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-black/40 flex justify-center">
+                        ${proofImg 
+                            ? `<div class="relative group cursor-zoom-in" onclick="viewImage('${proofImg}', '${s.mapName}', '${m.teamA.shortName}', '${s.teamAScore}', '${m.teamB.shortName}', '${s.teamBScore}')">
+                                <img src="${proofImg}" class="max-h-74 rounded border border-white/10 shadow-lg transition group-hover:brightness-110">
+                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/50 backdrop-blur-sm rounded">
+                                    <span class="text-white font-bold uppercase text-xs tracking-widest"><i class="fa-solid fa-expand mr-2"></i> Zoom In</span>
+                                </div>
+                               </div>` 
+                            : `<div class="h-32 w-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-[#333] rounded"><i class="fa-solid fa-image-slash text-2xl mb-2"></i><span class="text-xs uppercase font-bold">No Proof Image</span></div>`
+                        }
+                    </div>
+                </div>`;
+            }).join('');
+
+            // --- RIGHT COL: ROSTERS ---
+            const rightCol = document.getElementById('inspectRightCol');
+            const renderRosterList = (team) => {
+                if (!team || !team.members) return '<div class="text-gray-500 text-xs italic">No roster data</div>';
+                return team.members.map(mem => `
+                    <div class="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <div class="w-6 h-6 bg-[#222] rounded flex items-center justify-center text-[10px] font-bold text-gray-400">${mem.name.charAt(0)}</div>
+                            <div class="flex flex-col min-w-0">
+                                <span class="text-xs font-bold text-gray-200 truncate">${mem.name}</span>
+                                <span class="text-[9px] text-gray-500 font-mono">#${mem.tag}</span>
+                            </div>
+                        </div>
+                        <span class="text-[9px] font-bold uppercase text-gray-600 bg-[#0f1113] px-1.5 py-0.5 rounded border border-[#333]">${mem.role || 'Player'}</span>
+                    </div>
+                `).join('');
+            };
+
+            rightCol.innerHTML = `
+                <div class="mb-8">
+                    <div class="flex items-center gap-3 mb-3 pb-2 border-b border-[#ff4655]">
+                        <img src="${m.teamA.logo || DEFAULT_LOGO}" class="w-8 h-8 object-contain">
+                        <h4 class="font-header text-xl text-white">${m.teamA.name}</h4>
+                    </div>
+                    <div class="space-y-1">${renderRosterList(m.teamA)}</div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-3 mb-3 pb-2 border-b border-[#00d4ff]">
+                        <img src="${m.teamB.logo || DEFAULT_LOGO}" class="w-8 h-8 object-contain">
+                        <h4 class="font-header text-xl text-white">${m.teamB.name}</h4>
+                    </div>
+                    <div class="space-y-1">${renderRosterList(m.teamB)}</div>
+                </div>
+            `;
+
+            // --- ACTIONS ---
+            const actions = document.getElementById('inspectActions');
+            actions.innerHTML = `
+                <button onclick="rejectScore('${m._id}')" class="px-6 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 rounded font-bold text-sm uppercase transition flex items-center gap-2">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button onclick="approveScore('${m._id}')" class="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold text-sm uppercase transition shadow-lg shadow-green-900/20 flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i> Approve Result
+                </button>
+            `;
+
+            openModal('inspectScoreModal');
+        }
+
         function renderMemberRow(tid, m) {
             const statusColor = m.status === 'rejected' ? 'text-red-400' : (m.status === 'pending' ? 'text-blue-400' : 'text-emerald-400');
             const statusDot = m.status === 'rejected' ? 'bg-red-500' : (m.status === 'pending' ? 'bg-blue-500' : 'bg-emerald-500');
@@ -2694,8 +2793,8 @@
         }
         
         async function deleteTourney() { const id=document.getElementById('tsId').value; if(confirm("DELETE SYSTEM?")) { await fetch(`${API_BASE}/api/tournaments/${id}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); showToast('Deleted'); } }
-        async function approveScore(id) { if(confirm('Approve Result?')) await fetch(`${API_BASE}/api/matches/${id}/approve-score`, {method:'POST', headers: {'Authorization': token}}); init(); showToast('Score Approved'); }
-        async function rejectScore(id) { const r=prompt('Reason for rejection:'); if(r) await fetch(`${API_BASE}/api/matches/${id}/reject-score`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({reason:r})}); init(); showToast('Score Rejected'); }
+        async function approveScore(id) { if(confirm('Approve Result?')) { await fetch(`${API_BASE}/api/matches/${id}/approve-score`, {method:'POST', headers: {'Authorization': token}}); closeModal(); init(); showToast('Score Approved'); } }
+        async function rejectScore(id) { const r=prompt('Reason for rejection:'); if(r) { await fetch(`${API_BASE}/api/matches/${id}/reject-score`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({reason:r})}); closeModal(); init(); showToast('Score Rejected'); } }
         async function forceWinner(side) { const m=allMatches.find(x=>x._id===activeMatchId); if(confirm('Force Win?')) await fetch(`${API_BASE}/api/matches/${activeMatchId}/force-winner`, {method:'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'}, body:JSON.stringify({winnerId: side==='teamA'?m.teamA._id:m.teamB._id})}); closeModal(); init(); }
         async function deleteMatch() { if(confirm('Delete Match?')) await fetch(`${API_BASE}/api/matches/${activeMatchId}`, {method:'DELETE', headers: {'Authorization': token}}); closeModal(); init(); }
         async function deleteStage(tid, idx) { if(confirm('Delete Stage?')) await fetch(`${API_BASE}/api/tournaments/${tid}/stages/${idx}`, {method:'DELETE', headers: {'Authorization': token}}); init(); }

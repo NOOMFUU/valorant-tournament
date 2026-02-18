@@ -65,6 +65,10 @@
             clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
         }
 
+        .clipped-box {
+            clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+        }
+
         /* Nav Items */
         .nav-link {
             position: relative;
@@ -479,7 +483,7 @@
                 <div id="mapInputs" class="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scroll">
                 </div>
 
-                <button type="submit" class="btn-primary w-full py-4 text-2xl mt-4 shadow-lg">TRANSMIT DATA</button>
+                <button type="submit" id="btnSubmitScore" class="btn-primary w-full py-4 text-2xl mt-4 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:filter-grayscale" disabled>TRANSMIT DATA</button>
             </form>
         </div>
     </div>
@@ -564,6 +568,21 @@
         const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
         const socket = io(API_BASE || undefined);
         const DEFAULT_LOGO = "https://via.placeholder.com/100?text=TEAM";
+        const MAP_IMAGES = {
+            'Abyss': 'https://media.valorant-api.com/maps/224b0a95-48b9-f703-1bd8-67aca101a61f/splash.png',
+            'Ascent': 'https://media.valorant-api.com/maps/7eaecc1b-4337-bbf6-6ab9-04b8f06b3319/splash.png',
+            'Bind': 'https://media.valorant-api.com/maps/2c9d57ec-4431-9c5e-2939-8f9ef6dd5cba/splash.png',
+            'Haven': 'https://media.valorant-api.com/maps/2bee0dc9-4ffe-519b-1cbd-7fbe763a6047/splash.png',
+            'Lotus': 'https://media.valorant-api.com/maps/2fe4ed3a-450a-948b-6d6b-e89a78e680a9/splash.png',
+            'Sunset': 'https://media.valorant-api.com/maps/92584fbe-486a-b1b2-9faa-39b0f486b498/splash.png',
+            'Pearl': 'https://media.valorant-api.com/maps/fd267378-4d1d-484f-ff52-77821ed10dc2/splash.png',
+            'Split': 'https://media.valorant-api.com/maps/d960549e-485c-e861-8d71-aa9d1aed12a2/splash.png',
+            'Fracture': 'https://media.valorant-api.com/maps/b529448b-4d60-346e-e89e-00a4c527a405/splash.png',
+            'Breeze': 'https://media.valorant-api.com/maps/2fb9a4fd-47b8-4e7d-a969-74b4046ebd53/splash.png',
+            'Icebox': 'https://media.valorant-api.com/maps/e2ad5c54-4114-a870-9641-8ea21279579a/splash.png',
+            'Corrode': 'https://cms.tracker.gg/content/images/2025/06/Valorant-Corrode-Map.jpg',
+            'Kasbah': 'https://media.valorant-api.com/maps/5d6b454a-44d7-0632-0b97-469915b94805/splash.png'
+        };
 
         let myTeamId = null;
         let isRosterLocked = true;
@@ -1082,44 +1101,61 @@
                     const existing = m.scores.find(s => s.mapName === map.map) || {};
                     const valA = existing.teamAScore !== undefined ? existing.teamAScore : '';
                     const valB = existing.teamBScore !== undefined ? existing.teamBScore : '';
+                    const proofUrl = existing.proofImage || '';
                     const disabled = isFinished ? 'disabled' : '';
+                    const bg = MAP_IMAGES[map.map] || 'https://via.placeholder.com/800x400?text=Map';
 
                     return `
-                    <div class="bg-black/40 p-5 border border-white/10 relative clipped-box mb-4">
-                        <div class="flex justify-between mb-3">
-                            <span class="text-[#ff4655] font-header text-2xl tracking-wide uppercase">${map.map}</span>
-                        </div>
+                    <div class="relative clipped-box mb-6 overflow-hidden group border border-white/10 bg-[#1a1d21]">
+                        <div class="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-60 transition-all duration-700" style="background-image: url('${bg}');"></div>
+                        <div class="absolute inset-0 bg-gradient-to-r from-[#0f1923] via-[#0f1923]/90 to-[#0f1923]/60"></div>
                         
-                        <div class="flex items-center gap-4 mb-4">
-                            <div class="flex-1 bg-[#0f1923] p-2 border border-gray-700 flex items-center justify-between">
-                                <span class="text-[10px] text-gray-500 font-bold uppercase mr-2 tracking-wider">${m.teamA?.shortName}</span>
-                                <input type="number" id="scoreA_${i}" value="${valA}" ${disabled} class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
-                            </div>
-                            <span class="text-gray-600 font-header text-2xl">VS</span>
-                            <div class="flex-1 bg-[#0f1923] p-2 border border-gray-700 flex items-center justify-between">
-                                <input type="number" id="scoreB_${i}" value="${valB}" ${disabled} class="bg-transparent text-white font-header text-3xl text-center w-12 outline-none focus:text-[#ff4655]" placeholder="0">
-                                <span class="text-[10px] text-gray-500 font-bold uppercase ml-2 tracking-wider">${m.teamB?.shortName}</span>
-                            </div>
-                        </div>
-
-                        ${!isFinished ? `
-                        <div class="space-y-3">
-                            <div class="relative group">
-                                <input type="file" id="proofImg_${i}" class="hidden" accept="image/*" onchange="handleScoreProof(this, ${i})">
-                                <label for="proofImg_${i}" class="block w-full border border-dashed border-gray-600 hover:border-white p-3 text-center text-[10px] text-gray-400 cursor-pointer transition uppercase tracking-widest hover:text-white hover:bg-white/5">
-                                    <i class="fa-solid fa-paperclip mr-2"></i> <span id="fileName_${i}">Attach Scoreboard Screenshot</span>
-                                </label>
+                        <div class="relative p-6">
+                            <div class="flex justify-between mb-6 items-center border-b border-white/10 pb-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-map-location-dot text-[#ff4655]"></i>
+                                    <span class="text-white font-header text-3xl tracking-wide uppercase drop-shadow-lg">${map.map}</span>
+                                </div>
+                                <div class="text-[10px] font-mono text-gray-400 bg-black/50 px-3 py-1 rounded border border-white/10 tracking-widest">MAP 0${i+1}</div>
                             </div>
                             
-                            <div id="previewBox_${i}" class="hidden w-full h-40 bg-black/50 border border-white/20 relative group cursor-pointer overflow-hidden" onclick="document.getElementById('proofImg_${i}').click()">
-                                <img id="imgPreview_${i}" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition duration-500">
-                                <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition backdrop-blur-sm">
-                                    <span class="text-xs text-white font-bold uppercase tracking-widest"><i class="fa-solid fa-pen mr-2"></i>Change Image</span>
+                            <div class="flex items-center gap-8 mb-6 justify-center">
+                                <div class="flex-1 flex items-center justify-end gap-4">
+                                    <span class="text-lg text-gray-300 font-bold uppercase tracking-wider text-right font-header">${m.teamA?.shortName}</span>
+                                    <div class="bg-black/50 p-1 border border-white/10 skew-x-[-10deg] shadow-lg">
+                                        <input type="number" id="scoreA_${i}" value="${valA}" ${disabled} class="bg-transparent text-white font-header text-5xl text-center w-20 outline-none focus:text-[#ff4655] js-score-input skew-x-[10deg] transition-colors" placeholder="-" oninput="validateScoreForm()">
+                                    </div>
+                                </div>
+                                <span class="text-[#ff4655] font-header text-3xl italic opacity-80">VS</span>
+                                <div class="flex-1 flex items-center justify-start gap-4">
+                                    <div class="bg-black/50 p-1 border border-white/10 skew-x-[-10deg] shadow-lg">
+                                        <input type="number" id="scoreB_${i}" value="${valB}" ${disabled} class="bg-transparent text-white font-header text-5xl text-center w-20 outline-none focus:text-[#ff4655] js-score-input skew-x-[10deg] transition-colors" placeholder="-" oninput="validateScoreForm()">
+                                    </div>
+                                    <span class="text-lg text-gray-300 font-bold uppercase tracking-wider font-header">${m.teamB?.shortName}</span>
                                 </div>
                             </div>
-                        </div>` : ''}
 
-                    </div>`;
+                            ${!isFinished ? `
+                            <div class="space-y-3">
+                                <div class="relative group/upload">
+                                    <input type="file" id="proofImg_${i}" class="hidden js-proof-input" accept="image/*" onchange="handleScoreProof(this, ${i}); validateScoreForm()">
+                                    <label for="proofImg_${i}" id="labelProof_${i}" class="block w-full border border-dashed border-white/20 hover:border-[#ff4655] bg-black/40 hover:bg-[#ff4655]/10 p-4 text-center cursor-pointer transition-all duration-300 group-hover/upload:shadow-[0_0_20px_rgba(255,70,85,0.15)]">
+                                        <div class="flex items-center justify-center gap-3 text-xs font-bold text-gray-400 group-hover/upload:text-white uppercase tracking-widest">
+                                            <i class="fa-solid fa-camera text-lg"></i> <span id="fileName_${i}">Upload Scoreboard Proof</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                
+                                <div id="previewBox_${i}" class="${proofUrl ? '' : 'hidden'} w-full h-56 bg-black/50 border border-white/20 relative group/preview cursor-pointer overflow-hidden mt-2 rounded-sm shadow-xl" onclick="document.getElementById('proofImg_${i}').click()">
+                                    <img id="imgPreview_${i}" src="${proofUrl}" class="w-full h-full object-contain opacity-90 group-hover/preview:opacity-100 transition duration-300">
+                                    <div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/preview:opacity-100 transition backdrop-blur-sm">
+                                        <span class="text-xs text-[#ff4655] font-bold uppercase tracking-widest border border-[#ff4655] px-6 py-2 rounded-sm hover:bg-[#ff4655] hover:text-white transition shadow-[0_0_15px_#ff4655]">Change Image</span>
+                                    </div>
+                                </div>
+                            </div>` : ''}
+
+                            </div>
+                        </div>`;
                 }).join('');
 
                 const submitBtn = document.querySelector('#scoreForm button[type="submit"]');
@@ -1138,6 +1174,7 @@
 
                 document.getElementById('scoreModal').classList.remove('hidden');
                 document.getElementById('scoreModal').classList.add('flex');
+                validateScoreForm(); // Initial check
             });
         }
 
@@ -1210,9 +1247,21 @@
             const fd = new FormData();
             const scores = [];
             matchData.vetoData.pickedMaps.forEach((m, i) => {
-                scores.push({ mapName: m.map, teamAScore: document.getElementById(`scoreA_${i}`).value, teamBScore: document.getElementById(`scoreB_${i}`).value });
-                const f = document.getElementById(`proofImg_${i}`).files[0];
-                if (f) fd.append(`proof_${i}`, f);
+                const sA = document.getElementById(`scoreA_${i}`).value;
+                const sB = document.getElementById(`scoreB_${i}`).value;
+                // Only submit if scores are entered
+                if (sA !== '' && sB !== '') {
+                    scores.push({ mapName: m.map, teamAScore: sA, teamBScore: sB });
+                    const f = document.getElementById(`proofImg_${i}`).files[0];
+                    // Note: proof index in FormData must match the index in the scores array logic on server, 
+                    // but here we use the map index 'i' to keep it simple. Server should handle mapping or we send index.
+                    // To be safe with current server logic (which expects proof_0 for scores[0]), we should align them.
+                    // However, current server logic: `if (scores[index]) scores[index].proofImage = ...` using `parts[1]`.
+                    // So we must append proof with the SAME index as we push to `scores`.
+                    // Let's adjust:
+                    const scoreIndex = scores.length - 1; 
+                    if (f) fd.append(`proof_${scoreIndex}`, f);
+                }
             });
             fd.append('scores', JSON.stringify(scores));
             const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
@@ -1299,6 +1348,37 @@
                     boxEl.classList.remove('hidden'); // แสดงกล่องรูป
                 }
                 reader.readAsDataURL(file);
+            }
+        }
+
+        function validateScoreForm() {
+            const btn = document.getElementById('btnSubmitScore');
+            let isValid = false;
+            let hasAnyScore = false;
+            let missingProof = false;
+
+            // Check each map block
+            const mapBlocks = document.querySelectorAll('#mapInputs > div');
+            mapBlocks.forEach((block, i) => {
+                const sA = document.getElementById(`scoreA_${i}`).value;
+                const sB = document.getElementById(`scoreB_${i}`).value;
+                const fileInput = document.getElementById(`proofImg_${i}`);
+                const hasFile = fileInput.files.length > 0 || (document.getElementById(`imgPreview_${i}`).src && !document.getElementById(`imgPreview_${i}`).src.endsWith('undefined'));
+
+                if (sA !== '' || sB !== '') {
+                    hasAnyScore = true;
+                    // If score entered, MUST have file
+                    if (!hasFile) missingProof = true;
+                }
+            });
+
+            if (hasAnyScore && !missingProof) isValid = true;
+
+            btn.disabled = !isValid;
+            if (isValid) {
+                btn.classList.remove('opacity-50', 'cursor-not-allowed', 'filter-grayscale');
+            } else {
+                btn.classList.add('opacity-50', 'cursor-not-allowed', 'filter-grayscale');
             }
         }
     </script>
