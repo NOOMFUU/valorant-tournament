@@ -60,36 +60,94 @@ const discordClient = new Client({
 });
 
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID; // Your Server ID
-const DISCORD_CATEGORY_ID = process.env.DISCORD_MATCH_CATEGORY_ID; // Category for Match Channels
-const DISCORD_CLAIM_CHANNEL_ID = process.env.DISCORD_CLAIM_CHANNEL_ID; // Channel to send claim button
+// Note: We use process.env directly for channels to support auto-creation updates
 
-discordClient.once('ready', () => {
+discordClient.once('clientReady', async () => {
     console.log(`🤖 Discord Bot Logged in as ${discordClient.user.tag}`);
     discordClient.user.setActivity('Valorant Comp', { type: 'COMPETING' }); //Set status to "Competing in Valorant Comp"
+    await setupDiscordChannels(); // [UPDATED] Auto-create all necessary channels
 });
 
 discordClient.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
+
+    // [MERGED] Logic from discordBot.js: Team Selection Buttons
+    if (interaction.customId.startsWith('team_')) {
+        const teamName = interaction.customId.replace('team_', '');
+        
+        // หมายเหตุ: ตรงนี้ต้องเพิ่ม Logic การหายศ (Role) ในเซิร์ฟเวอร์มาให้ผู้เล่น
+        await interaction.reply({ 
+            content: `คุณได้ยืนยันตัวตนเข้าสู่ทีม **${teamName}** แล้ว! (ระบบกำลังจ่ายยศให้คุณ)`, 
+            ephemeral: true 
+        });
+        return;
+    }
 
     if (interaction.customId === 'claim_role') {
         await interaction.deferReply({ ephemeral: true });
 
         try {
             const discordId = interaction.user.id;
-            // Find team member with this Discord ID
-            const team = await Team.findOne({ "members.discordId": discordId });
+            const discordUsername = interaction.user.username;
 
-            if (!team) {
-                return interaction.editReply({ content: "❌ No registered player found with your Discord ID. Please contact an admin." });
+            // 1. ค้นหาด้วย ID ก่อน (กรณีเคยเคลมแล้ว หรือ Admin ใส่ ID ให้)
+            let team = await Team.findOne({ "members.discordId": discordId });
+            let member;
+
+            if (team) {
+                member = team.members.find(m => m.discordId === discordId);
+            } else {
+                // 2. ถ้าไม่เจอ ID ให้ค้นหาจากชื่อ Discord (Case Insensitive)
+                // ค้นหาทีมที่มี member ชื่อคล้ายกับ username
+                const potentialTeams = await Team.find({
+                    "members.discordName": { $regex: new RegExp(discordUsername, "i") }
+                });
+
+                // วนลูปตรวจสอบความถูกต้อง (รองรับกรณีชื่อใน DB มีหรือไม่มี Tag)
+                for (const t of potentialTeams) {
+                    const found = t.members.find(m => {
+                        if (!m.discordName) return false;
+                        const dbName = m.discordName.toLowerCase().trim();
+                        const inputName = discordUsername.toLowerCase();
+                        // ตรงกันเป๊ะ หรือ ตรงกันแบบตัด Tag (#1234) ออก
+                        return dbName === inputName || dbName.split('#')[0] === inputName;
+                    });
+
+                    if (found) {
+                        team = t;
+                        member = found;
+                        // บันทึก ID ทันทีเพื่อความแม่นยำในครั้งถัดไป
+                        if (!member.discordId) {
+                            member.discordId = discordId;
+                            await team.save();
+                            console.log(`✅ Auto-linked Discord ID for ${discordUsername} to Team ${team.name}`);
+                        }
+                        break;
+                    }
+                }
             }
 
-            const member = team.members.find(m => m.discordId === discordId);
+            if (!team || !member) {
+                return interaction.editReply({ 
+                    content: `❌ ไม่พบข้อมูลผู้เล่นที่ตรงกับ Discord: **${discordUsername}**\n👉 กรุณาไปที่หน้า **Team Dashboard** แล้วระบุชื่อ Discord ของคุณให้ถูกต้อง (ไม่ต้องใส่ #tag)` 
+                });
+            }
+
             const guild = interaction.guild;
 
             // Get or Create Role
             let role;
             if (team.discordRoleId) {
                 role = await guild.roles.fetch(team.discordRoleId).catch(() => null);
+            }
+
+            // [FIX] Try finding by name to avoid duplicates if ID is missing/invalid
+            if (!role) {
+                role = guild.roles.cache.find(r => r.name === team.name);
+                if (role) {
+                    team.discordRoleId = role.id;
+                    await team.save();
+                }
             }
 
             if (!role) {
@@ -107,10 +165,11 @@ discordClient.on('interactionCreate', async interaction => {
             const guildMember = await guild.members.fetch(discordId);
             await guildMember.roles.add(role);
 
-            // Update nickname (Optional)
-            // await guildMember.setNickname(`${team.shortName} ${member.name}`).catch(e => console.log("Cannot set nick"));
+            // Update nickname to "TeamTag | Name"
+            const nickname = `${team.shortName} | ${member.name}`;
+            await guildMember.setNickname(nickname).catch(e => console.log(`⚠️ Cannot set nickname for ${discordUsername}: ${e.message}`));
 
-            interaction.editReply({ content: `✅ Verified! You have been assigned the **${team.name}** role.` });
+            interaction.editReply({ content: `✅ ยืนยันตัวตนสำเร็จ! คุณได้รับยศ **${team.name}** เรียบร้อยแล้ว` });
 
         } catch (error) {
             console.error("Discord Claim Error:", error);
@@ -120,6 +179,8 @@ discordClient.on('interactionCreate', async interaction => {
 });
 
 discordClient.on('messageCreate', async message => {
+    if (message.author.bot) return;
+
     if (message.content === '!claim') {
         try {
             const discordName = message.author.username;
@@ -146,13 +207,108 @@ discordClient.on('messageCreate', async message => {
 
             await guildMember.roles.add(role);
 
-            // Update nickname (Optional)
-            // await guildMember.setNickname(`${team.shortName} ${member.name}`).catch(e => console.log("Cannot set nick"));
+            // Update nickname to "TeamTag | Name"
+            const nickname = `${teamMember.shortName} | ${member.name}`;
+            await guildMember.setNickname(nickname).catch(e => console.log(`⚠️ Cannot set nickname for ${message.author.username}: ${e.message}`));
 
             message.reply(`✅ Verified! You have been assigned the **${teamMember.name}** role.`);
         } catch (e) {
             console.log("❌ There was an error, please contact the admin");
         }
+    }
+
+    // [NEW] Admin Command: Delete Category (!deletecategory)
+    if (message.content === '!deletecategory') {
+        // Check for Administrator permission
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
+        const categoryId = message.channel.parentId;
+        if (!categoryId) return message.reply("❌ This channel is not inside a category.");
+
+        const category = message.guild.channels.cache.get(categoryId);
+        if (!category) return message.reply("❌ Category not found.");
+
+        await message.reply(`⚠️ **WARNING:** Deleting category **${category.name}** and all channels inside it in 5 seconds...`);
+
+        setTimeout(async () => {
+            const channels = message.guild.channels.cache.filter(c => c.parentId === categoryId);
+            // Delete all channels in the category
+            for (const [_, ch] of channels) {
+                await ch.delete().catch(e => console.error(`Failed to delete channel ${ch.name}:`, e.message));
+            }
+            // Delete the category itself
+            await category.delete().catch(e => console.error(`Failed to delete category ${category.name}:`, e.message));
+        }, 5000);
+    }
+});
+
+discordClient.on('guildMemberAdd', async member => {
+    try {
+        const discordId = member.id;
+        const discordUsername = member.user.username;
+
+        // 1. Search by ID first
+        let team = await Team.findOne({ "members.discordId": discordId });
+        let teamMember;
+
+        if (team) {
+            teamMember = team.members.find(m => m.discordId === discordId);
+        } else {
+            // 2. Search by Username if ID not found
+            const potentialTeams = await Team.find({
+                "members.discordName": { $regex: new RegExp(discordUsername, "i") }
+            });
+
+            for (const t of potentialTeams) {
+                const found = t.members.find(m => {
+                    if (!m.discordName) return false;
+                    const dbName = m.discordName.toLowerCase().trim();
+                    const inputName = discordUsername.toLowerCase();
+                    return dbName === inputName || dbName.split('#')[0] === inputName;
+                });
+
+                if (found) {
+                    team = t;
+                    teamMember = found;
+                    // Auto-link ID
+                    if (!teamMember.discordId) {
+                        teamMember.discordId = discordId;
+                        await team.save();
+                        console.log(`✅ Auto-linked Discord ID for ${discordUsername} to Team ${team.name} (Auto-Join)`);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (team && teamMember) {
+            const guild = member.guild;
+            let role;
+
+            if (team.discordRoleId) {
+                role = await guild.roles.fetch(team.discordRoleId).catch(() => null);
+            }
+
+            if (!role) {
+                role = await guild.roles.create({
+                    name: team.name,
+                    color: '#ff4655',
+                    reason: 'Tournament Team Role (Auto-Assign)'
+                });
+                team.discordRoleId = role.id;
+                await team.save();
+            }
+
+            await member.roles.add(role);
+            
+            // Update nickname to "TeamTag | Name"
+            const nickname = `${team.shortName} | ${teamMember.name}`;
+            await member.setNickname(nickname).catch(e => console.log(`⚠️ Cannot set nickname for ${discordUsername}: ${e.message}`));
+
+            console.log(`✅ Auto-assigned role ${team.name} to ${discordUsername}`);
+        }
+    } catch (error) {
+        console.error("Auto-Assign Role Error:", error);
     }
 });
 
@@ -162,28 +318,53 @@ if (process.env.DISCORD_TOKEN) {
 
 // Helper: Create Private Match Channel
 async function createMatchChannel(match) {
-    if (!match.teamA || !match.teamB || !match.scheduledTime) return;
+    if (!match.teamA || !match.teamB) return;
     if (match.discordChannelId) return; // Already created
 
     try {
         const guild = await discordClient.guilds.fetch(DISCORD_GUILD_ID);
         if (!guild) return;
+        if (!DISCORD_GUILD_ID) return console.error("DISCORD_GUILD_ID not set");
 
         // Ensure roles exist (or fetch them)
         const teamA = await Team.findById(match.teamA);
         const teamB = await Team.findById(match.teamB);
+
+        // [FIX] Auto-create/Find roles if missing to prevent channel creation failure
+        async function ensureTeamRole(team) {
+            let role;
+            if (team.discordRoleId) role = await guild.roles.fetch(team.discordRoleId).catch(() => null);
+            
+            if (!role) {
+                role = guild.roles.cache.find(r => r.name === team.name);
+                if (!role) {
+                    try {
+                        role = await guild.roles.create({ name: team.name, color: '#ff4655', reason: 'Auto-created for Match' });
+                    } catch (e) { console.error(`Failed to create role for ${team.name}:`, e.message); }
+                }
+                if (role) {
+                    team.discordRoleId = role.id;
+                    await team.save();
+                }
+            }
+        }
+
+        await ensureTeamRole(teamA);
+        await ensureTeamRole(teamB);
 
         if (!teamA.discordRoleId || !teamB.discordRoleId) {
             console.log(`Cannot create channel for Match ${match.matchNumber}: Missing roles`);
             return;
         }
 
-        const channelName = `match-${match.matchNumber}-${teamA.shortName}-vs-${teamB.shortName}`.toLowerCase();
-
-        const channel = await guild.channels.create({
-            name: channelName,
-            type: ChannelType.GuildText,
-            parent: DISCORD_CATEGORY_ID,
+        // [MODIFIED] Create a dedicated Category for this match
+        // Use matchNumber if valid, otherwise use ID fragment to avoid "Match 0" duplicates
+        const matchIdentifier = (match.matchNumber && match.matchNumber > 0) ? match.matchNumber : match._id.toString().slice(-4);
+        const categoryName = `🏆 Match ${matchIdentifier}: ${teamA.shortName} vs ${teamB.shortName}`;
+        
+        const category = await guild.channels.create({
+            name: categoryName,
+            type: ChannelType.GuildCategory,
             permissionOverwrites: [
                 {
                     id: guild.id, // @everyone
@@ -191,21 +372,27 @@ async function createMatchChannel(match) {
                 },
                 {
                     id: teamA.discordRoleId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect],
                 },
                 {
                     id: teamB.discordRoleId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect],
                 },
-                // Add Admin Role ID here if needed
             ],
         });
 
-        // [NEW] Create Voice Channel for Team A
+        // Create Text Channel inside Category
+        const textChannel = await guild.channels.create({
+            name: `💬-match-${matchIdentifier}-chat`,
+            type: ChannelType.GuildText,
+            parent: category.id,
+        });
+
+        // Create Voice Channel for Team A
         await guild.channels.create({
-            name: `🔊 ${teamA.shortName} (M${match.matchNumber})`,
+            name: `🔊 ${teamA.shortName} (M${matchIdentifier})`,
             type: ChannelType.GuildVoice,
-            parent: DISCORD_CATEGORY_ID,
+            parent: category.id,
             permissionOverwrites: [
                 {
                     id: guild.id,
@@ -215,14 +402,20 @@ async function createMatchChannel(match) {
                     id: teamA.discordRoleId,
                     allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.Speak],
                 },
+                {
+                    id: teamB.discordRoleId,
+                    deny: [PermissionsBitField.Flags.ViewChannel],
+                    allow: [PermissionsBitField.Flags.ViewChannel], // Allow seeing
+                    deny: [PermissionsBitField.Flags.Connect],      // Deny connecting
+                }
             ],
         });
 
-        // [NEW] Create Voice Channel for Team B
+        // Create Voice Channel for Team B
         await guild.channels.create({
-            name: `🔊 ${teamB.shortName} (M${match.matchNumber})`,
+            name: `🔊 ${teamB.shortName} (M${matchIdentifier})`,
             type: ChannelType.GuildVoice,
-            parent: DISCORD_CATEGORY_ID,
+            parent: category.id,
             permissionOverwrites: [
                 {
                     id: guild.id,
@@ -232,13 +425,20 @@ async function createMatchChannel(match) {
                     id: teamB.discordRoleId,
                     allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.Speak],
                 },
+                {
+                    id: teamA.discordRoleId,
+                    deny: [PermissionsBitField.Flags.ViewChannel],
+                    allow: [PermissionsBitField.Flags.ViewChannel], // Allow seeing
+                    deny: [PermissionsBitField.Flags.Connect],      // Deny connecting
+                }
             ],
         });
 
-        match.discordChannelId = channel.id;
+        match.discordChannelId = textChannel.id;
         await match.save();
 
-        channel.send(`**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: <t:${Math.floor(new Date(match.scheduledTime).getTime() / 1000)}:F>`);
+        const timeStr = match.scheduledTime ? `<t:${Math.floor(new Date(match.scheduledTime).getTime() / 1000)}:F>` : 'TBD';
+        textChannel.send(`**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: ${timeStr}`);
 
     } catch (e) {
         console.error("Error creating match channel:", e);
@@ -460,6 +660,7 @@ if (process.env.IMGBB_API_KEY) {
 // สร้าง Manager ก่อน Connect DB เพื่อให้พร้อมเรียกใช้ restoreTimers
 const vetoMgr = new VetoManager(io);
 BracketManager.setIO(io);
+BracketManager.onMatchReady = createMatchChannel; // [NEW] Hook up channel creation for next matches
 
 // --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
@@ -622,18 +823,50 @@ const auth = (roles = []) => async (req, res, next) => {
     } catch { res.status(401).json({ msg: 'Invalid Token' }); }
 };
 
-// --- LOGGING HELPER ---
+// --- [UPDATED] LOGGING HELPER ---
+async function sendDiscordLog(title, description, fields = [], color = 0x3498db) {
+    const channelId = process.env.DISCORD_ADMIN_LOG_CHANNEL_ID;
+    if (!channelId) return;
+    try {
+        const channel = await discordClient.channels.fetch(channelId).catch(() => null);
+        if (!channel) return;
+
+        const embed = new EmbedBuilder()
+            .setTitle(title)
+            .setDescription(description)
+            .addFields(fields)
+            .setColor(color)
+            .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+    } catch (e) {
+        console.error("Failed to send Discord log:", e);
+    }
+}
+
 async function logAdminAction(req, action, target, details) {
     try {
         const u = await User.findById(req.user.id);
+        const adminName = u ? u.username : 'Unknown';
+
         await AdminLog.create({
             adminId: req.user.id,
-            adminUsername: u ? u.username : 'Unknown',
+            adminUsername: adminName,
             action,
             target,
             details,
             ip: req.ip
         });
+
+        // [NEW] Send to Discord
+        const fields = [{ name: 'Admin', value: adminName, inline: true }, { name: 'Target', value: target || 'N/A', inline: true }];
+        if (details && Object.keys(details).length > 0) fields.push({ name: 'Details', value: JSON.stringify(details).substring(0, 1000) });
+
+        let color = 0x3498db; // Blue
+        if (['DELETE', 'RESET', 'REJECT', 'FORCE'].some(k => action.includes(k))) color = 0xe74c3c; // Red
+        if (['APPROVE', 'CREATE', 'UPDATE'].some(k => action.includes(k))) color = 0x2ecc71; // Green
+
+        await sendDiscordLog(`🛡️ Admin Action: ${action}`, `Action performed via Dashboard`, fields, color);
     } catch (e) { console.error("Log Error:", e); }
 }
 
@@ -686,6 +919,14 @@ app.post('/api/register', upload.single('logo'), async (req, res) => {
             logo,
             status: 'pending'
         }).save();
+
+        // [NEW] Log New Registration to Discord
+        sendDiscordLog(
+            '📝 New Team Registered', 
+            `Team **${name}** [${shortName}] has registered.`,
+            [{ name: 'Username', value: cleanUsername, inline: true }],
+            0xf1c40f // Yellow
+        );
 
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
@@ -827,9 +1068,11 @@ app.post('/api/admin/discord/import', auth(['admin']), csvUpload.single('file'),
 // [NEW] Send Claim Role Button
 app.post('/api/admin/discord/send-claim', auth(['admin']), async (req, res) => {
     try {
-        if (!DISCORD_CLAIM_CHANNEL_ID) return res.status(400).json({ msg: 'Channel ID not configured' });
+        // Use process.env directly as it might be updated by auto-setup
+        const channelId = process.env.DISCORD_CLAIM_CHANNEL_ID;
+        if (!channelId) return res.status(400).json({ msg: 'Channel ID not configured or auto-setup failed' });
 
-        const channel = await discordClient.channels.fetch(DISCORD_CLAIM_CHANNEL_ID);
+        const channel = await discordClient.channels.fetch(channelId);
         if (!channel) return res.status(404).json({ msg: 'Channel not found' });
 
         const embed = new EmbedBuilder()
@@ -850,6 +1093,72 @@ app.post('/api/admin/discord/send-claim', auth(['admin']), async (req, res) => {
         await channel.send({ embeds: [embed], components: [row] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] Sync All Team Roles & Members (Bulk Action)
+app.post('/api/admin/discord/sync-all-roles', auth(['admin']), async (req, res) => {
+    try {
+        if (!DISCORD_GUILD_ID) return res.status(500).json({ msg: 'Discord Guild ID not configured' });
+        const guild = await discordClient.guilds.fetch(DISCORD_GUILD_ID).catch(() => null);
+        if (!guild) return res.status(500).json({ msg: 'Discord Guild not found (Check Bot)' });
+
+        const teams = await Team.find({ status: 'approved' });
+        let rolesCreated = 0;
+        let membersUpdated = 0;
+
+        console.log(`Starting Bulk Sync for ${teams.length} teams...`);
+
+        for (const team of teams) {
+            let role;
+            // 1. Ensure Role Exists (Create First)
+            if (team.discordRoleId) {
+                role = await guild.roles.fetch(team.discordRoleId).catch(() => null);
+            }
+
+            if (!role) {
+                // Try finding by name to avoid duplicates
+                const existing = guild.roles.cache.find(r => r.name === team.name);
+                if (existing) {
+                    role = existing;
+                } else {
+                    try {
+                        role = await guild.roles.create({
+                            name: team.name,
+                            color: '#ff4655',
+                            reason: 'Bulk Sync: Tournament Team Role'
+                        });
+                        rolesCreated++;
+                    } catch (e) {
+                        console.error(`Failed to create role for ${team.name}:`, e.message);
+                        continue; // Skip member assignment if role creation failed
+                    }
+                }
+                team.discordRoleId = role.id;
+                await team.save();
+            }
+
+            // 2. Assign Members to Role
+            if (role) {
+                for (const m of team.members) {
+                    if (m.discordId) {
+                        try {
+                            const member = await guild.members.fetch(m.discordId).catch(() => null);
+                            if (member && !member.roles.cache.has(role.id)) {
+                                await member.roles.add(role);
+                                membersUpdated++;
+                            }
+                        } catch (e) { /* Member might not be in server */ }
+                    }
+                }
+            }
+        }
+
+        await logAdminAction(req, 'SYNC_ALL_ROLES', 'Discord', { rolesCreated, membersUpdated });
+        res.json({ success: true, msg: `Sync Complete: ${rolesCreated} roles created, ${membersUpdated} members assigned.` });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ msg: e.message }); 
+    }
 });
 
 // [NEW] Sync Team Role (Create/Update Discord Role)
@@ -1214,8 +1523,13 @@ app.get('/api/overlay/match/:id', async (req, res) => {
 
 app.delete('/api/matches/:id', auth(['admin']), async (req, res) => {
     try {
-        await Match.findByIdAndDelete(req.params.id);
-        await Tournament.updateMany({ "stages.matches": req.params.id }, { $pull: { "stages.$[].matches": req.params.id } });
+        const match = await Match.findById(req.params.id);
+        if (match) {
+            // [NEW] Delete Discord Channels
+            await deleteMatchChannels(match);
+            await Match.findByIdAndDelete(req.params.id);
+            await Tournament.updateMany({ "stages.matches": req.params.id }, { $pull: { "stages.$[].matches": req.params.id } });
+        }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
@@ -1240,7 +1554,7 @@ app.put('/api/matches/:id', auth(['admin']), async (req, res) => {
         }
 
         // [NEW] Create Discord Channel if scheduled
-        if (scheduledTime && match.teamA && match.teamB) {
+        if (match.teamA && match.teamB) {
             createMatchChannel(match);
         }
 
@@ -1312,6 +1626,8 @@ app.post('/api/matches/:id/force-winner', auth(['admin']), async (req, res) => {
 
         await logAdminAction(req, 'FORCE_WINNER', `Match ${match.matchNumber} (${match.name})`, { winner: winner.name });
 
+        sendMatchResultToDiscord(match);
+        await deleteMatchVoiceChannels(match); // [NEW] Delete voice channels
         io.emit('match_update', match);
         io.emit('bracket_update');
         res.json({ success: true, msg: `Forced win for ${winner.name}` });
@@ -1439,6 +1755,8 @@ app.post('/api/matches/:id/approve-score', auth(['admin']), async (req, res) => 
 
         await logAdminAction(req, 'APPROVE_SCORE', `Match ${match.matchNumber} (${match.name})`, { winner: winner.name });
 
+        sendMatchResultToDiscord(match);
+        await deleteMatchVoiceChannels(match); // [NEW] Delete voice channels
         io.emit('match_update', match);
         io.emit('bracket_update');
         res.json({ success: true });
@@ -1497,6 +1815,8 @@ app.put('/api/matches/:id/manual-score', auth(['admin']), async (req, res) => {
 
                 await BracketManager.propagateMatchResult(match, winner, loser);
                 io.emit('bracket_update');
+                sendMatchResultToDiscord(match);
+                await deleteMatchVoiceChannels(match); // [NEW] Delete voice channels
             }
         }
 
@@ -1595,11 +1915,11 @@ app.post('/api/matches/:id/checkin', auth(['team']), async (req, res) => {
 // [NEW] Reschedule Request
 app.post('/api/matches/:id/reschedule', auth(['team']), async (req, res) => {
     try {
-        const { proposedTime } = req.body;
-        const match = await Match.findById(req.params.id);
+        const { proposedTime, reason } = req.body;
+        const match = await Match.findById(req.params.id).populate('teamA teamB');
         if (!match) return res.status(404).json({ msg: 'Match not found' });
 
-        if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) {
+        if (match.teamA._id.toString() !== req.user.id && match.teamB._id.toString() !== req.user.id) {
             return res.status(403).json({ msg: 'Unauthorized' });
         }
         if (match.status !== 'scheduled') return res.status(400).json({ msg: 'Match not scheduled' });
@@ -1607,14 +1927,42 @@ app.post('/api/matches/:id/reschedule', auth(['team']), async (req, res) => {
         match.rescheduleRequest = {
             requestedBy: req.user.id,
             proposedTime: new Date(proposedTime),
+            reason: reason || 'No reason provided',
             status: 'pending'
         };
         await match.save();
         io.emit('match_update', match);
 
         // [NEW] Notify Opponent
-        const opponentId = match.teamA.toString() === req.user.id ? match.teamB.toString() : match.teamA.toString();
+        const opponentId = match.teamA._id.toString() === req.user.id ? match.teamB._id.toString() : match.teamA._id.toString();
         io.to(opponentId).emit('notification', { msg: `Reschedule Request received for ${match.name}` });
+
+        // [NEW] Discord Notification
+        if (match.discordChannelId) {
+            try {
+                const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+                if (channel) {
+                    const requesterTeam = match.teamA._id.toString() === req.user.id ? match.teamA : match.teamB;
+                    const opponentTeam = match.teamA._id.toString() === req.user.id ? match.teamB : match.teamA;
+                    
+                    const opponentRole = opponentTeam.discordRoleId ? `<@&${opponentTeam.discordRoleId}>` : opponentTeam.name;
+                    const timeString = `<t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>`;
+
+                    const embed = new EmbedBuilder()
+                        .setColor(0xffaa00) // Orange
+                        .setTitle('📅 Reschedule Requested')
+                        .setDescription(`**${requesterTeam.name}** has requested to reschedule this match.`)
+                        .addFields(
+                            { name: 'Proposed Time', value: timeString, inline: true },
+                            { name: 'Reason', value: reason || 'No reason provided', inline: true }
+                        )
+                        .setFooter({ text: 'Please accept or reject in the dashboard.' })
+                        .setTimestamp();
+
+                    await channel.send({ content: `${opponentRole}`, embeds: [embed] });
+                }
+            } catch (err) { console.error("Discord Reschedule Notification Error:", err); }
+        }
 
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
@@ -1624,14 +1972,18 @@ app.post('/api/matches/:id/reschedule', auth(['team']), async (req, res) => {
 app.post('/api/matches/:id/reschedule/respond', auth(['team']), async (req, res) => {
     try {
         const { action } = req.body;
-        const match = await Match.findById(req.params.id);
+        const match = await Match.findById(req.params.id).populate('teamA teamB');
         if (!match) return res.status(404).json({ msg: 'Match not found' });
 
         if (match.rescheduleRequest.status !== 'pending') return res.status(400).json({ msg: 'No pending request' });
         if (match.rescheduleRequest.requestedBy.toString() === req.user.id) return res.status(400).json({ msg: 'Cannot respond to own request' });
-        if (match.teamA.toString() !== req.user.id && match.teamB.toString() !== req.user.id) return res.status(403).json({ msg: 'Unauthorized' });
+        if (match.teamA._id.toString() !== req.user.id && match.teamB._id.toString() !== req.user.id) return res.status(403).json({ msg: 'Unauthorized' });
 
         const requester = match.rescheduleRequest.requestedBy;
+        const responderId = req.user.id;
+        const requesterTeam = match.teamA._id.toString() === requester.toString() ? match.teamA : match.teamB;
+        const responderTeam = match.teamA._id.toString() === responderId ? match.teamA : match.teamB;
+        const oldTime = match.rescheduleRequest.proposedTime;
 
         if (action === 'accept') {
             match.scheduledTime = match.rescheduleRequest.proposedTime;
@@ -1645,6 +1997,30 @@ app.post('/api/matches/:id/reschedule/respond', auth(['team']), async (req, res)
         if (requester) {
             const msg = action === 'accept' ? `Reschedule ACCEPTED for ${match.name}` : `Reschedule REJECTED for ${match.name}`;
             io.to(requester.toString()).emit('notification', { msg });
+        }
+
+        // [NEW] Discord Notification
+        if (match.discordChannelId) {
+            try {
+                const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+                if (channel) {
+                    const requesterRole = requesterTeam.discordRoleId ? `<@&${requesterTeam.discordRoleId}>` : requesterTeam.name;
+                    const isAccepted = action === 'accept';
+                    const color = isAccepted ? 0x2ecc71 : 0xe74c3c;
+                    const title = isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected';
+                    const desc = isAccepted 
+                        ? `**${responderTeam.name}** accepted the reschedule.\n**New Time:** <t:${Math.floor(new Date(oldTime).getTime() / 1000)}:F>`
+                        : `**${responderTeam.name}** rejected the reschedule request.`;
+
+                    const embed = new EmbedBuilder()
+                        .setColor(color)
+                        .setTitle(title)
+                        .setDescription(desc)
+                        .setTimestamp();
+
+                    await channel.send({ content: `${requesterRole}`, embeds: [embed] });
+                }
+            } catch (err) { console.error("Discord Reschedule Response Error:", err); }
         }
 
         res.json({ success: true });
@@ -1903,6 +2279,13 @@ app.post('/api/tournaments/:id/stages/generate', auth(['admin']), async (req, re
         });
 
         await tournament.save();
+
+        // [NEW] Create channels for generated matches
+        for (const mId of matchesIds) {
+            const m = await Match.findById(mId);
+            if (m) await createMatchChannel(m);
+        }
+
         res.json({ success: true });
 
     } catch (e) {
@@ -1931,6 +2314,11 @@ app.post('/api/tournaments/:id/stages/:stageIndex/matches', auth(['admin']), asy
         const savedMatch = await newMatch.save();
         tournament.stages[stageIndex].matches.push(savedMatch._id);
         await tournament.save();
+
+        if (savedMatch.teamA && savedMatch.teamB) {
+            createMatchChannel(savedMatch);
+        }
+
         io.emit('match_update', savedMatch); io.emit('bracket_update');
         res.json({ success: true, match: savedMatch });
     } catch (e) { res.status(500).json({ msg: e.message }); }
@@ -1998,7 +2386,14 @@ app.delete('/api/tournaments/:id/stages/:stageIndex', auth(['admin']), async (re
         const tournament = await Tournament.findById(req.params.id);
         const stageIndex = parseInt(req.params.stageIndex);
         const stage = tournament.stages[stageIndex];
-        if (stage.matches && stage.matches.length > 0) await Match.deleteMany({ _id: { $in: stage.matches } });
+        
+        if (stage.matches && stage.matches.length > 0) {
+            // [MODIFIED] Delete Discord Channels for all matches in this stage
+            const matches = await Match.find({ _id: { $in: stage.matches } });
+            for (const m of matches) await deleteMatchChannels(m);
+            await Match.deleteMany({ _id: { $in: stage.matches } });
+        }
+        
         tournament.stages.splice(stageIndex, 1);
         await tournament.save();
         res.json({ success: true });
@@ -2044,3 +2439,264 @@ io.on('connection', (socket) => {
 });
 
 server.listen(process.env.PORT || 3000, () => console.log('🚀 Server Running...'));
+
+// --- [MERGED] Helper Functions from discordBot.js ---
+
+/**
+ * ฟังก์ชัน: สร้างปุ่มสำหรับให้ผู้เล่นกดเลือกทีม
+ * @param {string} channelId - ID ของช่อง Text ที่ต้องการส่งปุ่มไป
+ * @param {Array} teams - ชื่อทีมทั้งหมด เช่น ['Team A', 'Team B']
+ */
+async function sendTeamRoleButtons(channelId, teams) {
+    const channel = discordClient.channels.cache.get(channelId);
+    if (!channel) return console.error('ไม่พบช่อง Discord ที่ระบุ');
+
+    const row = new ActionRowBuilder();
+    
+    // สร้างปุ่มตามรายชื่อทีม
+    teams.forEach(team => {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`team_${team}`)
+                .setLabel(`เข้าร่วม ${team}`)
+                .setStyle(ButtonStyle.Primary),
+        );
+    });
+
+    await channel.send({
+        content: '👇 **กรุณากดปุ่มด้านล่างเพื่อรับยศประจำทีมของคุณ** 👇',
+        components: [row]
+    });
+}
+
+/**
+ * ฟังก์ชัน: สร้างห้องแข่งขันแบบแยก Category (จาก discordBot.js เดิม)
+ * @param {string} guildId - ID ของเซิร์ฟเวอร์ Discord
+ * @param {Object} matchData - ข้อมูลแมตช์ (เลขแมตช์, ทีม A, ทีม B, ชื่อรายการ)
+ */
+async function createMatchChannels(guildId, matchData) {
+    const guild = discordClient.guilds.cache.get(guildId);
+    if (!guild) return console.error('ไม่พบเซิร์ฟเวอร์ Discord');
+
+    const { matchNumber, teamA, teamB, tournamentName } = matchData;
+
+    try {
+        const category = await guild.channels.create({ name: `🏆 [${tournamentName}] Match ${matchNumber}`, type: ChannelType.GuildCategory });
+        const textChannel = await guild.channels.create({ name: `💬-match-${matchNumber}-chat`, type: ChannelType.GuildText, parent: category.id });
+        
+        await textChannel.send(`🚨 **ประกาศเตือน!** 🚨\nแมตช์ระหว่าง **${teamA}** ⚔️ **${teamB}** กำลังจะเริ่มในอีก 15 นาที!`);
+        await guild.channels.create({ name: `🎧 ทีม ${teamA}`, type: ChannelType.GuildVoice, parent: category.id });
+        await guild.channels.create({ name: `🎧 ทีม ${teamB}`, type: ChannelType.GuildVoice, parent: category.id });
+
+        console.log(`สร้างห้องการแข่งขัน Match ${matchNumber} สำเร็จ`);
+        return category.id;
+    } catch (error) { console.error('เกิดข้อผิดพลาดในการสร้างห้อง:', error); }
+}
+
+/**
+ * ฟังก์ชัน: ลบห้องและ Category ของแมตช์ (Clean up)
+ */
+async function deleteMatchChannels(match) {
+    if (!match.discordChannelId) return;
+
+    try {
+        // Fetch the text channel to find its parent category
+        const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+        if (!channel) return;
+
+        const guild = channel.guild;
+        const categoryId = channel.parentId;
+
+        // 1. Delete the text channel
+        await channel.delete().catch(e => console.log(`Failed to delete text channel: ${e.message}`));
+
+        // 2. If inside a category, delete all siblings (Voice channels) and the Category
+        if (categoryId) {
+            const category = await guild.channels.fetch(categoryId).catch(() => null);
+            if (category) {
+                const children = guild.channels.cache.filter(c => c.parentId === categoryId);
+                for (const [_, child] of children) {
+                    await child.delete().catch(e => console.log(`Failed to delete child channel: ${e.message}`));
+                }
+                await category.delete().catch(e => console.log(`Failed to delete category: ${e.message}`));
+                console.log(`🗑️ Deleted Discord channels for Match ${match.matchNumber}`);
+            }
+        }
+    } catch (e) { console.error("Error deleting match channels:", e); }
+}
+
+/**
+ * ฟังก์ชัน: ลบเฉพาะห้องเสียงของแมตช์ (Voice Channels Cleanup)
+ */
+async function deleteMatchVoiceChannels(match) {
+    if (!match.discordChannelId) return;
+
+    try {
+        const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+        if (!channel || !channel.parentId) return;
+
+        const guild = channel.guild;
+        const categoryId = channel.parentId;
+
+        const children = guild.channels.cache.filter(c => c.parentId === categoryId && c.type === ChannelType.GuildVoice);
+        for (const [_, child] of children) {
+            await child.delete().catch(e => console.log(`Failed to delete voice channel: ${e.message}`));
+        }
+        console.log(`🗑️ Deleted Voice channels for Match ${match.matchNumber}`);
+
+        // [NEW] Rename Category to [Finished]
+        const category = await guild.channels.fetch(categoryId).catch(() => null);
+        if (category) {
+            const matchIdentifier = (match.matchNumber && match.matchNumber > 0) ? match.matchNumber : match._id.toString().slice(-4);
+            await category.setName(`🏁 [Finished] Match ${matchIdentifier}`).catch(e => console.error(`Failed to rename category: ${e.message}`));
+        }
+    } catch (e) { console.error("Error deleting match voice channels:", e); }
+}
+
+/**
+ * ฟังก์ชัน: ส่งผลการแข่งขันลง Discord (Scoreboard)
+ */
+async function sendMatchResultToDiscord(match) {
+    try {
+        // Calculate Series Score
+        let scoreA = 0, scoreB = 0;
+        if (match.scores) {
+            match.scores.forEach(s => {
+                const sA = parseInt(s.teamAScore) || 0;
+                const sB = parseInt(s.teamBScore) || 0;
+                if (sA > sB) scoreA++;
+                else if (sB > sA) scoreB++;
+            });
+        }
+
+        // Determine winner name safely
+        let winnerName = 'Unknown';
+        if (match.winner) {
+            if (match.winner.name) winnerName = match.winner.name;
+            else if (match.winner.toString() === match.teamA._id.toString()) winnerName = match.teamA.name;
+            else if (match.winner.toString() === match.teamB._id.toString()) winnerName = match.teamB.name;
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0xff4655) // Valorant Red
+            .setTitle(`🏆 MATCH RESULT: ${match.name}`)
+            .setDescription(`**WINNER:** ${winnerName}\n**SERIES:** ${match.teamA.shortName} **${scoreA} - ${scoreB}** ${match.teamB.shortName}`)
+            .setTimestamp();
+
+        // Add Map Details
+        if (match.scores && match.scores.length > 0) {
+            let mapDetails = '';
+            let lastProofImage = null;
+
+            match.scores.forEach(s => {
+                let proofUrl = s.proofImage;
+                // Fix relative URL if CLIENT_URL is set (for local uploads)
+                if (proofUrl && !proofUrl.startsWith('http') && process.env.CLIENT_URL) {
+                     proofUrl = new URL(proofUrl, process.env.CLIENT_URL).toString();
+                }
+
+                const proofLink = (proofUrl && proofUrl.startsWith('http')) ? ` | 📸 Proof` : '';
+                if (proofUrl && proofUrl.startsWith('http')) lastProofImage = proofUrl;
+
+                mapDetails += `**${s.mapName}**: ${match.teamA.shortName} **${s.teamAScore} - ${s.teamBScore}** ${match.teamB.shortName}${proofLink}\n`;
+            });
+            embed.addFields({ name: 'Map Scores', value: mapDetails });
+
+            // Show the last proof image in the embed
+            if (lastProofImage) {
+                embed.setImage(lastProofImage);
+            }
+        }
+
+        // 1. Send to Match Channel
+        if (match.discordChannelId) {
+            const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+            if (channel) await channel.send({ embeds: [embed] });
+        }
+
+        // 2. Send to Global Results Channel
+        const resultsChannelId = process.env.DISCORD_RESULTS_CHANNEL_ID;
+        if (resultsChannelId) {
+            const resultsChannel = await discordClient.channels.fetch(resultsChannelId).catch(() => null);
+            if (resultsChannel) await resultsChannel.send({ embeds: [embed] });
+        }
+
+        console.log(`Sent match result to Discord for Match ${match.matchNumber}`);
+
+    } catch (e) {
+        console.error("Error sending match result to Discord:", e);
+    }
+}
+
+// --- [UPDATED] Auto-Setup All Discord Channels ---
+async function setupDiscordChannels() {
+    if (!DISCORD_GUILD_ID) return console.log("⚠️ DISCORD_GUILD_ID not set, skipping auto-setup.");
+
+    try {
+        const guild = await discordClient.guilds.fetch(DISCORD_GUILD_ID).catch(() => null);
+        if (!guild) return console.log("⚠️ Bot not in guild, skipping auto-setup.");
+
+        // Helper to ensure channel exists
+        const ensureChannel = async (name, type, envVarName, permissionOverwrites = []) => {
+            let channelId = process.env[envVarName];
+            let channel;
+
+            if (channelId) channel = await guild.channels.fetch(channelId).catch(() => null);
+            if (!channel) channel = guild.channels.cache.find(c => c.name === name && c.type === type);
+
+            if (!channel) {
+                channel = await guild.channels.create({
+                    name: name,
+                    type: type,
+                    permissionOverwrites: permissionOverwrites
+                });
+                console.log(`✅ Created #${name} channel: ${channel.id}`);
+            } else {
+                console.log(`✅ Found #${name} channel: ${channel.id}`);
+            }
+            process.env[envVarName] = channel.id;
+            return channel;
+        };
+
+        // 1. Verify Role Channel (Public Read-Only)
+        const verifyChannel = await ensureChannel('verify-role', ChannelType.GuildText, 'DISCORD_CLAIM_CHANNEL_ID', [
+            { id: guild.id, deny: [PermissionsBitField.Flags.SendMessages], allow: [PermissionsBitField.Flags.ViewChannel] }
+        ]);
+
+        // 2. Admin Logs Channel (Private)
+        await ensureChannel('admin-logs', ChannelType.GuildText, 'DISCORD_ADMIN_LOG_CHANNEL_ID', [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] } 
+        ]);
+
+        // 3. Match Results Channel (Public Read-Only)
+        await ensureChannel('match-results', ChannelType.GuildText, 'DISCORD_RESULTS_CHANNEL_ID', [
+            { id: guild.id, deny: [PermissionsBitField.Flags.SendMessages], allow: [PermissionsBitField.Flags.ViewChannel] }
+        ]);
+
+        // Send Button to Verify Channel if needed
+        const messages = await verifyChannel.messages.fetch({ limit: 10 }).catch(() => []);
+        const hasButton = messages.some && messages.some(m => m.author.id === discordClient.user.id && m.components.length > 0);
+
+        if (!hasButton) {
+            const embed = new EmbedBuilder()
+                .setColor(0xff4655)
+                .setTitle('🛡️ TOURNAMENT ROLE CLAIM')
+                .setDescription('Click the button below to verify your registration and claim your Team Role.\nEnsure your Discord ID matches the one provided to the admins.')
+                .setFooter({ text: 'VCT System' });
+
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('claim_role')
+                        .setLabel('Claim Team Role')
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji('🔐')
+                );
+
+            await verifyChannel.send({ embeds: [embed], components: [row] });
+            console.log("✅ Sent Claim Button to #verify-role");
+        }
+    } catch (e) {
+        console.error("❌ Auto-setup Channels Error:", e);
+    }
+}

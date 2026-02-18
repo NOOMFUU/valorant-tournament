@@ -552,6 +552,7 @@
                 <p class="text-sm text-gray-400">Propose a new time for this match. The opponent must accept.</p>
                 <input type="datetime-local" id="rescheduleTime"
                     class="w-full bg-black/30 border border-white/10 text-white p-3 rounded focus:border-[#ff4655] outline-none [color-scheme:dark]">
+                <input type="text" id="rescheduleReason" placeholder="Reason (Optional)" class="w-full bg-black/30 border border-white/10 text-white p-3 rounded focus:border-[#ff4655] outline-none text-sm">
                 <button onclick="submitReschedule()" class="btn-primary w-full py-3">SEND REQUEST</button>
             </div>
         </div>
@@ -599,8 +600,8 @@
                     const loader = document.getElementById('loader');
                     loader.style.opacity = '0';
                     loader.style.pointerEvents = 'none';
-                    setTimeout(() => loader.classList.add('hidden'), 700);
-                }, 800);
+                    setTimeout(() => loader.classList.add('hidden'), 300);
+                }, 100);
 
             } catch (e) { console.error(e); showToast('Connection Failed', 'error'); }
         })();
@@ -609,6 +610,33 @@
             const m = document.getElementById('mobileMenu');
             m.classList.toggle('translate-x-full');
         }
+
+        // --- REAL-TIME CLOCK UPDATE ---
+        setInterval(() => {
+            document.querySelectorAll('.live-timer').forEach(el => {
+                const time = new Date(el.dataset.time);
+                const now = new Date();
+                const diff = time - now;
+                
+                if (diff > 0) {
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    if (hours < 24) {
+                        el.innerText = `Starts in ${hours}h ${minutes}m`;
+                        el.classList.add('text-emerald-400');
+                    } else {
+                        el.innerText = time.toLocaleDateString();
+                        el.classList.remove('text-emerald-400');
+                    }
+                } else if (diff > -1000 * 60 * 60 * 3) { // Within 3 hours past start
+                    el.innerText = 'In Progress / Due';
+                    el.classList.add('text-yellow-500');
+                } else {
+                    el.innerText = time.toLocaleDateString();
+                    el.classList.remove('text-emerald-400', 'text-yellow-500');
+                }
+            });
+        }, 10000); // Update every 10 seconds
 
         // --- DASHBOARD LOGIC ---
         async function loadDashboardData() {
@@ -662,7 +690,7 @@
                 if (m.scoreSubmission.status === 'rejected') {
                     rejectMsg = `<div class="mt-3 p-2 bg-red-500/10 border-l-2 border-red-500 text-[10px] text-gray-300 font-mono"><strong>REJECTED:</strong> ${m.scoreSubmission.rejectReason || 'Check details'}</div>`;
                     actionBtn = `<button onclick="openScoreModal('${m._id}')" class="w-full mt-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs font-bold font-header tracking-wide transition">FIX & RESUBMIT</button>`;
-                } else actionBtn = `<div class="w-full mt-2 text-center text-[10px] text-gray-500 font-mono py-2 border border-dashed border-gray-700 uppercase">Awaiting Admin Verification</div>`;
+                } else actionBtn = `<div class="w-full mt-2 text-center text-[10px] text-yellow-500 font-mono py-2 border border-dashed border-yellow-500/30 uppercase bg-yellow-500/5">Awaiting Verification</div>`;
             } else {
                 statusBadge = `<span class="text-gray-400 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest border border-white/5 rounded-sm">UPCOMING</span>`;
 
@@ -673,12 +701,14 @@
                 // Reschedule Logic
                 if (m.rescheduleRequest && m.rescheduleRequest.status === 'pending') {
                     const reqTime = new Date(m.rescheduleRequest.proposedTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const reasonText = m.rescheduleRequest.reason ? `<div class="text-[9px] text-gray-400 italic mt-1 truncate">"${m.rescheduleRequest.reason}"</div>` : '';
                     if (m.rescheduleRequest.requestedBy === myTeamId) {
-                        rescheduleUI = `<div class="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wider text-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Reschedule Pending (${reqTime})</div>`;
+                        rescheduleUI = `<div class="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wider text-center rounded"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Reschedule Pending (${reqTime})</div>`;
                     } else {
                         rescheduleUI = `
-                        <div class="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 text-center">
+                        <div class="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/50 text-center rounded animate-pulse">
                             <div class="text-yellow-500 text-[10px] font-bold uppercase tracking-wider mb-2">Opponent Proposed: ${reqTime}</div>
+                            ${reasonText}
                             <div class="flex gap-2">
                                 <button onclick="respondReschedule('${m._id}', 'accept')" class="flex-1 bg-green-500/20 hover:bg-green-500 text-green-500 hover:text-white py-1 text-[10px] font-bold uppercase transition border border-green-500/30">Accept</button>
                                 <button onclick="respondReschedule('${m._id}', 'reject')" class="flex-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white py-1 text-[10px] font-bold uppercase transition border border-red-500/30">Reject</button>
@@ -711,6 +741,26 @@
                 actionBtn = `${checkInBtn}<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a>${forfeitBtn}${rescheduleUI}`;
             }
             const timeDisplay = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'TBD';
+            const liveTimer = m.scheduledTime && m.status === 'scheduled' ? `<div class="text-[10px] font-mono text-gray-500 mt-1 live-timer" data-time="${m.scheduledTime}"></div>` : '';
+
+            // Veto & Score Summary
+            let infoSummary = '';
+            if (m.vetoData && m.vetoData.pickedMaps && m.vetoData.pickedMaps.length > 0) {
+                const maps = m.vetoData.pickedMaps.map(p => p.map).join(', ');
+                infoSummary += `<div class="mt-3 pt-3 border-t border-white/5 text-[10px] text-gray-400 flex items-start gap-2"><i class="fa-solid fa-map mt-0.5 text-[#ff4655]"></i> <div><span class="font-bold text-white">MAPS:</span> ${maps}</div></div>`;
+            }
+            
+            if (m.scores && m.scores.length > 0) {
+                let scoreText = '';
+                m.scores.forEach(s => {
+                    const sA = parseInt(s.teamAScore) || 0;
+                    const sB = parseInt(s.teamBScore) || 0;
+                    const myS = isMeA ? sA : sB;
+                    const oppS = isMeA ? sB : sA;
+                    scoreText += `<div class="flex justify-between w-full"><span class="text-gray-500">${s.mapName}</span> <span class="${myS > oppS ? 'text-green-400' : 'text-white'} font-mono">${myS} - ${oppS}</span></div>`;
+                });
+                infoSummary += `<div class="mt-2 space-y-1 bg-black/20 p-2 rounded border border-white/5 text-[10px]">${scoreText}</div>`;
+            }
 
             return `
             <div class="relative overflow-hidden bg-[#15171a] border border-white/10 match-card-hover transition-all duration-300 group rounded-sm">
@@ -720,6 +770,7 @@
                     <div class="flex flex-col items-center md:items-start min-w-[120px]">
                         ${statusBadge}
                         <span class="text-2xl font-header text-white mt-2 tracking-wide">${timeDisplay}</span>
+                        ${liveTimer}
                         <span class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Match #${String(m.matchNumber).padStart(3, '0')}</span>
                     </div>
 
@@ -733,12 +784,15 @@
                                 <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Opponent ${oppCheckIn ? '<span class="text-[#1fa474] ml-1"><i class="fa-solid fa-check-circle"></i> READY</span>' : ''}</div>
                             </div>
                         </div>
+                        ${infoSummary ? `<div class="hidden md:block h-10 w-[1px] bg-white/10 mx-2"></div><div class="hidden md:block min-w-[150px]">${infoSummary}</div>` : ''}
                     </div>
                     
                     <div class="flex flex-col gap-2 min-w-[160px] w-full md:w-auto">
                         ${actionBtn}
+                        <button onclick="openMatchStats('${m._id}')" class="text-[10px] text-gray-500 hover:text-white underline mt-1">View Full Details</button>
                     </div>
                 </div>
+                ${infoSummary ? `<div class="md:hidden px-6 pb-4">${infoSummary}</div>` : ''}
                 ${rejectMsg}
             </div>`;
         }
@@ -765,6 +819,7 @@
                 const discordInputName = `${role.toLowerCase()}_discord_${role === 'Coach' ? 0 : index}`;
 
                 const displayDiscord = member.discordName || '';
+                const isVerified = !!member.discordId;
 
                 return `
                 <div class="relative bg-[#15171a] border ${borderColor} p-1 transition-all duration-300 roster-card-hover group">
@@ -796,9 +851,13 @@
                                 </div>
                             </div>
                             <div class="group/input">
-                                <label class="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1 block group-focus-within/input:text-white transition">Discord</label>
+                                <label class="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1 block group-focus-within/input:text-white transition flex justify-between">
+                                    <span>Discord Username</span>
+                                    ${isVerified ? '<span class="text-[#1fa474] flex items-center gap-1"><i class="fa-solid fa-check-circle"></i> Verified</span>' : ''}
+                                </label>
                                 <input name="${discordInputName}" value="${displayDiscord}" placeholder="username" 
                                     class="w-full input-underline text-gray-300 font-mono text-sm py-1 focus:text-white placeholder-gray-800" ${isLocked ? 'disabled' : ''}>
+                                <input type="hidden" name="${role.toLowerCase()}_discordId_${role === 'Coach' ? 0 : index}" value="${member.discordId || ''}">
                             </div>
                         </div>
                     </div>
@@ -851,14 +910,16 @@
                     const nameInput = document.querySelector(`input[name="${role.toLowerCase()}_name_${nameIdx}"]`);
                     const tagInput = document.querySelector(`input[name="${role.toLowerCase()}_tag_${nameIdx}"]`);
                     const discordInput = document.querySelector(`input[name="${role.toLowerCase()}_discord_${nameIdx}"]`);
+                    const discordIdInput = document.querySelector(`input[name="${role.toLowerCase()}_discordId_${nameIdx}"]`);
 
                     const nameVal = nameInput ? nameInput.value.trim() : "";
                     const tagVal = tagInput ? tagInput.value.trim() : "";
                     const discordVal = discordInput ? discordInput.value.trim() : "";
+                    const discordIdVal = discordIdInput ? discordIdInput.value : "";
 
                     if (nameVal !== "") {
                         hasData = true;
-                        updatedMembers.push({ role: role, name: nameVal, tag: tagVal || "0000", discordName: discordVal });
+                        updatedMembers.push({ role: role, name: nameVal, tag: tagVal || "0000", discordName: discordVal, discordId: discordIdVal });
                     }
                 }
             });
@@ -1185,8 +1246,9 @@
 
         async function submitReschedule() {
             const time = document.getElementById('rescheduleTime').value;
+            const reason = document.getElementById('rescheduleReason').value;
             if (!time) return showToast('Select a time', 'error');
-            const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/reschedule`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ proposedTime: time }) });
+            const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/reschedule`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token }, body: JSON.stringify({ proposedTime: time, reason: reason }) });
             const d = await res.json();
             if (res.ok) { closeModal('rescheduleModal'); showToast('Request Sent'); } else showToast(d.msg, 'error');
         }

@@ -6,6 +6,7 @@ class BracketManager {
     
     constructor() {
         this.io = null;
+        this.onMatchReady = null; // [NEW] Callback for channel creation
     }
 
     setIO(io) {
@@ -576,6 +577,11 @@ class BracketManager {
         
         // Update and return new doc
         const match = await Match.findByIdAndUpdate(matchId, update, { new: true });
+
+        // [NEW] Trigger Channel Creation if both teams are present
+        if (match && match.teamA && match.teamB && this.onMatchReady) {
+            this.onMatchReady(match);
+        }
         
         // [FIX] Check for BYE_DROP condition to auto-advance
         const otherSlot = slot === 'teamA' ? 'teamB' : 'teamA';

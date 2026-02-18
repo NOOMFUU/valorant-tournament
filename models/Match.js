@@ -50,6 +50,7 @@ const MatchSchema = new mongoose.Schema({
     rescheduleRequest: {
         requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
         proposedTime: Date,
+        reason: String,
         status: { type: String, enum: ['none', 'pending', 'rejected'], default: 'none' }
     },
 
@@ -92,6 +93,9 @@ const MatchSchema = new mongoose.Schema({
         teamAReady: { type: Boolean, default: false },
         teamBReady: { type: Boolean, default: false }
     },
+    
+    discordChannelId: { type: String },
+    notificationSent: { type: Boolean, default: false },
     
     scheduledTime: { type: Date } 
 }, { timestamps: true });

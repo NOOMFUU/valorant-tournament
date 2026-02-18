@@ -5,6 +5,8 @@ const MemberSchema = new mongoose.Schema({
     name: String,
     tag: String,
     role: { type: String, enum: ['Main', 'Sub', 'Coach'], default: 'Main' },
+    discordName: { type: String, default: "" }, 
+    discordId: { type: String, default: "" },
     status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'pending' },
     pendingUpdate: {
         name: String,

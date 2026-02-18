@@ -213,6 +213,7 @@ class VetoManager {
             match.vetoData.status = 'completed';
             match.status = 'live'; 
             this.clearTimer(match._id);
+            this.io.emit('match_update', match); // [NEW] Notify dashboard to update status to LIVE
             await this.logAction(match, `VETO COMPLETED - GLHF!`);
         } else {
             const nextStep = match.vetoData.sequence[match.vetoData.sequenceIndex];
