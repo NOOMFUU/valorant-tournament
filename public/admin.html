@@ -1786,6 +1786,7 @@
             const statusDot = m.status === 'rejected' ? 'bg-red-500' : (m.status === 'pending' ? 'bg-blue-500' : 'bg-emerald-500');
             const safeRole = m.role || 'player';
             const safeTag = m.tag || '-';
+            const safeDiscord = m.discordName || '-';
 
             if (m.status === 'pending' && m.pendingUpdate) {
                 return `
@@ -1846,6 +1847,7 @@
                         <div class="min-w-0">
                             <div class="text-sm font-bold text-gray-200 group-hover:text-white truncate">${m.name}</div>
                             <div class="text-[10px] font-mono text-gray-500">#${safeTag} <span class="text-gray-700 mx-1">|</span> ${safeRole}</div>
+                            <div class="text-[9px] text-[#5865F2] font-bold mt-0.5 flex items-center gap-1"><i class="fa-brands fa-discord"></i> ${safeDiscord}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
@@ -2694,19 +2696,19 @@
         function downloadCsvTemplate() {
             const headers = [
                 "Team Name", "Short Name", "Username", "Password",
-                "Member 1 Name", "Member 1 Tag",
-                "Member 2 Name", "Member 2 Tag",
-                "Member 3 Name", "Member 3 Tag",
-                "Member 4 Name", "Member 4 Tag",
-                "Member 5 Name", "Member 5 Tag",
-                "Sub 1 Name", "Sub 1 Tag",
-                "Sub 2 Name", "Sub 2 Tag",
-                "Coach Name", "Coach Tag"
+                "Member 1 Name", "Member 1 Tag", "Member 1 Discord",
+                "Member 2 Name", "Member 2 Tag", "Member 2 Discord",
+                "Member 3 Name", "Member 3 Tag", "Member 3 Discord",
+                "Member 4 Name", "Member 4 Tag", "Member 4 Discord",
+                "Member 5 Name", "Member 5 Tag", "Member 5 Discord",
+                "Sub 1 Name", "Sub 1 Tag", "Sub 1 Discord",
+                "Sub 2 Name", "Sub 2 Tag", "Sub 2 Discord",
+                "Coach Name", "Coach Tag", "Coach Discord"
             ];
             const exampleRow = [
                 "Example Team", "EXT", "example_user", "pass123",
-                "PlayerOne", "1111", "PlayerTwo", "2222", "PlayerThree", "3333", "PlayerFour", "4444", "PlayerFive", "5555",
-                "SubOne", "6666", "SubTwo", "7777", "CoachName", "8888"
+                "PlayerOne", "1111", "player1_dc", "PlayerTwo", "2222", "player2_dc", "PlayerThree", "3333", "player3_dc", "PlayerFour", "4444", "player4_dc", "PlayerFive", "5555", "player5_dc",
+                "SubOne", "6666", "sub1_dc", "SubTwo", "7777", "sub2_dc", "CoachName", "8888", "coach_dc"
             ];
             const csvContent = "\uFEFF" + headers.join(",") + "\n" + exampleRow.join(",");
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

@@ -132,8 +132,19 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
             await team.save();
             return res.json({ success: true, msg: 'Roster initialized.' });
         }
-        // (Simplified logic for brevity - assumes full replacement logic from server.js)
-        team.members = newMembers.map(m => ({ ...m, status: 'pending' })); // Placeholder for complex logic
+
+        // Update logic: Only set to pending if Name or Tag changes. Discord updates are auto-approved (keep existing status).
+        team.members = newMembers.map(newM => {
+            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
+            let status = 'pending';
+            
+            if (oldM && oldM.name === newM.name && oldM.tag === newM.tag) {
+                status = oldM.status; // Keep existing status if critical info (Name/Tag) didn't change
+            }
+            
+            return { ...newM, status };
+        });
+
         await team.save();
         req.app.get('io').emit('teams_update');
         res.json({ success: true, msg: 'Changes submitted.' });
@@ -191,7 +202,13 @@ router.put('/teams/:id/members/:mid/edit', auth(['admin']), async (req, res) => 
     try {
         const team = await Team.findById(req.params.id);
         const member = team.members.id(req.params.mid);
-        if (member) { member.tag = req.body.tag; await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true }); }
+        if (member) { 
+            if (req.body.name) member.name = req.body.name;
+            if (req.body.tag) member.tag = req.body.tag;
+            if (req.body.discordName) member.discordName = req.body.discordName;
+            
+            await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true }); 
+        }
         else res.status(404).json({ msg: 'Member not found' });
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });

@@ -110,6 +110,9 @@ router.put('/matches/:id', auth(['admin']), async (req, res) => {
             if (match.teamA) req.app.get('io').to(match.teamA.toString()).emit('notification', { msg });
             if (match.teamB) req.app.get('io').to(match.teamB.toString()).emit('notification', { msg });
             await queueService.scheduleMatchJobs(match); // [NEW] Schedule Agenda Jobs
+            
+            const updateMatchTime = req.app.get('updateMatchTime');
+            if (updateMatchTime) updateMatchTime(match);
         }
 
         if (match.teamA && match.teamB) {
@@ -476,6 +479,9 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
             match.scheduledTime = match.rescheduleRequest.proposedTime;
             match.checkIn = { teamA: false, teamB: false, windowOpen: false };
             await queueService.scheduleMatchJobs(match); // [NEW] Update Schedule
+            
+            const updateMatchTime = req.app.get('updateMatchTime');
+            if (updateMatchTime) updateMatchTime(match);
         }
         match.rescheduleRequest = { status: 'none' };
         await match.save();

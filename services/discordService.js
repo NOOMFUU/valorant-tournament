@@ -106,6 +106,28 @@ class DiscordService {
         }
     }
 
+    async updateMatchTime(match) {
+        if (!this.client || !match.discordChannelId) return;
+        try {
+            const channel = await this.withRetry(() => this.client.channels.fetch(match.discordChannelId)).catch(() => null);
+            if (!channel) return;
+
+            const timeStr = match.scheduledTime ? `<t:${Math.floor(new Date(match.scheduledTime).getTime() / 1000)}:F>` : 'TBD';
+            
+            const messages = await this.withRetry(() => channel.messages.fetch({ limit: 50 })).catch(() => null);
+            if (messages) {
+                const targetMsg = messages.find(m => m.author.id === this.client.user.id && m.content.includes('Scheduled for:'));
+                if (targetMsg) {
+                    const newContent = targetMsg.content.replace(/Scheduled for: .*/, `Scheduled for: ${timeStr}`);
+                    await this.withRetry(() => targetMsg.edit(newContent));
+                    await this.withRetry(() => channel.send(`📅 Match time updated: ${timeStr}`));
+                } else {
+                    await this.withRetry(() => channel.send(`📅 **MATCH UPDATE**\nNew Schedule: ${timeStr}`));
+                }
+            }
+        } catch (e) { console.error("Error updating match time:", e); }
+    }
+
     async deleteMatchChannels(match) {
         if (!this.client || !match.discordChannelId) return;
         try {
