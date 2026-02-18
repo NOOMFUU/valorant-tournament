@@ -19,25 +19,22 @@ const { Client, GatewayIntentBits, PermissionsBitField, ChannelType, EmbedBuilde
 const helmet = require('helmet');
 const compression = require('compression');
 
-// Import Models
-const User = require('./models/User');
-const Team = require('./models/Team');
-const Tournament = require('./models/Tournament');
-const Match = require('./models/Match');
-const AdminLog = require('./models/AdminLog');
-
 // Import Managers
 const VetoManager = require('./managers/vetoManager');
 const BracketManager = require('./managers/bracketManager');
 
+// Import Models
+const Match = require('./models/Match');
+const Team = require('./models/Team');
+
 const app = express();
 const server = http.createServer(app);
 
-// [UPDATED] CORS Setup (Allow dynamic origins for dev/prod)
-const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:4000', 'https://your-app.onrender.com'];
+// [FIX] Initialize Socket.IO (Missing in previous code)
 const io = new Server(server, {
     cors: {
-        origin: "*" // หรือใส่ allowedOrigins ถ้าต้องการความเข้มงวด
+        origin: "*", // Allow all origins (adjust for production)
+        methods: ["GET", "POST"]
     }
 });
 
@@ -435,9 +432,6 @@ async function createMatchChannel(match) {
     }
 }
 
-// --- CONFIGURATION ---
-const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s";
-
 app.use(cors()); // Basic CORS
 // [ADDED] Security & Compression
 app.use(helmet({
@@ -469,6 +463,14 @@ BracketManager.onMatchReady = createMatchChannel; // [NEW] Hook up channel creat
 
 // Share VetoManager
 app.set('vetoMgr', vetoMgr);
+
+// [FIX] Share IO, Discord Client, and Helper Functions with Routes
+app.set('io', io);
+app.set('discordClient', discordClient);
+app.set('createMatchChannel', createMatchChannel);
+app.set('deleteMatchChannels', deleteMatchChannels);
+app.set('deleteMatchVoiceChannels', deleteMatchVoiceChannels);
+app.set('sendMatchResultToDiscord', sendMatchResultToDiscord);
 
 // --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
@@ -610,12 +612,14 @@ const matchRoutes = require('./routes/matchRoutes');
 const tournamentRoutes = require('./routes/tournamentRoutes');
 const discordRoutes = require('./routes/discordRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const overlayRoutes = require('./routes/overlayRoutes');
 
 app.use('/api', teamRoutes);
 app.use('/api', matchRoutes);
 app.use('/api', tournamentRoutes);
 app.use('/api', discordRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', overlayRoutes);
 
 // Socket.io Events
 io.on('connection', (socket) => {

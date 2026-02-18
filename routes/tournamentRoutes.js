@@ -17,7 +17,7 @@ const auth = require('../middleware/auth');
 // --- ROUTES ---
 
 // GET All Tournaments
-router.get('/tournaments', async (_, res) => {
+router.get('/tournaments', async (req, res) => {
     const t = await Tournament.find().populate('participants').sort({ createdAt: -1 });
     res.json(t);
 });

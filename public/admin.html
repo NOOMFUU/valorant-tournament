@@ -690,6 +690,7 @@
              <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]"><h3 class="text-base font-header text-white">EDIT TEAM</h3><button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="p-8 space-y-6">
                 <input type="hidden" id="teId"><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Team Name</label><input id="teName" class="w-full input-dark text-base"></div><div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Tag (Short Name)</label><input id="teShort" class="w-full input-dark text-base uppercase"></div>
+                <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Discord</label><input id="teDiscord" class="w-full input-dark text-base" placeholder="Invite Link / Username"></div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Wins</label><input type="number" id="teWins" class="w-full input-dark text-base"></div>
                     <div class="space-y-2"><label class="text-xs text-gray-500 font-bold uppercase">Losses</label><input type="number" id="teLosses" class="w-full input-dark text-base"></div>
@@ -1013,9 +1014,9 @@
                 ]);
                 
                 if(rT.status === 401) { logout(); return; }
-                allTeams = await rT.json();
-                allMatches = await rM.json();
-                allTourneys = await rTr.json();
+                allTeams = rT.ok ? await rT.json() : [];
+                allMatches = rM.ok ? await rM.json() : [];
+                allTourneys = rTr.ok ? await rTr.json() : [];
                 allLogs = rL.ok ? await rL.json() : [];
                 
                 updateStats(allTeams, allMatches);
@@ -2647,6 +2648,7 @@
             document.getElementById('teId').value = id; 
             document.getElementById('teName').value = t.name; 
             document.getElementById('teShort').value = t.shortName; 
+            document.getElementById('teDiscord').value = t.discord || '';
             document.getElementById('teWins').value = t.wins || 0;
             document.getElementById('teLosses').value = t.losses || 0;
             openModal('teamEditModal'); 
@@ -2655,10 +2657,11 @@
             const id = document.getElementById('teId').value;
             const name = document.getElementById('teName').value;
             const shortName = document.getElementById('teShort').value;
+            const discord = document.getElementById('teDiscord').value;
             const wins = document.getElementById('teWins').value;
             const losses = document.getElementById('teLosses').value;
             if(!name || !shortName) return showToast('Please fill all fields', 'error');
-            const res = await fetch(`${API_BASE}/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, wins, losses }) });
+            const res = await fetch(`${API_BASE}/api/teams/${id}`, { method: 'PUT', headers: { 'Authorization': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, shortName, discord, wins, losses }) });
             const data = await res.json();
             if (res.ok && data.success) { showToast('Team Updated Successfully'); closeModal(); init(); } else { showToast(data.msg || 'Update Failed', 'error'); }
         }

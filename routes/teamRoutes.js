@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
-const { EmbedBuilder } = require('discord.js');
 
 let imgbbUploader;
 try { imgbbUploader = require('imgbb-uploader'); } catch (e) {}
@@ -12,37 +11,12 @@ try { imgbbUploader = require('imgbb-uploader'); } catch (e) {}
 // Import Models
 const User = require('../models/User');
 const Team = require('../models/Team');
-const AdminLog = require('../models/AdminLog');
 
 // --- MIDDLEWARE & HELPERS ---
 const auth = require('../middleware/auth');
 const { upload, getFileUrl } = require('../middleware/upload');
+const { logAdminAction, sendDiscordLog } = require('../utils/helpers');
 const DEFAULT_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQY6fJtdoDAlMIcjcUyEDsxhhXJYDLrzw7dQg&s";
-
-// --- LOGGING HELPERS ---
-async function sendDiscordLog(req, title, description, fields = [], color = 0x3498db) {
-    const discordClient = req.app.get('discordClient');
-    const channelId = process.env.DISCORD_ADMIN_LOG_CHANNEL_ID;
-    if (!channelId || !discordClient) return;
-    try {
-        const channel = await discordClient.channels.fetch(channelId).catch(() => null);
-        if (channel) await channel.send({ embeds: [new EmbedBuilder().setTitle(title).setDescription(description).addFields(fields).setColor(color).setTimestamp()] });
-    } catch (e) { console.error("Failed to send Discord log:", e); }
-}
-
-async function logAdminAction(req, action, target, details) {
-    try {
-        const u = await User.findById(req.user.id);
-        const adminName = u ? u.username : 'Unknown';
-        await AdminLog.create({ adminId: req.user.id, adminUsername: adminName, action, target, details, ip: req.ip });
-        const fields = [{ name: 'Admin', value: adminName, inline: true }, { name: 'Target', value: target || 'N/A', inline: true }];
-        if (details && Object.keys(details).length > 0) fields.push({ name: 'Details', value: JSON.stringify(details).substring(0, 1000) });
-        let color = 0x3498db;
-        if (['DELETE', 'RESET', 'REJECT', 'FORCE'].some(k => action.includes(k))) color = 0xe74c3c;
-        if (['APPROVE', 'CREATE', 'UPDATE'].some(k => action.includes(k))) color = 0x2ecc71;
-        await sendDiscordLog(req, `🛡️ Admin Action: ${action}`, `Action performed via Dashboard`, fields, color);
-    } catch (e) { console.error("Log Error:", e); }
-}
 
 // --- ROUTES ---
 
@@ -85,7 +59,7 @@ router.post('/register', authLimiter, upload.single('logo'), async (req, res) =>
 // Team Management
 router.post('/teams/:id/approve', auth(['admin']), async (req, res) => { await Team.findByIdAndUpdate(req.params.id, { status: 'approved' }); res.json({ success: true }); });
 router.delete('/teams/:id', auth(['admin']), async (req, res) => { await Team.findByIdAndDelete(req.params.id); res.json({ success: true }); });
-router.get('/teams', async (_, res) => res.json(await Team.find()));
+router.get('/teams', async (req, res) => res.json(await Team.find()));
 router.get('/teams/me', auth(['team']), async (req, res) => res.json(await Team.findById(req.user.id)));
 
 router.post('/teams/reset-stats', auth(['admin']), async (req, res) => {
@@ -168,11 +142,12 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
 
 router.put('/teams/:id', auth(['admin']), async (req, res) => {
     try {
-        const { name, shortName, wins, losses } = req.body;
+        const { name, shortName, discord, wins, losses } = req.body;
         if (!name || !shortName) return res.status(400).json({ msg: 'Required fields missing' });
         if (await Team.findOne({ name, _id: { $ne: req.params.id } })) return res.status(400).json({ msg: 'Name taken' });
 
         const updateData = { name, shortName: shortName.toUpperCase() };
+        if (discord !== undefined) updateData.discord = discord;
         if (wins !== undefined) updateData.wins = parseInt(wins);
         if (losses !== undefined) updateData.losses = parseInt(losses);
 
