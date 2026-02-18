@@ -86,6 +86,8 @@ const MatchSchema = new mongoose.Schema({
         pausedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
         teamAPauses: { type: Number, default: 0 },
         teamBPauses: { type: Number, default: 0 },
+        teamALastPauseTime: Date,
+        teamBLastPauseTime: Date,
         turnTimeLimit: { type: Number, default: 45 },
         
         coinTossWinner: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },

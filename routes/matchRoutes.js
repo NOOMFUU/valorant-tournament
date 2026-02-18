@@ -51,7 +51,14 @@ router.get('/matches/upcoming', auth(['team']), async (req, res) => {
             $or: [{ teamA: teamId }, { teamB: teamId }],
             status: { $in: ['scheduled', 'live', 'pending_approval'] }
         }).populate('teamA teamB tournament').sort({ scheduledTime: 1 });
-        res.json(matches);
+        
+        const vetoMgr = req.app.get('vetoMgr');
+        const matchesWithPresence = matches.map(m => {
+            const obj = m.toObject();
+            obj.presence = (vetoMgr && vetoMgr.presence[m._id.toString()]) || {};
+            return obj;
+        });
+        res.json(matchesWithPresence);
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 

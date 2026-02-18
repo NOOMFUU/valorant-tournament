@@ -65,7 +65,7 @@ agenda.define('match-notification', async (job) => {
 agenda.define('check-in-expiry', async (job) => {
     const { matchId } = job.attrs.data;
     try {
-        const match = await Match.findById(matchId);
+        const match = await Match.findById(matchId).populate('teamA teamB');
         if (!match || match.status !== 'scheduled') return;
 
         let changed = false;
@@ -90,6 +90,9 @@ agenda.define('check-in-expiry', async (job) => {
 
         if (changed) {
             await match.save();
+
+            // [NEW] Send Result to Discord
+            await discordService.sendMatchResultToDiscord(match);
             
             // อัปเดต Bracket และ Stats
             const winnerId = match.winner.toString();

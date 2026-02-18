@@ -1,4 +1,5 @@
 const Match = require('../models/Match');
+const discordService = require('../services/discordService');
 
 // Fallback Map Pool (กรณี Tournament ไม่ได้ตั้งค่าไว้)
 const FALLBACK_MAP_POOL = ['Abyss', 'Ascent', 'Bind', 'Haven', 'Lotus', 'Sunset', 'Pearl'];
@@ -46,6 +47,10 @@ class VetoManager {
                 matchData.presence = this.presence[matchId] || {};
                 this.io.to(matchId).emit('veto_update', matchData);
                 this.io.to('admins').emit('veto_update', matchData);
+
+                // [NEW] Notify teams in dashboard about presence/veto updates
+                if (match.teamA) this.io.to(match.teamA._id.toString()).emit('lobby_presence_update', { matchId });
+                if (match.teamB) this.io.to(match.teamB._id.toString()).emit('lobby_presence_update', { matchId });
             }
         } catch (err) { console.error(err); }
     }
@@ -215,6 +220,9 @@ class VetoManager {
             this.clearTimer(match._id);
             this.io.emit('match_update', match); // [NEW] Notify dashboard to update status to LIVE
             await this.logAction(match, `VETO COMPLETED - GLHF!`);
+            
+            // [NEW] Announce Veto Results to Discord
+            await discordService.sendVetoResultToDiscord(match);
         } else {
             const nextStep = match.vetoData.sequence[match.vetoData.sequenceIndex];
             
@@ -302,13 +310,28 @@ class VetoManager {
         const isTeamB = match.teamB.toString() === teamId;
         if (!isTeamA && !isTeamB) return { success: false, msg: 'Unauthorized' };
 
-        const MAX_PAUSES = 3;
+        const MAX_PAUSES = 2;
         const currentPauses = isTeamA ? (match.vetoData.teamAPauses || 0) : (match.vetoData.teamBPauses || 0);
 
         if (currentPauses >= MAX_PAUSES) return { success: false, msg: `Pause limit reached (${MAX_PAUSES}/${MAX_PAUSES})` };
 
-        if (isTeamA) match.vetoData.teamAPauses = currentPauses + 1;
-        else match.vetoData.teamBPauses = currentPauses + 1;
+        // Cooldown Check
+        const lastPause = isTeamA ? match.vetoData.teamALastPauseTime : match.vetoData.teamBLastPauseTime;
+        const COOLDOWN = 20000; // 30 seconds
+        if (lastPause) {
+            const diff = Date.now() - new Date(lastPause).getTime();
+            if (diff < COOLDOWN) {
+                return { success: false, msg: `Pause cooldown: wait ${Math.ceil((COOLDOWN - diff)/1000)}s` };
+            }
+        }
+
+        if (isTeamA) {
+            match.vetoData.teamAPauses = currentPauses + 1;
+            match.vetoData.teamALastPauseTime = new Date();
+        } else {
+            match.vetoData.teamBPauses = currentPauses + 1;
+            match.vetoData.teamBLastPauseTime = new Date();
+        }
 
         await this.pauseTimer(match);
         

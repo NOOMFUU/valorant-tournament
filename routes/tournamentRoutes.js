@@ -181,6 +181,12 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
             }
         }
 
+        // [NEW] Announce Bracket in Discord
+        const sendBracketAnnouncement = req.app.get('sendBracketAnnouncement');
+        if (sendBracketAnnouncement) {
+            sendBracketAnnouncement(tournament, name, matchesIds.length);
+        }
+
         res.json({ success: true });
 
     } catch (e) {

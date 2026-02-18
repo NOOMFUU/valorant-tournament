@@ -169,7 +169,6 @@ class DiscordService {
                 if (targetMsg) {
                     const newContent = targetMsg.content.replace(/Scheduled for: .*/, `Scheduled for: ${timeStr}`);
                     await this.withRetry(() => targetMsg.edit(newContent));
-                    await this.withRetry(() => channel.send(`📅 Match time updated: ${timeStr}`));
                 } else {
                     await this.withRetry(() => channel.send(`📅 **MATCH UPDATE**\nNew Schedule: ${timeStr}`));
                 }
@@ -275,6 +274,54 @@ class DiscordService {
                 if (resultsChannel) await this.withRetry(() => resultsChannel.send({ embeds: [embed] }));
             }
         } catch (e) { console.error("Error sending match result to Discord:", e); }
+    }
+
+    async sendBracketAnnouncement(tournament, stageName, matchCount) {
+        if (!this.client) return;
+        // Use configured announcement channel or fallback to results channel
+        const channelId = process.env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID || process.env.DISCORD_RESULTS_CHANNEL_ID;
+        if (!channelId) return;
+
+        try {
+            const channel = await this.withRetry(() => this.client.channels.fetch(channelId)).catch(() => null);
+            if (!channel) return;
+
+            const embed = new EmbedBuilder()
+                .setColor(0x3498db) // Blue
+                .setTitle(`📢 Tournament Update: ${tournament.name}`)
+                .setDescription(`**${stageName}** bracket has been generated!`)
+                .addFields(
+                    { name: 'Matches Created', value: `${matchCount}`, inline: true },
+                    { name: 'Status', value: 'Scheduled', inline: true }
+                )
+                .setTimestamp();
+
+            await this.withRetry(() => channel.send({ embeds: [embed] }));
+        } catch (e) { console.error("Error sending bracket announcement:", e); }
+    }
+
+    async sendVetoResultToDiscord(match) {
+        if (!this.client || !match.discordChannelId) return;
+        try {
+            const channel = await this.withRetry(() => this.client.channels.fetch(match.discordChannelId)).catch(() => null);
+            if (!channel) return;
+
+            let description = "";
+            match.vetoData.pickedMaps.forEach((pick, index) => {
+                const mapName = pick.map;
+                const atkTeam = pick.teamAStartingSide === 'atk' ? match.teamA.shortName : match.teamB.shortName;
+                const defTeam = pick.teamAStartingSide === 'def' ? match.teamA.shortName : match.teamB.shortName;
+                description += `**Map ${index + 1}: ${mapName}**\n🗡️ Attack: **${atkTeam}**\n🛡️ Defend: **${defTeam}**\n\n`;
+            });
+
+            const embed = new EmbedBuilder()
+                .setColor(0xe67e22) // Orange
+                .setTitle(`🗺️ Veto Completed: ${match.teamA.shortName} vs ${match.teamB.shortName}`)
+                .setDescription(description || "No maps picked.")
+                .setTimestamp();
+
+            await this.withRetry(() => channel.send({ embeds: [embed] }));
+        } catch (e) { console.error("Error sending veto result:", e); }
     }
 
     async setupDiscordChannels() {

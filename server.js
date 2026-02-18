@@ -85,6 +85,7 @@ app.set('deleteMatchChannels', discordService.deleteMatchChannels.bind(discordSe
 app.set('deleteMatchVoiceChannels', discordService.deleteMatchVoiceChannels.bind(discordService));
 app.set('sendMatchResultToDiscord', discordService.sendMatchResultToDiscord.bind(discordService));
 app.set('updateMatchTime', discordService.updateMatchTime.bind(discordService));
+app.set('sendBracketAnnouncement', discordService.sendBracketAnnouncement.bind(discordService));
 
 // --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
