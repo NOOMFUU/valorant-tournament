@@ -11,6 +11,7 @@
     <style>
         body { background-color: #0f1923; color: #ece8e1; font-family: 'Inter', sans-serif; overflow: hidden; }
         .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; }
+        .font-mono { font-family: 'Courier New', monospace; }
         
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -19,24 +20,26 @@
         ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
 
         /* Bracket Specifics */
+        .bracket-viewport { cursor: grab; active: cursor: grabbing; background-image: radial-gradient(#2d3139 1px, transparent 1px); background-size: 30px 30px; }
+        .bracket-viewport:active { cursor: grabbing; }
+        
         .match-node {
-            width: 220px;
+            width: 280px;
             background: #1a1d21;
-            border: 1px solid #333;
-            border-radius: 4px;
+            border: 1px solid #2d3139;
             position: relative;
             z-index: 10;
-            transition: all 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
         }
-        .match-node:hover { border-color: #888; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .match-node.live { border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.2); }
+        .match-node:hover { border-color: #ff4655; transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 50; }
+        .match-node.live { border-left: 4px solid #ff4655; box-shadow: 0 0 20px rgba(255, 70, 85, 0.15); }
         
         .bracket-column {
             display: flex;
             flex-direction: column;
             justify-content: space-around;
-            min-width: 260px;
-            padding: 20px 0;
+            min-width: 320px;
+            padding: 40px 0;
             position: relative;
         }
 
@@ -54,7 +57,7 @@
             stroke-width: 2;
             opacity: 0.6;
         }
-        path.connector.highlight { stroke: #ff4655; opacity: 1; stroke-width: 3; }
+        path.connector.highlight { stroke: #ff4655; opacity: 1; stroke-width: 4; filter: drop-shadow(0 0 5px #ff4655); }
 
         /* Tabs */
         .nav-tab {
@@ -76,7 +79,7 @@
 
         /* Highlight Styles */
         .match-node.dimmed { opacity: 0.3; }
-        .match-node.highlight-team { opacity: 1; border-color: #ff4655; box-shadow: 0 0 15px rgba(255, 70, 85, 0.4); z-index: 20; }
+        .match-node.highlight-team { opacity: 1; border-color: #ff4655; box-shadow: 0 0 25px rgba(255, 70, 85, 0.3); z-index: 20; }
         path.connector.dimmed { opacity: 0.1; }
         path.connector.highlight-path { stroke: #ff4655; opacity: 1; stroke-width: 3; }
 
@@ -99,19 +102,31 @@
 <body class="flex flex-col h-screen">
 
     <!-- Header -->
-    <header class="h-16 bg-[#111] border-b border-[#222] flex items-center px-8 shrink-0 z-20">
+    <header class="h-20 bg-[#111] border-b border-[#222] flex items-center px-8 shrink-0 z-20 shadow-lg">
         <div class="flex items-center gap-4 mr-12">
-            <i class="fa-solid fa-trophy text-[#ff4655] text-2xl"></i>
-            <h1 class="text-xl font-header tracking-wide text-white" id="tourneyTitle">LOADING...</h1>
+            <div class="w-10 h-10 bg-[#ff4655] flex items-center justify-center rounded">
+                <i class="fa-solid fa-trophy text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-header tracking-wide text-white leading-none" id="tourneyTitle">LOADING...</h1>
+                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Tournament Bracket View</div>
+            </div>
         </div>
         <nav id="stageTabs" class="flex h-full overflow-x-auto no-scrollbar"></nav>
         <button onclick="toggleFullScreen()" class="ml-auto text-gray-500 hover:text-white transition px-8"><i class="fa-solid fa-expand text-xl"></i></button>
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 relative overflow-hidden bg-[#0f1923]">
-        <div id="contentArea" class="w-full h-full overflow-auto custom-scroll p-8">
+    <main class="flex-1 relative overflow-hidden bg-[#0f1923]" id="mainContainer">
+        <div id="contentArea" class="w-full h-full">
             <!-- Dynamic Content Injected Here -->
+        </div>
+        
+        <!-- Zoom Controls -->
+        <div id="zoomControls" class="absolute bottom-8 right-8 flex flex-col gap-2 z-50 hidden">
+            <button onclick="zoomIn()" class="w-10 h-10 bg-[#1a1d21] border border-[#333] text-white hover:bg-[#ff4655] hover:border-[#ff4655] rounded flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-plus"></i></button>
+            <button onclick="zoomReset()" class="w-10 h-10 bg-[#1a1d21] border border-[#333] text-white hover:bg-[#ff4655] hover:border-[#ff4655] rounded flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-compress"></i></button>
+            <button onclick="zoomOut()" class="w-10 h-10 bg-[#1a1d21] border border-[#333] text-white hover:bg-[#ff4655] hover:border-[#ff4655] rounded flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-minus"></i></button>
         </div>
     </main>
 
@@ -131,6 +146,13 @@
         let teamsData = [];
         let activeView = 'overview';
         let activeStageIndex = 0;
+        
+        // Zoom/Pan State
+        let scale = 1;
+        let panning = false;
+        let pointX = 0, pointY = 0, startX = 0, startY = 0;
+        let translateX = 0, translateY = 0;
+        const ZOOM_SPEED = 0.1;
 
         // --- INITIALIZATION ---
         async function init() {
@@ -177,6 +199,7 @@
         function switchView(view) {
             activeView = view;
             renderTabs();
+            resetPanZoom();
             renderContent();
         }
 
@@ -184,6 +207,7 @@
             activeView = 'stage';
             activeStageIndex = index;
             renderTabs();
+            resetPanZoom();
             renderContent();
         }
 
@@ -197,9 +221,14 @@
 
         function renderContent() {
             const container = document.getElementById('contentArea');
+            const zoomCtrls = document.getElementById('zoomControls');
+            
             if (activeView === 'overview') renderOverview(container);
             else if (activeView === 'teams') renderTeams(container);
             else renderStage(container, activeStageIndex);
+            
+            if (activeView === 'stage') zoomCtrls.classList.remove('hidden');
+            else zoomCtrls.classList.add('hidden');
         }
 
         // --- OVERVIEW ---
@@ -212,7 +241,7 @@
                 </div>
             `;
 
-            container.innerHTML = `
+            container.innerHTML = `<div class="w-full h-full overflow-auto custom-scroll p-8">
                 <div class="max-w-5xl mx-auto space-y-8 animate-enter">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div class="md:col-span-2 bg-[#1a1d21] border border-[#333] rounded p-6">
@@ -233,12 +262,12 @@
                         </div>
                     </div>
                 </div>
-            `;
+            </div>`;
         }
 
         // --- TEAMS ---
         function renderTeams(container) {
-            container.innerHTML = `
+            container.innerHTML = `<div class="w-full h-full overflow-auto custom-scroll p-8">
                 <div class="max-w-7xl mx-auto animate-enter">
                     <!-- Header -->
                     <div class="flex items-center justify-between mb-6 border-b border-[#333] pb-4">
@@ -263,7 +292,7 @@
                         ${teamsData.map(t => createLiquipediaCard(t)).join('')}
                     </div>
                 </div>
-            `;
+            </div>`;
         }
 
         function createLiquipediaCard(t) {
@@ -352,13 +381,13 @@
             const stage = tournamentData.stages[index];
             const stageMatches = stage.matches.map(mid => matchesData.find(m => m._id === mid)).filter(m => m);
 
-            container.innerHTML = '';
-
             if (stage.type === 'round_robin' || stage.type === 'swiss' || stage.type === 'cross_group') {
                 if (stage.type === 'cross_group') {
+                    container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
                     renderCrossGroupStage(container, stage, stageMatches);
                     return;
                 }
+                container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
                 renderGroupStage(container, stage, stageMatches);
             } else if (stage.type === 'gsl') {
                 renderGSLStage(container, stage, stageMatches);
@@ -623,6 +652,7 @@
 
         // --- GSL STAGE VIEW ---
         function renderGSLStage(container, stage, matches) {
+            container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
             const groups = {};
             const getGroupName = (name) => {
                 const match = name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
@@ -685,7 +715,7 @@
                 `;
             });
 
-            container.innerHTML = `<div class="max-w-7xl mx-auto">${html}</div>`;
+            container.innerHTML += `<div class="max-w-7xl mx-auto">${html}</div></div>`;
         }
 
         function filterGroups(group) {
@@ -749,11 +779,11 @@
                 const svgId = `bracketSvg-${idx}`;
 
                 html += `
-                    <div class="mb-20 relative group-bracket">
+                    <div class="relative group-bracket flex-shrink-0">
                         ${sortedGroups.length > 1 ? `<h3 class="font-header text-3xl text-white mb-8 border-l-4 border-[#ff4655] pl-4">${gName}</h3>` : ''}
                         <div class="relative min-w-max pb-10">
                             <svg id="${svgId}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
-                            <div class="flex flex-col gap-16 p-4">
+                            <div class="flex flex-col gap-16 p-10">
                                 <div class="flex gap-16" id="upperBracket-${idx}">
                                     ${ubRounds.length ? renderRoundColumns(ubRounds, 'UB') : ''}
                                     ${finalRounds.length ? renderRoundColumns(finalRounds, 'GF') : ''}
@@ -765,7 +795,12 @@
                 `;
             });
 
-            container.innerHTML = html;
+            container.innerHTML = `
+                <div id="bracketViewport" class="bracket-viewport w-full h-full overflow-hidden relative">
+                    <div id="bracketCanvas" class="absolute top-0 left-0 flex gap-20 p-20 origin-top-left transition-transform duration-75 ease-out">
+                        ${html}
+                    </div>
+                </div>`;
 
             // Draw Lines after render
             setTimeout(() => {
@@ -773,6 +808,8 @@
                     drawBracketLines(groups[gName], `bracketSvg-${idx}`);
                 });
             }, 100);
+            
+            initPanZoom();
         }
 
         function renderRoundColumns(rounds, prefix) {
@@ -782,7 +819,7 @@
                 
                 return `
                 <div class="bracket-column">
-                    <div class="absolute -top-6 left-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest w-full text-center">
+                    <div class="absolute top-0 left-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest w-full text-center border-b border-[#333] pb-2 mb-4">
                         ${label}
                     </div>
                     ${matches.map(m => createBracketNode(m)).join('')}
@@ -804,25 +841,25 @@
             const idB = m.teamB ? m.teamB._id : '';
 
             return `
-                <div class="match-node ${isLive ? 'live' : ''} cursor-pointer" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
-                    <div class="flex justify-between items-center px-2 py-1 bg-[#111] border-b border-[#333] text-[10px] text-gray-500">
+                <div class="match-node ${isLive ? 'live' : ''} cursor-pointer group" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
+                    <div class="flex justify-between items-center px-3 py-2 bg-[#15171a] border-b border-[#2d3139] text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                         <span>${isLive ? '<span class="text-[#ff4655] font-bold animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD')}</span>
                         <span>${m.format || 'BO3'}</span>
                     </div>
-                    <div class="p-1">
-                        <div class="flex justify-between items-center p-1 rounded ${winA ? 'bg-white/5' : ''} cursor-pointer hover:bg-white/5 transition" onmouseenter="highlightTeam('${idA}')" onmouseleave="resetHighlight()">
-                            <div class="flex items-center gap-2 overflow-hidden">
-                                <img src="${m.teamA?.logo || 'https://via.placeholder.com/20'}" class="w-4 h-4 object-contain">
-                                <span class="text-xs font-bold truncate ${winA ? 'text-white' : 'text-gray-400'}" title="${nameA}">${nameA}</span>
+                    <div class="p-2 space-y-1">
+                        <div class="flex justify-between items-center p-2 rounded ${winA ? 'bg-white/10' : ''} transition" onmouseenter="highlightTeam('${idA}')" onmouseleave="resetHighlight()">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <img src="${m.teamA?.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain bg-black/30 rounded p-0.5">
+                                <span class="text-sm font-bold truncate ${winA ? 'text-white' : 'text-gray-400'} font-header tracking-wide" title="${nameA}">${nameA}</span>
                             </div>
-                            <span class="font-mono text-xs ${winA ? 'text-[#ff4655]' : 'text-gray-500'}">${sA}</span>
+                            <span class="font-mono text-lg font-bold ${winA ? 'text-[#ff4655]' : 'text-gray-600'}">${sA}</span>
                         </div>
-                        <div class="flex justify-between items-center p-1 rounded ${winB ? 'bg-white/5' : ''} cursor-pointer hover:bg-white/5 transition" onmouseenter="highlightTeam('${idB}')" onmouseleave="resetHighlight()">
-                            <div class="flex items-center gap-2 overflow-hidden">
-                                <img src="${m.teamB?.logo || 'https://via.placeholder.com/20'}" class="w-4 h-4 object-contain">
-                                <span class="text-xs font-bold truncate ${winB ? 'text-white' : 'text-gray-400'}" title="${nameB}">${nameB}</span>
+                        <div class="flex justify-between items-center p-2 rounded ${winB ? 'bg-white/10' : ''} transition" onmouseenter="highlightTeam('${idB}')" onmouseleave="resetHighlight()">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <img src="${m.teamB?.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain bg-black/30 rounded p-0.5">
+                                <span class="text-sm font-bold truncate ${winB ? 'text-white' : 'text-gray-400'} font-header tracking-wide" title="${nameB}">${nameB}</span>
                             </div>
-                            <span class="font-mono text-xs ${winB ? 'text-[#ff4655]' : 'text-gray-500'}">${sB}</span>
+                            <span class="font-mono text-lg font-bold ${winB ? 'text-[#ff4655]' : 'text-gray-600'}">${sB}</span>
                         </div>
                     </div>
                 </div>
@@ -1046,7 +1083,7 @@
 
             path.setAttribute("d", d);
             path.setAttribute("fill", "none");
-            path.setAttribute("stroke-width", "2");
+            path.setAttribute("stroke-width", "3");
             path.classList.add("connector");
             
             svg.appendChild(path);
@@ -1072,8 +1109,59 @@
             }
         });
 
+        // --- PAN & ZOOM LOGIC ---
+        function initPanZoom() {
+            const viewport = document.getElementById('bracketViewport');
+            const canvas = document.getElementById('bracketCanvas');
+            if(!viewport || !canvas) return;
+
+            viewport.onmousedown = function (e) {
+                e.preventDefault();
+                startX = e.clientX - translateX;
+                startY = e.clientY - translateY;
+                panning = true;
+            };
+
+            viewport.onmouseup = function (e) { panning = false; };
+            viewport.onmouseleave = function (e) { panning = false; };
+
+            viewport.onmousemove = function (e) {
+                e.preventDefault();
+                if (!panning) return;
+                translateX = e.clientX - startX;
+                translateY = e.clientY - startY;
+                updateTransform();
+            };
+
+            viewport.onwheel = function (e) {
+                e.preventDefault();
+                const xs = (e.clientX - translateX) / scale;
+                const ys = (e.clientY - translateY) / scale;
+                const delta = -Math.sign(e.deltaY) * ZOOM_SPEED;
+                
+                const oldScale = scale;
+                scale = Math.min(Math.max(0.2, scale + delta), 3);
+                
+                if (oldScale !== scale) {
+                    translateX = e.clientX - xs * scale;
+                    translateY = e.clientY - ys * scale;
+                    updateTransform();
+                }
+            };
+        }
+
+        function updateTransform() {
+            const canvas = document.getElementById('bracketCanvas');
+            if(canvas) canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
+
+        function zoomIn() { scale = Math.min(3, scale + 0.2); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.2, scale - 0.2); updateTransform(); }
+        function zoomReset() { scale = 1; translateX = 0; translateY = 0; updateTransform(); }
+        function resetPanZoom() { scale = 1; translateX = 0; translateY = 0; panning = false; }
+
         init();
     </script>
 
 </body>
-</html>
+</html>    
