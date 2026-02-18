@@ -404,7 +404,6 @@ async function createMatchChannel(match) {
                 },
                 {
                     id: teamB.discordRoleId,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
                     allow: [PermissionsBitField.Flags.ViewChannel], // Allow seeing
                     deny: [PermissionsBitField.Flags.Connect],      // Deny connecting
                 }
@@ -427,7 +426,6 @@ async function createMatchChannel(match) {
                 },
                 {
                     id: teamA.discordRoleId,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
                     allow: [PermissionsBitField.Flags.ViewChannel], // Allow seeing
                     deny: [PermissionsBitField.Flags.Connect],      // Deny connecting
                 }

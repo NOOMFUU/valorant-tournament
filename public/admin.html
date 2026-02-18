@@ -1222,21 +1222,20 @@
             <div ${!bulkMode ? `data-action="open-edit-match" data-id="${m._id}"` : ''} class="${cardClass}">
                 ${pauseAlert}
                 ${check}
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
-                    <span class="text-[10px] font-mono text-gray-500">${timeStr}</span>
-                <div class="flex justify-between items-start mb-2">
+                <div class="flex justify-between items-start mb-3 border-b border-white/5 pb-2">
                     <div class="flex flex-col">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':''}">${statusText}</span>
-                        <span class="text-[9px] font-mono text-gray-500">${matchNumStr}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold uppercase tracking-wider ${isLive?'text-[#ff4655] animate-pulse':'text-gray-500'}">${statusText}</span>
+                            ${matchNumStr ? `<span class="text-[9px] font-mono text-gray-600 bg-black/20 px-1 rounded">${matchNumStr}</span>` : ''}
+                        </div>
                     </div>
                     <div class="text-right">
-                        <span class="text-[10px] font-mono text-gray-500 block leading-none">${timeStr}</span>
-                        <span class="text-[9px] font-mono text-gray-600 block leading-none mt-0.5">${dateStr}</span>
+                        <span class="text-[10px] font-mono text-gray-400 block leading-none">${timeStr}</span>
+                        ${dateStr ? `<span class="text-[9px] font-mono text-gray-600 block leading-none mt-0.5">${dateStr}</span>` : ''}
                     </div>
                 </div>
                 ${menuBtn}
-                <div class="flex flex-col gap-1">
+                <div class="flex flex-col gap-1.5 relative z-10">
                     ${renderTeamRow(m.teamA, 'teamA', sA, sA > sB)}
                     ${renderTeamRow(m.teamB, 'teamB', sB, sB > sA)}
                 </div>
@@ -3072,7 +3071,7 @@
             const endX = endRect.left - containerRect.left;
             const endY = endRect.top + (endRect.height / 2) - containerRect.top;
             const midX = (startX + endX) / 2;
-            const d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+            const d = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
             path.setAttribute("d", d); path.setAttribute("fill", "none"); path.setAttribute("stroke", "#444"); path.setAttribute("stroke-width", "2"); path.classList.add("connector");
             svg.appendChild(path);
