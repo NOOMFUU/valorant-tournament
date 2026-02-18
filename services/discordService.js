@@ -5,6 +5,9 @@ class DiscordService {
     constructor() {
         this.client = null;
         this.guildId = process.env.DISCORD_GUILD_ID;
+        this.spectatorRoleId = process.env.DISCORD_SPECTATOR_ROLE_ID;
+        this.channelCreationQueue = [];
+        this.isProcessingChannels = false;
     }
 
     init(client) {
@@ -26,7 +29,37 @@ class DiscordService {
         }
     }
 
+    async logToAdminChannel(message) {
+        const channelId = process.env.DISCORD_ADMIN_LOGS_CHANNEL_ID;
+        if (!channelId || !this.client) return;
+        try {
+            const channel = await this.client.channels.fetch(channelId);
+            if (channel) channel.send(`📝 **ADMIN LOG:** ${message}`);
+        } catch (e) { console.error('Failed to send admin log:', e); }
+    }
+
+    // Wrapper for Queue
     async createMatchChannel(match) {
+        return new Promise((resolve) => {
+            this.channelCreationQueue.push({ match, resolve });
+            this.processChannelQueue();
+        });
+    }
+
+    async processChannelQueue() {
+        if (this.isProcessingChannels || this.channelCreationQueue.length === 0) return;
+        this.isProcessingChannels = true;
+
+        const { match, resolve } = this.channelCreationQueue.shift();
+        try {
+            await this.createMatchChannelInternal(match);
+        } catch (e) { console.error(`Queue Error for match ${match._id}:`, e); }
+        
+        resolve();
+        setTimeout(() => { this.isProcessingChannels = false; this.processChannelQueue(); }, 1000); // 1 sec delay
+    }
+
+    async createMatchChannelInternal(match) {
         if (!this.client || !match.teamA || !match.teamB) return;
         if (match.discordChannelId) return;
 
@@ -62,21 +95,32 @@ class DiscordService {
 
             const matchIdentifier = (match.matchNumber && match.matchNumber > 0) ? match.matchNumber : match._id.toString().slice(-4);
             const categoryName = `🏆 Match ${matchIdentifier}: ${teamA.shortName} vs ${teamB.shortName}`;
+            
+            const overwrites = [
+                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: teamA.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
+                { id: teamB.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
+            ];
+
+            if (this.spectatorRoleId) {
+                overwrites.push({
+                    id: this.spectatorRoleId,
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect]
+                });
+            }
 
             const category = await this.withRetry(() => guild.channels.create({
                 name: categoryName,
                 type: ChannelType.GuildCategory,
-                permissionOverwrites: [
-                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: teamA.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
-                    { id: teamB.discordRoleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect] },
-                ],
+                permissionOverwrites: overwrites,
+                reason: `Match Creation: ${match.name}`
             }));
 
             const textChannel = await this.withRetry(() => guild.channels.create({
                 name: `💬-match-${matchIdentifier}-chat`,
                 type: ChannelType.GuildText,
                 parent: category.id,
+                reason: `Match Text Channel`
             }));
 
             const createVoice = async (team, opponentRole) => {
@@ -99,7 +143,15 @@ class DiscordService {
             await match.save();
 
             const timeStr = match.scheduledTime ? `<t:${Math.floor(new Date(match.scheduledTime).getTime() / 1000)}:F>` : 'TBD';
-            await this.withRetry(() => textChannel.send(`**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: ${timeStr}`));
+            
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`checkin_${match._id}`).setLabel('✅ Check-in').setStyle(ButtonStyle.Success)
+            );
+
+            await this.withRetry(() => textChannel.send({
+                content: `**MATCH READY**\n<@&${teamA.discordRoleId}> vs <@&${teamB.discordRoleId}>\nScheduled for: ${timeStr}\n\n**Please Check-in when ready:**`,
+                components: [row]
+            }));
 
         } catch (e) {
             console.error("Error creating match channel:", e);
