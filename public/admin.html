@@ -2828,6 +2828,29 @@
             closeModal(); init(true); showToast('Settings Updated');
         }
         
+        // --- MANAGE TEAMS DRAG & DROP ---
+        let manageDragSrcId = null;
+        function handleManageDragStart(e, tid) {
+            manageDragSrcId = tid;
+            e.dataTransfer.effectAllowed = "move";
+            e.target.classList.add('opacity-50');
+        }
+        function handleManageDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add('border-[#ff4655]', 'bg-[#ff4655]/10'); }
+        function handleManageDragLeave(e) { e.currentTarget.classList.remove('border-[#ff4655]', 'bg-[#ff4655]/10'); }
+        async function handleManageDrop(e, targetTid) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('border-[#ff4655]', 'bg-[#ff4655]/10');
+            document.querySelectorAll('.opacity-50').forEach(el => el.classList.remove('opacity-50'));
+            if (!manageDragSrcId || manageDragSrcId === targetTid) return;
+            manageTeamsState.swapSrc = null; // Reset click-swap state
+            await fetch(`${API_BASE}/api/tournaments/${manageTeamsState.tid}/stages/${manageTeamsState.sIdx}/teams/swap`, {
+                method: 'POST', headers: {'Authorization': token, 'Content-Type': 'application/json'},
+                body: JSON.stringify({ team1Id: manageDragSrcId, team2Id: targetTid })
+            });
+            init(true); openManageTeams(manageTeamsState.tid, manageTeamsState.sIdx); showToast('Teams Swapped');
+            manageDragSrcId = null;
+        }
+
         // --- MANAGE TEAMS (ADD/SWAP) ---
         let manageTeamsState = { tid: null, sIdx: null, swapSrc: null };
         
@@ -2870,7 +2893,7 @@
                         ${teamIds.map(tid => {
                             const team = allTeams.find(t => t._id === tid);
                             if(!team) return '';
-                            return `<div onclick="handleManageSwap('${tid}')" class="p-2 bg-[#1a1d21] border border-[#333] rounded flex justify-between items-center cursor-pointer hover:border-[#ff4655] transition group manage-team-item" data-id="${tid}">
+                            return `<div draggable="true" ondragstart="handleManageDragStart(event, '${tid}')" ondragover="handleManageDragOver(event)" ondragleave="handleManageDragLeave(event)" ondrop="handleManageDrop(event, '${tid}')" onclick="handleManageSwap('${tid}')" class="p-2 bg-[#1a1d21] border border-[#333] rounded flex justify-between items-center cursor-pointer hover:border-[#ff4655] transition group manage-team-item" data-id="${tid}">
                                 <span class="text-xs font-bold text-gray-300 group-hover:text-white">${team.name}</span>
                                 <i class="fa-solid fa-arrow-right-arrow-left text-[10px] text-gray-600 group-hover:text-[#ff4655]"></i>
                             </div>`;
