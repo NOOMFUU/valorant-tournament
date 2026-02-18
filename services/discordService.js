@@ -239,6 +239,8 @@ class DiscordService {
                 if (match.winner.name) winnerName = match.winner.name;
                 else if (match.winner.toString() === match.teamA._id.toString()) winnerName = match.teamA.name;
                 else if (match.winner.toString() === match.teamB._id.toString()) winnerName = match.teamB.name;
+            } else if (match.status === 'finished') {
+                winnerName = 'None (Double Forfeit)';
             }
 
             const embed = new EmbedBuilder()

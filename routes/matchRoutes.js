@@ -411,7 +411,7 @@ router.post('/matches/:id/reset', auth(['admin']), async (req, res) => {
 // CHECK-IN
 router.post('/matches/:id/checkin', auth(['team']), async (req, res) => {
     try {
-        const match = await Match.findById(req.params.id);
+        const match = await Match.findById(req.params.id).populate('teamA teamB');
         if (!match) return res.status(404).json({ msg: 'Match not found' });
         if (!match.scheduledTime) return res.status(400).json({ msg: 'Match has no scheduled time' });
 
@@ -424,12 +424,35 @@ router.post('/matches/:id/checkin', auth(['team']), async (req, res) => {
 
         const teamId = req.user.id;
         let checked = false;
-        if (match.teamA && match.teamA.toString() === teamId) { match.checkIn.teamA = true; checked = true; }
-        else if (match.teamB && match.teamB.toString() === teamId) { match.checkIn.teamB = true; checked = true; }
+        let checkingTeam = null;
+        let opponentTeam = null;
+
+        if (match.teamA && match.teamA._id.toString() === teamId) { 
+            match.checkIn.teamA = true; checked = true; 
+            checkingTeam = match.teamA; opponentTeam = match.teamB;
+        }
+        else if (match.teamB && match.teamB._id.toString() === teamId) { 
+            match.checkIn.teamB = true; checked = true; 
+            checkingTeam = match.teamB; opponentTeam = match.teamA;
+        }
 
         if (checked) {
             await match.save();
             req.app.get('io').emit('match_update', match);
+
+            // [NEW] Notify Discord
+            if (match.discordChannelId) {
+                const discordClient = req.app.get('discordClient');
+                const channel = await discordClient.channels.fetch(match.discordChannelId).catch(() => null);
+                if (channel && checkingTeam && opponentTeam) {
+                    const opponentRole = opponentTeam.discordRoleId ? `<@&${opponentTeam.discordRoleId}>` : opponentTeam.name;
+                    await channel.send({ 
+                        content: `✅ **${checkingTeam.name}** has checked in! ${opponentRole} please check in if you haven't.`,
+                        allowedMentions: { parse: ['roles'] }
+                    });
+                }
+            }
+
             res.json({ success: true, msg: 'Check-in Successful' });
         } else res.status(403).json({ msg: 'You are not in this match' });
     } catch (e) { res.status(500).json({ msg: e.message }); }

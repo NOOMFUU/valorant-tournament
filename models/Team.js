@@ -29,6 +29,7 @@ const TeamSchema = new mongoose.Schema({
     password: { type: String, required: true },
     logo: { type: String, default: '' },
     status: { type: String, enum: ['pending', 'approved'], default: 'pending' },
+    discordRoleId: { type: String, default: '' },
     
     members: [MemberSchema],
     rosterLocked: { type: Boolean, default: false },

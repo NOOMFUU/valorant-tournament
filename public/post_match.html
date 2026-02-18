@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Match Summary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tungsten:wght@600&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: transparent; overflow: hidden; font-family: 'Oswald', sans-serif; }
+        .font-header { font-family: 'Tungsten', sans-serif; }
+        .clip-box { clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px); }
+        .clip-score { clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%); }
+        .text-shadow-glow { text-shadow: 0 0 20px rgba(255, 255, 255, 0.3); }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+    <div id="summaryContainer" class="relative w-[1200px] bg-[#0f1923] text-white border border-white/10 shadow-2xl clip-box opacity-0 transition-opacity duration-1000 transform scale-95">
+        <!-- Content injected via JS -->
+    </div>
+
+    <script>
+        const matchId = new URLSearchParams(location.search).get('match');
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+
+        async function init() {
+            if(!matchId) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/matches/${matchId}`);
+                if(!res.ok) return;
+                const m = await res.json();
+
+                render(m);
+                
+                // Animate in
+                setTimeout(() => {
+                    const el = document.getElementById('summaryContainer');
+                    el.classList.remove('opacity-0', 'scale-95');
+                    el.classList.add('opacity-100', 'scale-100');
+                }, 100);
+
+            } catch(e) { console.error(e); }
+        }
+
+        function render(m) {
+            // Calculate Series Score
+            let winsA = 0, winsB = 0;
+            if (m.scores) {
+                m.scores.forEach(s => {
+                    const a = parseInt(s.teamAScore) || 0;
+                    const b = parseInt(s.teamBScore) || 0;
+                    if (a > b) winsA++; else if (b > a) winsB++;
+                });
+            }
+
+            const isWinA = winsA > winsB;
+            const isWinB = winsB > winsA;
+            const isDraw = winsA === winsB;
+
+            const container = document.getElementById('summaryContainer');
+            
+            let mapsHtml = '';
+            if (m.scores && m.scores.length > 0) {
+                mapsHtml = m.scores.map(s => {
+                    const sA = parseInt(s.teamAScore) || 0;
+                    const sB = parseInt(s.teamBScore) || 0;
+                    const mapWinA = sA > sB;
+                    
+                    return `
+                        <div class="flex items-center h-16 bg-[#1a1d21] border-l-4 ${mapWinA ? 'border-[#ff4655]' : (sB > sA ? 'border-[#1fa474]' : 'border-gray-500')} mb-2 relative overflow-hidden group">
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                            
+                            <!-- Map Name -->
+                            <div class="w-32 pl-6 flex flex-col justify-center">
+                                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">MAP ${i+1}</span>
+                                <span class="text-xl font-header text-white uppercase tracking-wide leading-none">${s.mapName}</span>
+                            </div>
+
+                            <!-- Score A -->
+                            <div class="flex-1 flex justify-end items-center pr-6 gap-4">
+                                <span class="text-2xl font-header ${mapWinA ? 'text-[#ff4655]' : 'text-gray-500'}">${sA}</span>
+                            </div>
+
+                            <!-- Divider -->
+                            <div class="w-px h-8 bg-white/10"></div>
+
+                            <!-- Score B -->
+                            <div class="flex-1 flex justify-start items-center pl-6 gap-4">
+                                <span class="text-2xl font-header ${!mapWinA && sB > sA ? 'text-[#1fa474]' : 'text-gray-500'}">${sB}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                mapsHtml = '<div class="text-center text-gray-500 py-8 font-mono text-xs uppercase tracking-widest">No map data available</div>';
+            }
+
+            container.innerHTML = `
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#ff4655] via-white to-[#1fa474]"></div>
+                <div class="absolute bottom-0 right-0 p-4 opacity-10 pointer-events-none">
+                    <h1 class="text-9xl font-header text-white tracking-tighter leading-none">VCT</h1>
+                </div>
+                
+                <div class="p-10 h-full flex flex-col">
+                    <!-- Header -->
+                    <div class="flex justify-between items-end mb-10 border-b border-white/10 pb-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="w-2 h-2 bg-[#ff4655]"></div>
+                                <span class="text-xs font-bold text-[#ff4655] uppercase tracking-[0.2em]">Post-Match Protocol</span>
+                            </div>
+                            <h1 class="text-4xl font-header text-white uppercase tracking-wide">${m.name}</h1>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500 font-bold uppercase tracking-widest">Format</div>
+                            <div class="text-xl font-header text-white">${m.format || 'BO3'}</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="flex-1 flex items-center justify-center gap-12">
+                        
+                        <!-- Team A (Left) -->
+                        <div class="flex-1 flex flex-col items-end text-right relative group">
+                            ${isWinA ? '<div class="absolute -top-6 right-0 text-[#ff4655] font-bold text-xs uppercase tracking-[0.3em] animate-pulse">Victory</div>' : ''}
+                            <div class="relative z-10">
+                                <h2 class="text-6xl font-header text-white leading-none mb-2 ${isWinA ? 'text-shadow-glow' : 'opacity-60'}">${m.teamA.name}</h2>
+                                <div class="text-sm font-bold text-gray-500 uppercase tracking-widest">${m.teamA.shortName}</div>
+                            </div>
+                            <img src="${m.teamA.logo || ''}" class="absolute top-1/2 right-10 -translate-y-1/2 w-64 h-64 object-contain opacity-10 grayscale group-hover:opacity-20 transition-opacity duration-500 pointer-events-none">
+                        </div>
+
+                        <!-- Scoreboard (Center) -->
+                        <div class="shrink-0 flex items-center justify-center bg-[#1a1d21] px-10 py-6 clip-score border border-white/10 relative shadow-2xl">
+                            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1 bg-[#ff4655]"></div>
+                            <div class="text-8xl font-header text-white leading-none flex items-center gap-8">
+                                <span class="${isWinA ? 'text-[#ff4655]' : 'text-white'}">${winsA}</span>
+                                <span class="text-gray-600 text-4xl opacity-50">-</span>
+                                <span class="${isWinB ? 'text-[#1fa474]' : 'text-white'}">${winsB}</span>
+                            </div>
+                        </div>
+
+                        <!-- Team B (Right) -->
+                        <div class="flex-1 flex flex-col items-start text-left relative group">
+                            ${isWinB ? '<div class="absolute -top-6 left-0 text-[#1fa474] font-bold text-xs uppercase tracking-[0.3em] animate-pulse">Victory</div>' : ''}
+                            <div class="relative z-10">
+                                <h2 class="text-6xl font-header text-white leading-none mb-2 ${isWinB ? 'text-shadow-glow' : 'opacity-60'}">${m.teamB.name}</h2>
+                                <div class="text-sm font-bold text-gray-500 uppercase tracking-widest">${m.teamB.shortName}</div>
+                            </div>
+                            <img src="${m.teamB.logo || ''}" class="absolute top-1/2 left-10 -translate-y-1/2 w-64 h-64 object-contain opacity-10 grayscale group-hover:opacity-20 transition-opacity duration-500 pointer-events-none">
+                        </div>
+                    </div>
+
+                    <!-- Map Breakdown (Bottom) -->
+                    <div class="mt-12">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="h-px bg-white/10 flex-1"></div>
+                            <span class="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Map Breakdown</span>
+                            <div class="h-px bg-white/10 flex-1"></div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2 max-w-4xl mx-auto">
+                            ${mapsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        init();
+    </script>
+</body>
+</html>

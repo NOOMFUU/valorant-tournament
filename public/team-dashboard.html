@@ -12,6 +12,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
     <style>
         :root {
@@ -562,6 +564,41 @@
         </div>
     </div>
 
+    <div id="cropModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[300] backdrop-blur-sm p-4">
+        <div class="bg-[#1a1d21] w-full max-w-2xl border border-white/10 relative animate-slide-up shadow-2xl clipped-box flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#0f1923]">
+                <h3 class="text-2xl font-header text-white">ADJUST IDENTITY</h3>
+                <button onclick="closeCropModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 flex-1 overflow-hidden bg-black/50 flex items-center justify-center relative min-h-[300px]">
+                <img id="cropImage" src="" class="max-w-full max-h-[60vh] block">
+            </div>
+            <div class="p-6 border-t border-white/10 bg-[#0f1923] flex justify-end gap-4">
+                <button onclick="closeCropModal()" class="btn-secondary px-6 py-2 text-sm">CANCEL</button>
+                <button onclick="performCrop()" class="btn-primary px-8 py-2 text-sm">PREVIEW</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewCropModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[310] backdrop-blur-sm p-4">
+        <div class="bg-[#1a1d21] w-full max-w-md border border-white/10 relative animate-slide-up shadow-2xl clipped-box flex flex-col">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#0f1923]">
+                <h3 class="text-2xl font-header text-white">CONFIRM IDENTITY</h3>
+                <button onclick="closePreviewModal()" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-8 flex flex-col items-center gap-4 bg-black/20">
+                <div class="w-32 h-32 border-2 border-white/10 bg-black/50 flex items-center justify-center overflow-hidden shadow-lg">
+                    <img id="previewCropImage" src="" class="w-full h-full object-contain">
+                </div>
+                <p class="text-xs text-gray-500 font-mono uppercase tracking-widest">Preview (300x300)</p>
+            </div>
+            <div class="p-6 border-t border-white/10 bg-[#0f1923] flex justify-end gap-4">
+                <button onclick="closePreviewModal()" class="btn-secondary px-6 py-2 text-sm">BACK</button>
+                <button onclick="confirmUpload()" class="btn-primary px-8 py-2 text-sm">UPLOAD</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const token = localStorage.getItem('token');
         if (!token) location.href = '/login.html';
@@ -590,6 +627,8 @@
         let matchData = null;
         let currentMatchId = null;
         let allMyMatches = [];
+        let cropper = null;
+        let pendingUploadBlob = null;
 
         // --- SOCKET LISTENERS ---
         socket.on('match_update', () => loadDashboardData());
@@ -1289,10 +1328,129 @@
 
         async function uploadLogo(input) {
             if (!input.files[0]) return;
-            const fd = new FormData(); fd.append('logo', input.files[0]);
-            const res = await fetch(`${API_BASE}/api/teams/logo`, { method: 'PUT', headers: { 'Authorization': token }, body: fd });
-            const d = await res.json();
-            if (res.ok) { document.getElementById('teamLogo').src = d.logo; showToast('Identity Updated'); }
+            
+            const file = input.files[0];
+
+            // Validation
+            const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+            const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+            if (!ALLOWED_TYPES.includes(file.type)) {
+                showToast('Invalid file type. Use JPG, PNG, WEBP or GIF.', 'error');
+                input.value = '';
+                return;
+            }
+
+            if (file.size > MAX_SIZE) {
+                showToast('File too large. Max size is 5MB.', 'error');
+                input.value = '';
+                return;
+            }
+
+            // Open Crop Modal
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const image = document.getElementById('cropImage');
+                image.src = e.target.result;
+                
+                document.getElementById('cropModal').classList.remove('hidden');
+                document.getElementById('cropModal').classList.add('flex');
+                
+                if(cropper) cropper.destroy();
+                cropper = new Cropper(image, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    autoCropArea: 1,
+                    background: false,
+                    modal: true,
+                    guides: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+        }
+
+        function closeCropModal() {
+            document.getElementById('cropModal').classList.add('hidden');
+            document.getElementById('cropModal').classList.remove('flex');
+            if(cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+        }
+
+        function performCrop() {
+            if(!cropper) return;
+            
+            const canvas = cropper.getCroppedCanvas({
+                width: 300,
+                height: 300,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+
+            canvas.toBlob((blob) => {
+                if(blob) {
+                    pendingUploadBlob = blob;
+                    document.getElementById('previewCropImage').src = URL.createObjectURL(blob);
+                    document.getElementById('previewCropModal').classList.remove('hidden');
+                    document.getElementById('previewCropModal').classList.add('flex');
+                }
+            }, 'image/png');
+        }
+
+        function closePreviewModal() {
+            const img = document.getElementById('previewCropImage');
+            if(img.src) URL.revokeObjectURL(img.src);
+            img.src = '';
+            document.getElementById('previewCropModal').classList.add('hidden');
+            document.getElementById('previewCropModal').classList.remove('flex');
+            pendingUploadBlob = null;
+        }
+
+        function confirmUpload() {
+            if(pendingUploadBlob) {
+                processUpload(pendingUploadBlob);
+                closePreviewModal();
+                closeCropModal();
+            }
+        }
+
+        async function processUpload(fileBlob) {
+            const img = document.getElementById('teamLogo');
+            const oldSrc = img.src;
+            img.style.opacity = '0.5';
+
+            let success = false;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const fd = new FormData(); fd.append('logo', fileBlob, 'team-logo.png');
+                    const res = await fetch(`${API_BASE}/api/teams/logo`, { method: 'PUT', headers: { 'Authorization': token }, body: fd });
+                    
+                    if (res.ok) { 
+                        const d = await res.json().catch(() => ({}));
+                        document.getElementById('teamLogo').src = d.logo + (d.logo.includes('?') ? '&' : '?') + 't=' + Date.now(); 
+                        showToast('Identity Updated'); 
+                        success = true;
+                        break;
+                    } else if (attempt === 3 || (res.status < 500 && res.status !== 429)) {
+                        const d = await res.json().catch(() => ({}));
+                        showToast(d.msg || `Upload Failed (${res.status})`, 'error');
+                        break;
+                    }
+                } catch (e) {
+                    console.error(e);
+                    if (attempt === 3) showToast('Connection Error', 'error');
+                }
+                if (!success) await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+            
+            if (!success) img.src = oldSrc;
+            img.style.opacity = '';
         }
 
         function openRescheduleModal(mid) {

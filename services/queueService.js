@@ -23,11 +23,67 @@ agenda.define('match-reminder-1h', async (job) => {
         if (channel) {
             const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
             const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
-            await channel.send(`⏰ **1 HOUR REMAINING**\n${roleA} and ${roleB}, your match starts in 1 hour.`);
+            await channel.send({ content: `⏰ **1 HOUR REMAINING**\n${roleA} and ${roleB}, your match starts in 1 hour.`, allowedMentions: { parse: ['roles'] } });
         }
     } catch (e) {
         console.error(`Job match-reminder-1h failed for ${matchId}:`, e);
     }
+});
+
+// [NEW] Task: แจ้งเตือนก่อนแข่ง 5 นาที (Check-in Reminder)
+agenda.define('match-reminder-5m', async (job) => {
+    const { matchId } = job.attrs.data;
+    try {
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        if (!match || match.status !== 'scheduled' || !match.discordChannelId) return;
+
+        // ถ้า Check-in ครบแล้ว ไม่ต้องเตือน
+        if (match.checkIn.teamA && match.checkIn.teamB) return;
+
+        const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
+        if (channel) {
+            const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
+            const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
+            
+            let msg = "";
+            if (!match.checkIn.teamA && !match.checkIn.teamB) msg = `⚠️ **5 MINUTES REMAINING**\n${roleA} and ${roleB}, you have not checked in yet!`;
+            else if (!match.checkIn.teamA) msg = `⚠️ **5 MINUTES REMAINING**\n${roleA}, please check in!`;
+            else if (!match.checkIn.teamB) msg = `⚠️ **5 MINUTES REMAINING**\n${roleB}, please check in!`;
+
+            if (msg) await channel.send({ content: msg, allowedMentions: { parse: ['roles'] } });
+        }
+    } catch (e) { console.error(`Job match-reminder-5m failed for ${matchId}:`, e); }
+});
+
+// [NEW] Task: Late Check-in Reminder (Every 3 mins after start)
+agenda.define('match-reminder-late', async (job) => {
+    const { matchId, minute } = job.attrs.data;
+    try {
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        if (!match || match.status !== 'scheduled' || !match.discordChannelId) return;
+
+        // If both checked in, stop reminding
+        if (match.checkIn.teamA && match.checkIn.teamB) return;
+
+        const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
+        if (channel) {
+            const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
+            const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
+            
+            let msg = "";
+            const remaining = 15 - minute;
+            
+            if (!match.checkIn.teamA && !match.checkIn.teamB) {
+                msg = `⚠️ **LATE CHECK-IN (${minute}m passed)**\n${roleA} and ${roleB}, you are late! ${remaining} mins remaining before disqualification.`;
+            } else if (!match.checkIn.teamA) {
+                msg = `⚠️ **LATE CHECK-IN (${minute}m passed)**\n${roleA}, you are late! ${remaining} mins remaining before disqualification.`;
+            } else if (!match.checkIn.teamB) {
+                msg = `⚠️ **LATE CHECK-IN (${minute}m passed)**\n${roleB}, you are late! ${remaining} mins remaining before disqualification.`;
+            }
+
+            if (msg) await channel.send({ content: msg, allowedMentions: { parse: ['roles'] } });
+        }
+    } catch (e) { console.error(`Job match-reminder-late failed for ${matchId}:`, e); }
 });
 
 // 1. Task: แจ้งเตือนก่อนแข่ง 10 นาที
@@ -87,9 +143,38 @@ agenda.define('check-in-expiry', async (job) => {
             match.name += " (Auto Win)";
             changed = true;
         }
+        // [NEW] Both missing
+        else if (!match.checkIn.teamA && !match.checkIn.teamB) {
+            match.status = 'finished';
+            match.winner = null;
+            match.scoreSubmission.status = 'rejected';
+            match.scoreSubmission.rejectReason = 'AUTO: Both Teams Missed Check-in';
+            match.name += " (Double Forfeit)";
+            changed = true;
+        }
 
         if (changed) {
             await match.save();
+
+            // [NEW] Notify Discord with Tag
+            if (match.discordChannelId) {
+                const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
+                if (channel) {
+                    const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
+                    const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
+                    let msg = "";
+                    
+                    if (match.scoreSubmission.rejectReason.includes('Both')) {
+                        msg = `❌ **DOUBLE FORFEIT**\n${roleA} and ${roleB} failed to check-in. Match cancelled.`;
+                    } else if (match.winner && match.winner._id.toString() === match.teamA._id.toString()) {
+                        msg = `🏆 **AUTO WIN**\n${roleA} wins! ${roleB} failed to check-in.`;
+                    } else if (match.winner && match.winner._id.toString() === match.teamB._id.toString()) {
+                        msg = `🏆 **AUTO WIN**\n${roleB} wins! ${roleA} failed to check-in.`;
+                    }
+                    
+                    if (msg) await channel.send({ content: msg, allowedMentions: { parse: ['roles'] } });
+                }
+            }
 
             // [NEW] Send Result to Discord
             await discordService.sendMatchResultToDiscord(match);
@@ -122,6 +207,7 @@ agenda.scheduleMatchJobs = async (match) => {
     
     const matchTime = new Date(match.scheduledTime);
     const notifyTime = new Date(matchTime.getTime() - 10 * 60000);
+    const remind5mTime = new Date(matchTime.getTime() - 5 * 60000); // [NEW] 5 mins before
     const remind1hTime = new Date(matchTime.getTime() - 60 * 60000); // 1 hour
     const forfeitTime = new Date(matchTime.getTime() + 15 * 60000); // [NEW] 15 mins grace period
 
@@ -135,8 +221,19 @@ agenda.scheduleMatchJobs = async (match) => {
     if (notifyTime > new Date()) {
         await agenda.schedule(notifyTime, 'match-notification', { matchId: match._id });
     }
+    if (remind5mTime > new Date()) {
+        await agenda.schedule(remind5mTime, 'match-reminder-5m', { matchId: match._id });
+    }
     if (forfeitTime > new Date()) {
         await agenda.schedule(forfeitTime, 'check-in-expiry', { matchId: match._id });
+    }
+
+    // [NEW] Late Reminders (3, 6, 9, 12 mins after start)
+    for (let i = 3; i < 15; i += 3) {
+        const lateTime = new Date(matchTime.getTime() + i * 60000);
+        if (lateTime > new Date()) {
+            await agenda.schedule(lateTime, 'match-reminder-late', { matchId: match._id, minute: i });
+        }
     }
 };
 

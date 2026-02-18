@@ -216,15 +216,20 @@
         }
 
         /* Effect สำหรับกล่องที่กำลังเป็นตาเลือก (Active Turn) */
-        .veto-col.active-turn {
-            background-color: #fff;
-            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.2);
-            animation: pulseBg 2s infinite;
+        .veto-col.active-turn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.1);
+            z-index: 50;
+            animation: borderPulse 1.5s infinite ease-in-out;
+            pointer-events: none;
         }
-        @keyframes pulseBg {
-            0% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
-            50% { box-shadow: inset 0 0 20px rgba(255,255,255,0.1); }
-            100% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
+        @keyframes borderPulse {
+            0% { border-color: rgba(255,255,255,0.3); box-shadow: 0 0 5px rgba(255,255,255,0.1); }
+            50% { border-color: rgba(255,255,255,0.9); box-shadow: 0 0 25px rgba(255,255,255,0.4); }
+            100% { border-color: rgba(255,255,255,0.3); box-shadow: 0 0 5px rgba(255,255,255,0.1); }
         }
 
         /* Coin Flip */
@@ -236,10 +241,37 @@
         .face-tails { transform: rotateY(180deg); }
         .animate-spin-coin { animation: spinCoin 2s infinite linear; }
         @keyframes spinCoin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+
+        /* Glitch & Scanlines */
+        .glitch-entry { animation: glitch-skew 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+        @keyframes glitch-skew {
+            0% { transform: skew(0deg); }
+            20% { transform: skew(-10deg); }
+            40% { transform: skew(10deg); }
+            60% { transform: skew(-5deg); }
+            80% { transform: skew(5deg); }
+            100% { transform: skew(0deg); }
+        }
+        
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 20;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            opacity: 0.6;
+        }
+        
+        .veto-map:not(.banned) .veto-map-bg {
+            animation: zoomInBg 20s infinite alternate linear;
+        }
+        @keyframes zoomInBg {
+            from { transform: scale(1); }
+            to { transform: scale(1.15); }
+        }
     </style>
 </head>
 <body>
     <div id="vetoWrapper" class="veto-wrapper opacity-0">
+        <div class="scanlines"></div>
         <div id="timerContainer" class="timer-container hidden">
             <div id="timerFill" class="timer-fill"></div>
         </div>
@@ -359,36 +391,67 @@
                             // นำ block 'else' ที่เคยเป็น WAITING ออกไป เพื่อให้ซ่อนแถบนี้จนกว่าจะเลือก
                         }
 
-                        const colContent = `
-                            <div class="veto-header">
-                                <span class="team-name" title="${teamName}">${teamName}</span>${headerSub}
-                            </div>
-                            <div class="veto-map ${isBanned ? 'banned' : ''}">
-                                <div class="veto-map-bg" style="background-image: url('${isActive ? mapImg : ''}');"></div>
-                                ${isBanned ? `<div class="ban-icon" style="animation-delay: ${parseFloat(index*0.1) + 0.3}s;"></div>` : ''}
-                                ${mapName ? `<div class="map-name">${mapName}</div>` : ''}
-                            </div>
-                            ${footerHtml}
-                        `;
-
                         const colClass = `veto-col ${isActiveTurn && !mapName ? 'active-turn' : ''}`;
                         
                         let colEl = grid.children[index];
+                        
+                        // Prepare content parts
+                        const headerHTML = `<span class="team-name glitch-entry" title="${teamName}">${teamName}</span>${headerSub}`;
+                        const mapInner = `<div class="veto-map-bg" style="background-image: url('${isActive ? mapImg : ''}');"></div>
+                                ${isBanned ? `<div class="ban-icon" style="animation-delay: ${parseFloat(index*0.1) + 0.3}s;"></div>` : ''}
+                                ${mapName ? `<div class="map-name">${mapName}</div>` : ''}`;
+
                         if (!colEl) {
                             colEl = document.createElement('div');
-                            colEl.className = colClass;
                             colEl.style.animationDelay = animDelay;
-                            colEl.innerHTML = colContent;
-                            colEl._lastHTML = colContent;
-                            colEl._lastData = null; // Reset pre-match data
                             grid.appendChild(colEl);
+                        }
+
+                        // Update Class & Style
+                        if (colEl.className !== colClass) colEl.className = colClass;
+                        if (colEl.style.width) colEl.style.width = '';
+
+                        // Check if structure exists (to avoid full re-render)
+                        const mapEl = colEl.querySelector('.veto-map');
+                        
+                        if (!mapEl) {
+                            // Full Render
+                            colEl.innerHTML = `
+                                <div class="veto-header">${headerHTML}</div>
+                                <div class="veto-map ${isBanned ? 'banned' : ''}">${mapInner}</div>
+                                ${footerHtml}
+                            `;
+                            colEl._lastHeader = headerHTML;
+                            colEl._lastMapInner = mapInner;
+                            colEl._lastFooter = footerHtml;
+                            colEl._lastBanned = isBanned;
+                            colEl._lastData = null;
                         } else {
-                            if (colEl.className !== colClass) colEl.className = colClass;
-                            if (colEl.style.width) colEl.style.width = '';
-                            if (colEl._lastHTML !== colContent) {
-                                colEl.innerHTML = colContent;
-                                colEl._lastHTML = colContent;
-                                colEl._lastData = null; // Reset pre-match data
+                            // Granular Updates
+                            const headerEl = colEl.querySelector('.veto-header');
+                            if (headerEl && colEl._lastHeader !== headerHTML) {
+                                headerEl.innerHTML = headerHTML;
+                                colEl._lastHeader = headerHTML;
+                            }
+
+                            if (colEl._lastBanned !== isBanned) {
+                                mapEl.classList.toggle('banned', isBanned);
+                                colEl._lastBanned = isBanned;
+                            }
+                            if (colEl._lastMapInner !== mapInner) {
+                                mapEl.innerHTML = mapInner;
+                                colEl._lastMapInner = mapInner;
+                            }
+
+                            if (colEl._lastFooter !== footerHtml) {
+                                let footerEl = colEl.querySelector('.veto-footer');
+                                if (footerHtml) {
+                                    if (!footerEl) colEl.insertAdjacentHTML('beforeend', footerHtml);
+                                    else footerEl.outerHTML = footerHtml;
+                                } else {
+                                    if (footerEl) footerEl.remove();
+                                }
+                                colEl._lastFooter = footerHtml;
                             }
                         }
                     });

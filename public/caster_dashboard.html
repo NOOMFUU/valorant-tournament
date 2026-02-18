@@ -131,6 +131,9 @@
                             <button onclick="openOverlayWindow()" class="btn-action py-3 rounded flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-window-restore"></i> Open Overlay Popup
                             </button>
+                            <button onclick="openPostMatchWindow()" class="btn-action py-3 rounded flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-flag-checkered"></i> Post-Match
+                            </button>
                             <button onclick="refreshData()" class="btn-action py-3 rounded flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-rotate"></i> Refresh Data
                             </button>
@@ -259,6 +262,11 @@
         function openOverlayWindow() {
             if (!activeMatch) return;
             window.open(`/overlay.html?match=${activeMatch._id}`, 'Overlay', 'width=1920,height=1080,menubar=no,toolbar=no');
+        }
+
+        function openPostMatchWindow() {
+            if (!activeMatch) return;
+            window.open(`/post_match.html?match=${activeMatch._id}`, 'PostMatch', 'width=1920,height=1080,menubar=no,toolbar=no');
         }
 
         function refreshData() {
