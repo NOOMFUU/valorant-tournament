@@ -15,6 +15,7 @@ const Tournament = require('../models/Tournament');
 
 // Import Managers
 const BracketManager = require('../managers/bracketManager');
+const queueService = require('../services/queueService');
 
 // --- HELPERS & MIDDLEWARE ---
 const auth = require('../middleware/auth');
@@ -108,6 +109,7 @@ router.put('/matches/:id', auth(['admin']), async (req, res) => {
             const msg = `Match ${match.name} time updated: ${new Date(scheduledTime).toLocaleString()}`;
             if (match.teamA) req.app.get('io').to(match.teamA.toString()).emit('notification', { msg });
             if (match.teamB) req.app.get('io').to(match.teamB.toString()).emit('notification', { msg });
+            await queueService.scheduleMatchJobs(match); // [NEW] Schedule Agenda Jobs
         }
 
         if (match.teamA && match.teamB) {
@@ -473,6 +475,7 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
         if (action === 'accept') {
             match.scheduledTime = match.rescheduleRequest.proposedTime;
             match.checkIn = { teamA: false, teamB: false, windowOpen: false };
+            await queueService.scheduleMatchJobs(match); // [NEW] Update Schedule
         }
         match.rescheduleRequest = { status: 'none' };
         await match.save();
