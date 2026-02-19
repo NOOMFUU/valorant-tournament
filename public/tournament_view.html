@@ -776,7 +776,7 @@
                 const svgId = `bracketSvg-${idx}`;
 
                 html += `
-                    <div class="relative group-bracket flex-shrink-0 mr-24">
+                    <div id="group-${idx}" class="relative group-bracket flex-shrink-0 mb-24">
                         ${sortedGroups.length > 1 ? `<h3 class="font-header text-3xl text-white mb-8 border-l-4 border-[#ff4655] pl-4">${gName}</h3>` : ''}
                         <div class="relative min-w-max pb-10">
                             <svg id="${svgId}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
@@ -792,9 +792,17 @@
                 `;
             });
 
+            let anchorHtml = '';
+            if (sortedGroups.length > 1) {
+                anchorHtml = `<div class="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex gap-2 bg-[#1a1d21]/90 backdrop-blur border border-[#333] p-1.5 rounded-full shadow-2xl">
+                    ${sortedGroups.map((g, i) => `<button onclick="jumpToGroup(${i})" class="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase hover:bg-[#ff4655] hover:text-white transition text-gray-400 tracking-wider">${g}</button>`).join('')}
+                </div>`;
+            }
+
             container.innerHTML = `
+                ${anchorHtml}
                 <div id="bracketViewport" class="bracket-viewport w-full h-full overflow-hidden relative">
-                    <div id="bracketCanvas" class="absolute top-0 left-0 flex gap-20 p-20 origin-top-left transition-transform duration-75 ease-out">
+                    <div id="bracketCanvas" class="absolute top-0 left-0 flex flex-col gap-20 p-20 origin-top-left transition-transform duration-75 ease-out">
                         ${html}
                     </div>
                 </div>`;
@@ -1169,6 +1177,21 @@
                     updateTransform();
                 }
             };
+        }
+
+        function jumpToGroup(index) {
+            const target = document.getElementById(`group-${index}`);
+            if (!target) return;
+            
+            const canvas = document.getElementById('bracketCanvas');
+            canvas.style.transitionDuration = '500ms';
+            
+            scale = 1;
+            translateX = -target.offsetLeft + 80;
+            translateY = -target.offsetTop + 80;
+            
+            updateTransform();
+            setTimeout(() => { canvas.style.transitionDuration = '75ms'; }, 500);
         }
 
         function updateTransform() {
