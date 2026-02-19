@@ -97,7 +97,7 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
         let finalParticipants = [];
 
         // 1. STAGE-TO-STAGE LOGIC
-        if (settings.sourceStageIndex >= 0 && tournament.stages[settings.sourceStageIndex]) {
+        if (settings.sourceStageIndex >= 0 && tournament.stages[settings.sourceStageIndex] && !settings.usePlaceholders) {
             const sourceStage = tournament.stages[settings.sourceStageIndex];
             const sourceMatches = sourceStage.matches;
 
@@ -147,13 +147,18 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
                 finalParticipants = selectedIds.map(id => teamsDb.find(t => t._id.toString() === id.toString())).filter(t => t);
             }
             else {
-                const teamsDb = await Team.find({ _id: { $in: participants } });
+                const teamsDb = await Team.find({ _id: { $in: participants || [] } });
                 finalParticipants = participants.map(id => teamsDb.find(t => t._id.toString() === id)).filter(t => t);
             }
 
         } else {
             const teamsDb = await Team.find({ _id: { $in: participants } });
             finalParticipants = participants.map(id => teamsDb.find(t => t._id.toString() === id)).filter(t => t);
+        }
+
+        // [NEW] If using placeholders, we might pass empty participants but BracketManager handles it
+        if (settings.usePlaceholders) {
+            finalParticipants = []; // BracketManager will generate seeds
         }
 
         if (type === 'triple_elim' && settings.teamCount) {
@@ -193,6 +198,34 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
         console.error(e);
         res.status(500).json({ msg: e.message });
     }
+});
+
+// [NEW] RESOLVE PLACEHOLDERS
+router.post('/tournaments/:id/stages/:stageIndex/resolve', auth(['admin']), async (req, res) => {
+    try {
+        await BracketManager.resolveStagePlaceholders(req.params.id, req.params.stageIndex);
+        req.app.get('io').emit('bracket_update');
+        res.json({ success: true, msg: 'Placeholders resolved based on current standings.' });
+    } catch (e) {
+        res.status(500).json({ msg: e.message });
+    }
+});
+
+// [NEW] UPDATE MATCH PLACEHOLDER (Admin Override)
+router.put('/matches/:id/placeholder', auth(['admin']), async (req, res) => {
+    try {
+        const { side, label, sourceGroupIndex, sourceRank } = req.body; // side = 'teamA' or 'teamB'
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+
+        match[`${side}Placeholder`] = { label, sourceGroupIndex, sourceRank, sourceStageIndex: match[`${side}Placeholder`]?.sourceStageIndex || 0 };
+        // If admin manually sets a placeholder, we should probably clear the actual team if it was already resolved, to force re-resolution or manual set
+        match[side] = null; 
+        
+        await match.save();
+        req.app.get('io').emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
 // ADD MATCH TO STAGE

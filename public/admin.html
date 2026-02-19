@@ -619,17 +619,25 @@
 
                         <!-- Participants Import -->
                         <div class="p-4 bg-[#0f1113] border border-[#2d3139] rounded relative">
-                            <div class="flex flex-col gap-3 mb-4 border-b border-[#333] pb-4">
-                                <label class="text-xs text-[#ff4655] font-bold uppercase">Participants</label>
-                                <div class="flex gap-2">
-                                    <select id="impStage" class="bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none"></select>
-                                    <select id="impType" class="js-imp-type bg-[#1a1d21] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none">
+                            <div class="flex flex-col gap-4 mb-4 border-b border-[#333] pb-4">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-xs text-[#ff4655] font-bold uppercase flex items-center gap-2"><i class="fa-solid fa-users"></i> Participants Management</label>
+                                    <div class="flex gap-2">
+                                        <button onclick="addAllApprovedTeams()" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-300 px-3 py-1.5 rounded font-bold uppercase transition border border-[#333]"><i class="fa-solid fa-plus mr-1"></i> Add All Approved</button>
+                                        <button onclick="shuffleStageSeeds()" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-300 px-3 py-1.5 rounded font-bold uppercase transition border border-[#333]"><i class="fa-solid fa-shuffle mr-1"></i> Shuffle</button>
+                                        <button onclick="clearStageSelection()" class="text-[10px] bg-[#222] hover:bg-red-600 hover:text-white text-gray-300 px-3 py-1.5 rounded font-bold uppercase transition border border-[#333]"><i class="fa-solid fa-trash mr-1"></i> Clear</button>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 items-center bg-[#15171a] p-3 rounded border border-[#333]">
+                                    <span class="text-[10px] font-bold text-gray-500 uppercase px-1">Import From:</span>
+                                    <select id="impStage" class="bg-[#0f1113] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none focus:border-[#ff4655] transition"></select>
+                                    <select id="impType" class="js-imp-type bg-[#0f1113] text-white text-xs border border-[#333] p-2 rounded flex-1 outline-none focus:border-[#ff4655] transition">
                                         <option value="all">All Participants</option>
                                         <option value="top_n">Top N (Standings)</option>
                                         <option value="gsl">GSL Qualified (Top 2)</option>
                                     </select>
-                                    <input type="number" id="impCount" value="4" class="w-16 bg-[#1a1d21] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500" placeholder="N">
-                                    <button data-action="run-import" class="btn-val px-4 py-1 rounded text-[10px] font-bold hover:brightness-110 transition"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
+                                    <input type="number" id="impCount" value="4" class="w-16 bg-[#0f1113] border border-[#333] text-white text-center p-2 rounded text-xs hidden placeholder-gray-500 focus:border-[#ff4655] outline-none" placeholder="N">
+                                    <button data-action="run-import" class="btn-val px-5 py-2 rounded text-[10px] font-bold hover:brightness-110 transition shadow-lg"><i class="fa-solid fa-file-import mr-1"></i> IMPORT</button>
                                 </div>
                             </div>
 
@@ -648,6 +656,36 @@
                         <button data-action="generate-stage" data-loading="Generating..." class="btn-val w-full py-4 rounded font-bold text-sm mt-4 tracking-widest shadow-lg shadow-red-900/20">GENERATE STAGE</button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="editPlaceholderModal" class="modal-content hidden bg-[#1a1d21] w-full max-w-md border border-[#333] rounded-lg shadow-2xl animate-slide-up">
+            <div class="p-5 border-b border-[#333] flex justify-between items-center bg-[#222]">
+                <h3 class="text-base font-header text-white">EDIT PLACEHOLDER</h3>
+                <button data-action="close-modal" class="text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-8 space-y-6">
+                <input type="hidden" id="phMatchId">
+                <input type="hidden" id="phSide">
+                
+                <div class="space-y-2">
+                    <label class="text-xs text-gray-500 font-bold uppercase">Display Label</label>
+                    <input id="phLabel" class="w-full input-dark text-base" placeholder="e.g. Group A #1">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Source Group</label>
+                        <select id="phGroup" class="w-full bg-[#1a1d21] border-b-2 border-[#2d3139] text-white text-sm py-2 outline-none focus:border-[#ff4655]"></select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-gray-500 font-bold uppercase">Source Rank</label>
+                        <select id="phRank" class="w-full bg-[#1a1d21] border-b-2 border-[#2d3139] text-white text-sm py-2 outline-none focus:border-[#ff4655]">
+                            <option value="1">1st Place</option><option value="2">2nd Place</option><option value="3">3rd Place</option><option value="4">4th Place</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="savePlaceholderEdit()" class="btn-val w-full py-3.5 rounded font-bold text-sm mt-2">UPDATE PLACEHOLDER</button>
             </div>
         </div>
 
@@ -1082,7 +1120,11 @@
             localStorage.setItem('currentView', id);
         }
 
-        function getSmartTBD(matchId, slot) {
+        function getSmartTBD(m, slot) {
+            const ph = m[`${slot}Placeholder`];
+            if (ph && ph.label) return `<span class="text-gray-400 text-[10px] uppercase font-bold">${ph.label}</span>`;
+
+            const matchId = m._id;
             const winnerSource = allMatches.find(m => m.nextMatchId === matchId && m.nextMatchSlot === slot);
             if (winnerSource) return `<span class="text-gray-500 text-[10px] uppercase font-bold">WINNER OF</span> <span class="text-[#ff4655]">${winnerSource.name}</span>`;
             const loserSource = allMatches.find(m => m.loserMatchId === matchId && m.loserMatchSlot === slot);
@@ -1190,7 +1232,12 @@
             const renderTeamRow = (team, slot, score, isWinner) => {
                 const teamId = team ? team._id : '';
                 const logo = team ? `<img src="${team.logo || DEFAULT_LOGO}" class="w-5 h-5 rounded object-cover bg-black/50 shrink-0 border border-white/10">` : '<div class="w-5 h-5 rounded bg-white/5 shrink-0 border border-white/5 flex items-center justify-center"><i class="fa-solid fa-question text-[8px] text-gray-600"></i></div>';
-                const nameHtml = team ? `<span class="truncate">${team.shortName}</span>` : getSmartTBD(m._id, slot);
+                
+                let nameHtml = team ? `<span class="truncate">${team.shortName}</span>` : getSmartTBD(m, slot);
+                if (!team) {
+                    nameHtml = `<div class="flex items-center gap-2 truncate">${nameHtml} <button onclick="event.stopPropagation(); openEditPlaceholderModal('${m._id}', '${slot}')" class="opacity-0 group-hover/team:opacity-100 text-[10px] text-gray-500 hover:text-[#ff4655] transition"><i class="fa-solid fa-pen"></i></button></div>`;
+                }
+
                 const scoreColor = isWinner ? 'text-[#ff4655]' : '';
                 const textColor = isWinner ? 'text-white' : 'text-gray-400';
                 
@@ -1203,8 +1250,8 @@
                     onmouseenter="highlightTeam('${teamId}')" 
                     onmouseleave="resetHighlight()"
                     class="flex justify-between items-center text-sm font-medium ${textColor} transition-colors p-1.5 -mx-1.5 rounded hover:bg-white/5 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 group/team">
-                    <div class="flex items-center gap-2 overflow-hidden pointer-events-none">
-                        <i class="fa-solid fa-grip-vertical text-gray-700 group-hover/team:text-gray-500 text-[10px] mr-1"></i>
+                    <div class="flex items-center gap-2 overflow-hidden pointer-events-auto">
+                        <i class="fa-solid fa-grip-vertical text-gray-700 group-hover/team:text-gray-500 text-[10px] mr-1 pointer-events-none"></i>
                         ${logo}
                         ${nameHtml}
                     </div>
@@ -1380,6 +1427,7 @@
                             ${swissBtn}
                             ${settingsBtn}
                             ${manageTeamsBtn}
+                            <button onclick="resolveStage('${t._id}', ${activeStageIndex})" class="text-yellow-500 hover:text-yellow-400 text-xs font-bold uppercase ml-4 border border-[#333] px-3 py-1 rounded hover:bg-[#333] transition"><i class="fa-solid fa-sync mr-2"></i> Resolve TBD</button>
                             <button onclick="exportStageCSV('${t._id}', ${activeStageIndex})" class="text-green-500 hover:text-green-400 text-xs font-bold uppercase ml-4"><i class="fa-solid fa-file-csv mr-2"></i> Export CSV</button>
                         </div>
                         <button onclick="deleteStage('${t._id}', ${activeStageIndex})" class="text-red-500 hover:text-red-400 text-xs font-bold uppercase"><i class="fa-solid fa-trash mr-2"></i> Delete Stage</button>
@@ -2379,6 +2427,17 @@
             renderStageLists();
             showToast(`Imported ${movedCount} teams`);
             saveStageState();
+        }
+
+        function addAllApprovedTeams() {
+            stageSelected = [...stageSelected, ...stagePool];
+            stagePool = [];
+            renderStageLists(); saveStageState(); showToast('All approved teams added');
+        }
+
+        function shuffleStageSeeds() {
+            for (let i = stageSelected.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [stageSelected[i], stageSelected[j]] = [stageSelected[j], stageSelected[i]]; }
+            renderStageLists(); saveStageState(); showToast('Seeds Shuffled');
         }
 
         function saveStageState() {

@@ -20,6 +20,20 @@ const MatchSchema = new mongoose.Schema({
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     
+    // [NEW] Placeholder Logic for TBD Matches
+    teamAPlaceholder: {
+        label: String, // e.g., "Group A #1"
+        sourceStageIndex: Number,
+        sourceGroupIndex: Number,
+        sourceRank: Number // 1 = 1st place, 2 = 2nd place
+    },
+    teamBPlaceholder: {
+        label: String,
+        sourceStageIndex: Number,
+        sourceGroupIndex: Number,
+        sourceRank: Number
+    },
+
     // Snapshot of rosters at match time
     teamARoster: [{ name: String, tag: String, role: String }],
     teamBRoster: [{ name: String, tag: String, role: String }],
