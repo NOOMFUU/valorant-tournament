@@ -272,6 +272,37 @@ router.put('/matches/:id/submission/edit', auth(['admin']), async (req, res) => 
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// ADMIN UPDATE SCORE & PROOF
+router.post('/matches/:id/admin/update-score', auth(['admin']), upload.single('proofImage'), async (req, res) => {
+    try {
+        const { mapIndex, teamAScore, teamBScore } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+
+        const idx = parseInt(mapIndex);
+        let targetArray;
+        if (match.status === 'finished' && match.scores && match.scores.length > 0) {
+            targetArray = match.scores;
+        } else {
+            targetArray = match.scoreSubmission.tempScores;
+        }
+
+        if (!targetArray || !targetArray[idx]) return res.status(404).json({ msg: 'Score entry not found' });
+
+        if (teamAScore !== undefined) targetArray[idx].teamAScore = teamAScore;
+        if (teamBScore !== undefined) targetArray[idx].teamBScore = teamBScore;
+        if (req.file) targetArray[idx].proofImage = getFileUrl(req.file);
+
+        if (match.status === 'finished') match.markModified('scores');
+        else match.markModified('scoreSubmission.tempScores');
+
+        await match.save();
+        await logAdminAction(req, 'UPDATE_SCORE_PROOF', `Match ${match.matchNumber}`, { mapIndex, teamAScore, teamBScore, hasFile: !!req.file });
+        req.app.get('io').emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 // APPROVE Score
 router.post('/matches/:id/approve-score', auth(['admin']), async (req, res) => {
     try {

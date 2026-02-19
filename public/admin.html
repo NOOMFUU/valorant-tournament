@@ -512,6 +512,7 @@
                         <button data-action="open-veto-page" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase">Open Veto Interface</button>
                         <button data-action="open-overlay-page" class="btn-val flex-1 py-3.5 rounded text-xs font-bold uppercase bg-blue-600 hover:bg-blue-500">Open Overlay</button>
                     </div>
+                    <button data-action="inspect-active-match" class="w-full py-3 border border-white/10 hover:bg-white/5 text-gray-300 rounded text-xs font-bold uppercase transition mt-3"><i class="fa-solid fa-magnifying-glass mr-2"></i> Inspect Proofs & Details</button>
                 </div>
                 <div id="view-tab-scoreboard" class="hidden space-y-6">
                     <div class="flex justify-between items-center"><label class="text-xs text-[#ff4655] font-bold uppercase">Manual Scores</label><select id="emFormat" class="js-em-format bg-[#0f1113] text-white text-xs p-2 border border-[#333] rounded"><option value="BO1">BO1</option><option value="BO3">BO3</option><option value="BO5">BO5</option></select></div>
@@ -932,6 +933,7 @@
                         case 'save-match-edit': return saveMatchEdit();
                         case 'select-format': return selectFormat(trigger.dataset.format);
                         case 'run-import': return runImport();
+                        case 'inspect-active-match': return openInspectModal(activeMatchId);
                         case 'open-match-context-menu':
                             event.stopPropagation();
                             return openMatchContextMenu(event, trigger.dataset.id);
@@ -1847,30 +1849,40 @@
             const m = allMatches.find(x => x._id === matchId);
             if(!m) return;
 
-            document.getElementById('inspectMatchTitle').innerText = `${m.name} • ${new Date(m.scheduledTime).toLocaleString()}`;
+            document.getElementById('inspectMatchTitle').innerHTML = `
+                <span class="select-text">${m.name} • ${new Date(m.scheduledTime).toLocaleString()}</span>
+                <button onclick="navigator.clipboard.writeText('${m._id}'); showToast('Match ID Copied')" class="ml-3 px-2 py-0.5 bg-[#333] hover:bg-white hover:text-black text-gray-400 rounded text-[10px] font-bold uppercase transition border border-gray-600" title="Copy ID: ${m._id}">
+                    <i class="fa-regular fa-copy mr-1"></i> Copy ID
+                </button>
+                <button onclick="window.open('/veto.html?match=${m._id}', '_blank')" class="ml-2 px-2 py-0.5 bg-[#333] hover:bg-white hover:text-black text-gray-400 rounded text-[10px] font-bold uppercase transition border border-gray-600" title="Open Veto Page">
+                    <i class="fa-solid fa-list-check mr-1"></i> Veto
+                </button>
+            `;
             
             // --- LEFT COL: MAPS & PROOFS ---
             const leftCol = document.getElementById('inspectLeftCol');
-            const scores = m.scoreSubmission.tempScores || [];
+            const scores = (m.scores && m.scores.length > 0) ? m.scores : (m.scoreSubmission.tempScores || []);
             
             leftCol.innerHTML = scores.map((s, i) => {
-                const winA = parseInt(s.teamAScore) > parseInt(s.teamBScore);
-                const winB = parseInt(s.teamBScore) > parseInt(s.teamAScore);
                 const proofImg = s.proofImage || '';
                 
                 return `
                 <div class="mb-6 bg-[#1a1d21] border border-[#333] rounded-lg overflow-hidden">
                     <div class="px-4 py-3 bg-[#222] border-b border-[#333] flex justify-between items-center">
                         <span class="text-sm font-bold text-white uppercase tracking-wider"><i class="fa-solid fa-map mr-2 text-gray-500"></i> ${s.mapName}</span>
-                        <div class="flex items-center gap-3 font-mono font-bold text-lg">
-                            <span class="${winA ? 'text-green-400' : 'text-gray-400'}">${m.teamA.shortName} ${s.teamAScore}</span>
+                        <div class="flex items-center gap-2">
+                             <span class="text-[10px] text-gray-500 font-bold mr-1">${m.teamA.shortName}</span>
+                             <input type="number" id="insp_sA_${i}" value="${s.teamAScore}" class="w-12 bg-[#0f1113] border border-[#333] text-center text-white font-bold text-sm rounded focus:border-[#ff4655] outline-none">
                             <span class="text-gray-600">:</span>
-                            <span class="${winB ? 'text-green-400' : 'text-gray-400'}">${s.teamBScore} ${m.teamB.shortName}</span>
+                             <input type="number" id="insp_sB_${i}" value="${s.teamBScore}" class="w-12 bg-[#0f1113] border border-[#333] text-center text-white font-bold text-sm rounded focus:border-[#ff4655] outline-none">
+                             <span class="text-[10px] text-gray-500 font-bold ml-1">${m.teamB.shortName}</span>
+                             <button onclick="saveInspectEntry('${m._id}', ${i})" class="ml-3 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-white border border-blue-600/50 px-2 py-1 rounded text-xs transition" title="Save Score"><i class="fa-solid fa-floppy-disk"></i></button>
+                             <button onclick="resetInspectScore('${m._id}', ${i})" class="ml-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/50 px-2 py-1 rounded text-xs transition" title="Reset Score"><i class="fa-solid fa-rotate-left"></i></button>
                         </div>
                     </div>
-                    <div class="p-4 bg-black/40 flex justify-center">
+                    <div class="p-4 bg-black/40 flex flex-col items-center justify-center gap-3">
                         ${proofImg 
-                            ? `<div class="relative group cursor-zoom-in" onclick="viewImage('${proofImg}', '${s.mapName}', '${m.teamA.shortName}', '${s.teamAScore}', '${m.teamB.shortName}', '${s.teamBScore}')">
+                            ? `<div class="relative group cursor-zoom-in max-w-full" onclick="viewImage('${proofImg}', '${s.mapName}', '${m.teamA.shortName}', document.getElementById('insp_sA_${i}').value, '${m.teamB.shortName}', document.getElementById('insp_sB_${i}').value)">
                                 <img src="${proofImg}" class="max-h-74 rounded border border-white/10 shadow-lg transition group-hover:brightness-110">
                                 <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/50 backdrop-blur-sm rounded">
                                     <span class="text-white font-bold uppercase text-xs tracking-widest"><i class="fa-solid fa-expand mr-2"></i> Zoom In</span>
@@ -1878,6 +1890,13 @@
                                </div>` 
                             : `<div class="h-32 w-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-[#333] rounded"><i class="fa-solid fa-image-slash text-2xl mb-2"></i><span class="text-xs uppercase font-bold">No Proof Image</span></div>`
                         }
+                        <div class="w-full flex items-center gap-2 bg-[#15171a] p-2 rounded border border-[#333]">
+                            <label class="flex-1 cursor-pointer">
+                                <span class="text-[10px] text-gray-400 hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-upload"></i> <span id="insp_file_label_${i}">Upload New Proof</span></span>
+                                <input type="file" id="insp_file_${i}" class="hidden" accept="image/*" onchange="document.getElementById('insp_file_label_${i}').innerText = this.files[0].name; document.getElementById('insp_file_label_${i}').classList.add('text-[#ff4655]')">
+                            </label>
+                            <button onclick="saveInspectEntry('${m._id}', ${i})" class="text-[10px] bg-[#222] hover:bg-white hover:text-black text-gray-300 px-2 py-1 rounded font-bold uppercase transition">Update</button>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
@@ -1919,16 +1938,47 @@
 
             // --- ACTIONS ---
             const actions = document.getElementById('inspectActions');
-            actions.innerHTML = `
-                <button onclick="rejectScore('${m._id}')" class="px-6 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 rounded font-bold text-sm uppercase transition flex items-center gap-2">
-                    <i class="fa-solid fa-xmark"></i> Reject
-                </button>
-                <button onclick="approveScore('${m._id}')" class="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold text-sm uppercase transition shadow-lg shadow-green-900/20 flex items-center gap-2">
-                    <i class="fa-solid fa-check"></i> Approve Result
-                </button>
-            `;
+            if (m.status === 'pending_approval') {
+                actions.classList.remove('hidden');
+                actions.innerHTML = `
+                    <button onclick="rejectScore('${m._id}')" class="px-6 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 rounded font-bold text-sm uppercase transition flex items-center gap-2">
+                        <i class="fa-solid fa-xmark"></i> Reject
+                    </button>
+                    <button onclick="approveScore('${m._id}')" class="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold text-sm uppercase transition shadow-lg shadow-green-900/20 flex items-center gap-2">
+                        <i class="fa-solid fa-check"></i> Approve Result
+                    </button>
+                `;
+            } else {
+                actions.classList.add('hidden');
+                actions.innerHTML = '';
+            }
 
             openModal('inspectScoreModal');
+        }
+
+        async function saveInspectEntry(matchId, mapIndex) {
+            const sA = document.getElementById(`insp_sA_${mapIndex}`).value;
+            const sB = document.getElementById(`insp_sB_${mapIndex}`).value;
+            const fileInput = document.getElementById(`insp_file_${mapIndex}`);
+            const file = fileInput.files[0];
+            const fd = new FormData();
+            fd.append('mapIndex', mapIndex); fd.append('teamAScore', sA); fd.append('teamBScore', sB);
+            if (file) fd.append('proofImage', file);
+            const res = await fetch(`${API_BASE}/api/matches/${matchId}/admin/update-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
+            if (res.ok) {
+                showToast('Entry Updated');
+                const mRes = await fetch(`${API_BASE}/api/matches/${matchId}`);
+                const m = await mRes.json();
+                const idx = allMatches.findIndex(x => x._id === matchId); if(idx !== -1) allMatches[idx] = m;
+                openInspectModal(matchId);
+            } else showToast('Update Failed', 'error');
+        }
+
+        function resetInspectScore(matchId, mapIndex) {
+            if(!confirm("Reset score for this map to 0-0?")) return;
+            document.getElementById(`insp_sA_${mapIndex}`).value = 0;
+            document.getElementById(`insp_sB_${mapIndex}`).value = 0;
+            saveInspectEntry(matchId, mapIndex);
         }
 
         function renderMemberRow(tid, m) {
