@@ -20,7 +20,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
 
         /* Bracket Specifics */
-        .bracket-viewport { cursor: grab; active: cursor: grabbing; background-image: radial-gradient(#2d3139 1px, transparent 1px); background-size: 30px 30px; }
+        .bracket-viewport { cursor: grab; background-image: radial-gradient(#2d3139 1px, transparent 1px); background-size: 30px 30px; }
         .bracket-viewport:active { cursor: grabbing; }
         
         .match-node {
@@ -383,11 +383,9 @@
 
             if (stage.type === 'round_robin' || stage.type === 'swiss' || stage.type === 'cross_group') {
                 if (stage.type === 'cross_group') {
-                    container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
                     renderCrossGroupStage(container, stage, stageMatches);
                     return;
                 }
-                container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
                 renderGroupStage(container, stage, stageMatches);
             } else if (stage.type === 'gsl') {
                 renderGSLStage(container, stage, stageMatches);
@@ -481,7 +479,7 @@
                     </div>`;
             });
 
-            container.innerHTML = `
+            container.innerHTML = `<div class="w-full h-full overflow-y-auto custom-scroll p-8">
                 <div class="max-w-7xl mx-auto">
                     <div class="mb-16 relative bg-[#15171a]/50 border border-white/5 rounded-xl p-8 backdrop-blur-sm shadow-xl animate-enter">
                         <div class="absolute top-0 left-0 w-1 h-full bg-[#ff4655] rounded-l-xl"></div>
@@ -494,7 +492,7 @@
                             <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-[#ff4655]"></i> Schedule</h4>
                             <div class="space-y-2">${matchesHtml}</div>
                         </div>
-                    </div>
+                    </div></div>
                 </div>`;
         }
 
@@ -647,12 +645,11 @@
                 `;
             });
 
-            container.innerHTML = `<div class="max-w-6xl mx-auto">${html}</div>`;
+            container.innerHTML = `<div class="w-full h-full overflow-y-auto custom-scroll p-8"><div class="max-w-6xl mx-auto">${html}</div></div>`;
         }
 
         // --- GSL STAGE VIEW ---
         function renderGSLStage(container, stage, matches) {
-            container.innerHTML = '<div class="w-full h-full overflow-auto custom-scroll p-8">';
             const groups = {};
             const getGroupName = (name) => {
                 const match = name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
@@ -715,7 +712,7 @@
                 `;
             });
 
-            container.innerHTML += `<div class="max-w-7xl mx-auto">${html}</div></div>`;
+            container.innerHTML = `<div class="w-full h-full overflow-auto custom-scroll p-8"><div class="max-w-7xl mx-auto">${html}</div></div>`;
         }
 
         function filterGroups(group) {
@@ -779,7 +776,7 @@
                 const svgId = `bracketSvg-${idx}`;
 
                 html += `
-                    <div class="relative group-bracket flex-shrink-0">
+                    <div class="relative group-bracket flex-shrink-0 mr-24">
                         ${sortedGroups.length > 1 ? `<h3 class="font-header text-3xl text-white mb-8 border-l-4 border-[#ff4655] pl-4">${gName}</h3>` : ''}
                         <div class="relative min-w-max pb-10">
                             <svg id="${svgId}" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
@@ -833,6 +830,10 @@
             const sB = calculateScore(m, 'B');
             const winA = m.winner && (m.winner === m.teamA?._id || m.winner._id === m.teamA?._id);
             const winB = m.winner && (m.winner === m.teamB?._id || m.winner._id === m.teamB?._id);
+            
+            let statusClass = 'upcoming';
+            if (isLive) statusClass = 'live';
+            else if (m.status === 'finished') statusClass = 'finished';
 
             const nameA = m.teamA ? m.teamA.shortName : getSourceText(m._id, 'teamA');
             const nameB = m.teamB ? m.teamB.shortName : getSourceText(m._id, 'teamB');
@@ -841,20 +842,20 @@
             const idB = m.teamB ? m.teamB._id : '';
 
             return `
-                <div class="match-node ${isLive ? 'live' : ''} cursor-pointer group" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
+                <div class="match-node ${statusClass} cursor-pointer group" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
                     <div class="flex justify-between items-center px-3 py-2 bg-[#15171a] border-b border-[#2d3139] text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                         <span>${isLive ? '<span class="text-[#ff4655] font-bold animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD')}</span>
                         <span>${m.format || 'BO3'}</span>
                     </div>
                     <div class="p-2 space-y-1">
-                        <div class="flex justify-between items-center p-2 rounded ${winA ? 'bg-white/10' : ''} transition" onmouseenter="highlightTeam('${idA}')" onmouseleave="resetHighlight()">
+                        <div class="flex justify-between items-center p-2 rounded ${winA ? 'bg-white/5' : ''} transition" onmouseenter="highlightTeam('${idA}')" onmouseleave="resetHighlight()">
                             <div class="flex items-center gap-3 overflow-hidden">
                                 <img src="${m.teamA?.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain bg-black/30 rounded p-0.5">
                                 <span class="text-sm font-bold truncate ${winA ? 'text-white' : 'text-gray-400'} font-header tracking-wide" title="${nameA}">${nameA}</span>
                             </div>
                             <span class="font-mono text-lg font-bold ${winA ? 'text-[#ff4655]' : 'text-gray-600'}">${sA}</span>
                         </div>
-                        <div class="flex justify-between items-center p-2 rounded ${winB ? 'bg-white/10' : ''} transition" onmouseenter="highlightTeam('${idB}')" onmouseleave="resetHighlight()">
+                        <div class="flex justify-between items-center p-2 rounded ${winB ? 'bg-white/5' : ''} transition" onmouseenter="highlightTeam('${idB}')" onmouseleave="resetHighlight()">
                             <div class="flex items-center gap-3 overflow-hidden">
                                 <img src="${m.teamB?.logo || 'https://via.placeholder.com/30'}" class="w-6 h-6 object-contain bg-black/30 rounded p-0.5">
                                 <span class="text-sm font-bold truncate ${winB ? 'text-white' : 'text-gray-400'} font-header tracking-wide" title="${nameB}">${nameB}</span>
@@ -1008,7 +1009,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="p-6 bg-[#1a1d21] border-t border-[#333] grid grid-cols-1 gap-2">
+                <div class="p-6 bg-[#15171a] border-t border-[#333] grid grid-cols-1 gap-2 max-h-[40vh] overflow-y-auto custom-scroll">
                      ${mapsList.map((s,i) => `<div class="bg-black/20 p-3 flex justify-between items-center border-l-2 border-[#333]"><span class="text-xs text-gray-500 uppercase tracking-widest">MAP ${i+1}: ${s.mapName || 'VETO'}</span><div class="font-header text-white text-xl"><span class="${parseInt(s.teamAScore) > parseInt(s.teamBScore) ? 'text-[#ff4655]' : ''}">${s.teamAScore}</span><span class="px-2 text-gray-600">:</span><span class="${parseInt(s.teamBScore) > parseInt(s.teamAScore) ? 'text-[#ff4655]' : ''}">${s.teamBScore}</span></div></div>`).join('')}
                      ${mapsList.length === 0 ? '<div class="text-center text-gray-600 text-xs italic py-4">No map data available</div>' : ''}
                 </div>
@@ -1122,8 +1123,18 @@
                 panning = true;
             };
 
+            // Touch Support
+            viewport.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    panning = true;
+                    startX = e.touches[0].clientX - translateX;
+                    startY = e.touches[0].clientY - translateY;
+                }
+            }, { passive: false });
+
             viewport.onmouseup = function (e) { panning = false; };
             viewport.onmouseleave = function (e) { panning = false; };
+            viewport.addEventListener('touchend', () => { panning = false; });
 
             viewport.onmousemove = function (e) {
                 e.preventDefault();
@@ -1133,18 +1144,28 @@
                 updateTransform();
             };
 
+            viewport.addEventListener('touchmove', (e) => {
+                if (panning && e.touches.length === 1) {
+                    e.preventDefault();
+                    translateX = e.touches[0].clientX - startX;
+                    translateY = e.touches[0].clientY - startY;
+                    updateTransform();
+                }
+            }, { passive: false });
+
             viewport.onwheel = function (e) {
                 e.preventDefault();
-                const xs = (e.clientX - translateX) / scale;
-                const ys = (e.clientY - translateY) / scale;
+                const rect = viewport.getBoundingClientRect();
+                const xs = (e.clientX - rect.left - translateX) / scale;
+                const ys = (e.clientY - rect.top - translateY) / scale;
                 const delta = -Math.sign(e.deltaY) * ZOOM_SPEED;
                 
                 const oldScale = scale;
                 scale = Math.min(Math.max(0.2, scale + delta), 3);
                 
                 if (oldScale !== scale) {
-                    translateX = e.clientX - xs * scale;
-                    translateY = e.clientY - ys * scale;
+                    translateX = e.clientX - rect.left - xs * scale;
+                    translateY = e.clientY - rect.top - ys * scale;
                     updateTransform();
                 }
             };
