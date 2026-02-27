@@ -54,7 +54,7 @@
         path.connector {
             fill: none;
             stroke: #444;
-            stroke-width: 2;
+            stroke-width: 3;
             opacity: 0.6;
         }
         path.connector.highlight { stroke: #ff4655; opacity: 1; stroke-width: 4; filter: drop-shadow(0 0 5px #ff4655); }
@@ -79,8 +79,8 @@
 
         /* Highlight Styles */
         .match-node.dimmed { opacity: 0.3; }
-        .match-node.highlight-team { opacity: 1; border-color: #ff4655; box-shadow: 0 0 25px rgba(255, 70, 85, 0.3); z-index: 20; }
-        path.connector.dimmed { opacity: 0.1; }
+        .match-node.highlight-team { opacity: 1; border-color: #ff4655; box-shadow: 0 0 30px rgba(255, 70, 85, 0.4); z-index: 20; transform: scale(1.02); }
+        path.connector.dimmed { opacity: 0.1; transition: opacity 0.3s; }
         path.connector.highlight-path { stroke: #ff4655; opacity: 1; stroke-width: 3; }
 
         /* Modal Animation */
@@ -850,7 +850,7 @@
             const idB = m.teamB ? m.teamB._id : '';
 
             return `
-                <div class="match-node ${statusClass} cursor-pointer group" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')">
+                <div class="match-node ${statusClass} cursor-pointer group" id="match-${m._id}" data-next="${m.nextMatchId||''}" data-loser="${m.loserMatchId||''}" onclick="openMatchDetail('${m._id}')" onmouseenter="highlightMatchPath('${m._id}')" onmouseleave="resetHighlight()">
                     <div class="flex justify-between items-center px-3 py-2 bg-[#15171a] border-b border-[#2d3139] text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                         <span>${isLive ? '<span class="text-[#ff4655] font-bold animate-pulse">LIVE</span>' : (m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'TBD')}</span>
                         <span>${m.format || 'BO3'}</span>
@@ -927,6 +927,37 @@
 
         function shortenName(name) {
             return name.replace(/Upper Bracket/g, 'UB').replace(/Lower Bracket/g, 'LB').replace(/Round /g, 'R').replace(/Match /g, 'M').replace(/Grand Final/g, 'GF');
+        }
+
+        // [NEW] Enhanced Path Highlighting
+        function highlightMatchPath(matchId) {
+            document.querySelectorAll('.match-node').forEach(el => el.classList.add('dimmed'));
+            document.querySelectorAll('path.connector').forEach(el => el.classList.add('dimmed'));
+
+            const highlightRecursive = (mid, direction) => {
+                const el = document.getElementById(`match-${mid}`);
+                if (!el) return;
+                el.classList.remove('dimmed');
+                el.classList.add('highlight-team');
+
+                // Highlight lines connected to this match
+                document.querySelectorAll(`path[data-source="${mid}"]`).forEach(p => {
+                    p.classList.remove('dimmed');
+                    p.classList.add('highlight-path');
+                    if (direction === 'forward') highlightRecursive(p.getAttribute('data-target'), 'forward');
+                });
+                
+                if (direction === 'backward') {
+                    document.querySelectorAll(`path[data-target="${mid}"]`).forEach(p => {
+                        p.classList.remove('dimmed');
+                        p.classList.add('highlight-path');
+                        highlightRecursive(p.getAttribute('data-source'), 'backward');
+                    });
+                }
+            };
+
+            highlightRecursive(matchId, 'forward');
+            highlightRecursive(matchId, 'backward');
         }
 
         function highlightTeam(teamId) {
