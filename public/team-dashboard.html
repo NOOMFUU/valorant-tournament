@@ -758,7 +758,15 @@
                 if (m.scoreSubmission.status === 'rejected') {
                     rejectMsg = `<div class="mt-3 p-2 bg-red-500/10 border-l-2 border-red-500 text-[10px] text-gray-300 font-mono"><strong>REJECTED:</strong> ${m.scoreSubmission.rejectReason || 'Check details'}</div>`;
                     actionBtn = `<button onclick="openScoreModal('${m._id}')" class="w-full mt-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs font-bold font-header tracking-wide transition">FIX & RESUBMIT</button>`;
-                } else actionBtn = `<a href="/veto.html?match=${m._id}" class="w-full block bg-[#1fa474]/10 hover:bg-[#1fa474] text-[#1fa474] hover:text-white border border-[#1fa474]/30 px-4 py-2 text-xs font-bold font-header tracking-wider transition text-center mb-1">ENTER LOBBY</a><div class="w-full mt-2 text-center text-[10px] text-yellow-500 font-mono py-2 border border-dashed border-yellow-500/30 uppercase bg-yellow-500/5">Awaiting Verification</div>`;
+                } else {
+                    // Allow verification by opponent
+                    actionBtn = `
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button onclick="verifyScore('${m._id}')" class="bg-green-600 hover:bg-green-500 text-white py-2 rounded text-[10px] font-bold uppercase transition">CONFIRM</button>
+                        <button onclick="openScoreModal('${m._id}')" class="bg-[#1a1d21] border border-[#333] hover:bg-[#333] text-gray-300 py-2 rounded text-[10px] font-bold uppercase transition">VIEW</button>
+                    </div>
+                    <div class="text-[9px] text-center text-gray-500 mt-1">Verify Opponent's Score</div>`;
+                }
             } else {
                 statusBadge = `<span class="text-gray-400 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest border border-white/5 rounded-sm">UPCOMING</span>`;
 
@@ -1103,7 +1111,7 @@
 
                         <div class="flex items-center gap-4 w-full md:w-auto justify-end">
                             <img src="${opp ? (opp.logo || 'https://via.placeholder.com/40') : 'https://via.placeholder.com/40'}" class="w-10 h-10 object-contain opacity-60 grayscale group-hover:grayscale-0 transition">
-                            <button onclick="openMatchStats('${m._id}')" class="btn-secondary px-4 py-2 text-[10px] border-white/20 hover:bg-white hover:text-black">STATS</button>
+                            <div class="flex flex-col gap-1"><button onclick="openMatchStats('${m._id}')" class="btn-secondary px-4 py-1 text-[10px] border-white/20 hover:bg-white hover:text-black">STATS</button><button onclick="requestReview('${m._id}')" class="text-[9px] text-red-500 hover:text-red-400 underline">REPORT</button></div>
                         </div>
                     </div>
                     ${mapScoresHtml}
@@ -1311,6 +1319,19 @@
             fd.append('scores', JSON.stringify(scores));
             const res = await fetch(`${API_BASE}/api/matches/${currentMatchId}/submit-score`, { method: 'POST', headers: { 'Authorization': token }, body: fd });
             if (res.ok) { closeModal('scoreModal'); showToast('Score Data Transmitted'); loadDashboardData(); }
+        }
+
+        async function verifyScore(mid) {
+            if(!confirm("Confirm that the reported score is correct? This will finalize the match.")) return;
+            const res = await fetch(`${API_BASE}/api/matches/${mid}/verify-score`, { method: 'POST', headers: { 'Authorization': token } });
+            if (res.ok) { showToast('Match Finalized'); loadDashboardData(); }
+            else showToast('Error verifying score', 'error');
+        }
+
+        async function requestReview(mid) {
+            if(!confirm("Request Admin Review for this match?")) return;
+            const res = await fetch(`${API_BASE}/api/matches/${mid}/request-review`, { method: 'POST', headers: { 'Authorization': token } });
+            if (res.ok) showToast('Admin Notified');
         }
 
         function openForfeitModal(mid) { currentMatchId = mid; document.getElementById('forfeitModal').classList.remove('hidden'); document.getElementById('forfeitModal').classList.add('flex'); }

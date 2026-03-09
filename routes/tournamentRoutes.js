@@ -359,4 +359,46 @@ router.delete('/tournaments/:id', auth(['admin']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
+// [NEW] TEAM VERIFY SCORE
+router.post('/matches/:id/verify-score', auth(['team']), async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        if (match.status !== 'pending_approval') return res.status(400).json({ msg: 'Match not pending approval' });
+
+        // Auto-approve logic
+        match.status = 'finished';
+        match.scores = match.scoreSubmission.tempScores;
+        
+        let winsA = 0, winsB = 0;
+        match.scores.forEach(s => {
+            if (parseInt(s.teamAScore) > parseInt(s.teamBScore)) winsA++;
+            else if (parseInt(s.teamBScore) > parseInt(s.teamAScore)) winsB++;
+        });
+
+        if (winsA > winsB) match.winner = match.teamA;
+        else match.winner = match.teamB;
+
+        await match.save();
+        
+        // Update Bracket Progression
+        await BracketManager.updateMatch(match);
+
+        req.app.get('io').emit('match_update', match);
+        req.app.get('io').emit('bracket_update');
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// [NEW] REQUEST REVIEW
+router.post('/matches/:id/request-review', auth(['team']), async (req, res) => {
+    try {
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        // Logic to flag match for admin review (could add a flag to schema or just notify)
+        req.app.get('io').emit('notification', { msg: `Review Requested for Match #${match.matchNumber}`, type: 'warning' });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
 module.exports = router;
