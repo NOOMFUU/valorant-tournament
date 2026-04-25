@@ -8,6 +8,10 @@ const MemberSchema = new mongoose.Schema({
     discordName: { type: String, default: "" }, 
     discordId: { type: String, default: "" },
     status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'pending' },
+    // [NEW] API Validated Info
+    puuid: { type: String, default: "" },
+    accountLevel: { type: Number, default: 0 },
+    playerCard: { type: String, default: "" },
     pendingUpdate: {
         name: String,
         tag: String

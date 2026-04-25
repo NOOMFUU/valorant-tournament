@@ -19,6 +19,8 @@ const queueService = require('../services/queueService');
 
 // --- HELPERS & MIDDLEWARE ---
 const auth = require('../middleware/auth');
+const validate = require('../middleware/validate');
+const { swapTeamsSchema, validateScoreSchema } = require('../utils/schemas');
 const { upload, getFileUrl } = require('../middleware/upload');
 const { logAdminAction } = require('../utils/helpers');
 
@@ -132,7 +134,7 @@ router.put('/matches/:id', auth(['admin']), async (req, res) => {
 });
 
 // SWAP Teams
-router.post('/matches/swap-teams', auth(['admin']), async (req, res) => {
+router.post('/matches/swap-teams', auth(['admin']), validate(swapTeamsSchema), async (req, res) => {
     try {
         const { match1Id, slot1, match2Id, slot2 } = req.body;
         let m1 = await Match.findById(match1Id);
@@ -273,7 +275,7 @@ router.put('/matches/:id/submission/edit', auth(['admin']), async (req, res) => 
 });
 
 // ADMIN UPDATE SCORE & PROOF
-router.post('/matches/:id/admin/update-score', auth(['admin']), upload.single('proofImage'), async (req, res) => {
+router.post('/matches/:id/admin/update-score', auth(['admin']), upload.single('proofImage'), validate(validateScoreSchema), async (req, res) => {
     try {
         const { mapIndex, teamAScore, teamBScore } = req.body;
         const match = await Match.findById(req.params.id);

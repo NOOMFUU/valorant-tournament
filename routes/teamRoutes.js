@@ -14,15 +14,18 @@ const Team = require('../models/Team');
 
 // --- MIDDLEWARE & HELPERS ---
 const auth = require('../middleware/auth');
+const validate = require('../middleware/validate');
+const { registerSchema, loginSchema } = require('../utils/schemas');
 const { upload, getFileUrl } = require('../middleware/upload');
 const { logAdminAction, sendDiscordLog } = require('../utils/helpers');
+const { verifyRiotAccount } = require('../utils/riotApi');
 
 // --- ROUTES ---
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { msg: "Too many login attempts" } });
 
 // Login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { username, password, role } = req.body;
         const cleanUsername = username.toLowerCase().trim();
@@ -39,7 +42,7 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // Register
-router.post('/register', authLimiter, upload.single('logo'), async (req, res) => {
+router.post('/register', authLimiter, upload.single('logo'), validate(registerSchema), async (req, res) => {
     try {
         const { username, name, shortName, password } = req.body;
         const cleanUsername = username.toLowerCase().trim();
@@ -125,29 +128,51 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
         const newMembers = req.body.members;
-        if (!team.rosterLocked) {
-            team.members = newMembers.map(m => ({ ...m, status: 'approved', pendingUpdate: null }));
-            team.rosterLocked = true;
-            await team.save();
-            return res.json({ success: true, msg: 'Roster initialized.' });
+        
+        const processedMembers = [];
+        // [NEW] API Verification Loop
+        for (const newM of newMembers) {
+            // Find existing member by ID or Name+Tag
+            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
+            
+            let status = 'pending';
+            let puuid = oldM ? oldM.puuid : '';
+            let accountLevel = oldM ? oldM.accountLevel : 0;
+            let playerCard = oldM ? oldM.playerCard : '';
+
+            // Check if name or tag changed, or if it's a new member (Require Riot API Check)
+            const needsVerification = !oldM || oldM.name !== newM.name || oldM.tag !== newM.tag || !puuid;
+
+            if (needsVerification) {
+                try {
+                    const riotData = await verifyRiotAccount(newM.name, newM.tag);
+                    if (!riotData) {
+                        return res.status(400).json({ msg: `Player not found in Valorant Database: ${newM.name}#${newM.tag}` });
+                    }
+                    puuid = riotData.puuid;
+                    accountLevel = riotData.level;
+                    playerCard = riotData.card;
+                    status = 'pending'; // Require admin approval for new accounts
+                } catch (apiError) {
+                    return res.status(503).json({ msg: `Riot API Verification Failed. Please try again later. (${apiError.message})` });
+                }
+            } else {
+                status = oldM.status; // Keep existing status if info didn't change
+            }
+
+            // Auto-approve if roster is currently unlocked (first time setup)
+            if (!team.rosterLocked) status = 'approved';
+
+            processedMembers.push({ ...newM, status, puuid, accountLevel, playerCard, pendingUpdate: null });
         }
 
-        // Update logic: Only set to pending if Name or Tag changes. Discord updates are auto-approved (keep existing status).
-        team.members = newMembers.map(newM => {
-            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
-            let status = 'pending';
-            
-            if (oldM && oldM.name === newM.name && oldM.tag === newM.tag) {
-                status = oldM.status; // Keep existing status if critical info (Name/Tag) didn't change
-            }
-            
-            return { ...newM, status };
-        });
+        team.members = processedMembers;
+        if (!team.rosterLocked) team.rosterLocked = true;
 
         await team.save();
         req.app.get('io').emit('teams_update');
-        res.json({ success: true, msg: 'Changes submitted.' });
-    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+        res.json({ success: true, msg: 'Roster saved and players verified successfully.' });
+    } catch (e) { res.status(500).json({ msg: 'Server Error: ' + e.message }); }
 });
 
 // Upload Logo (Team Self) - MOVED UP before /teams/:id

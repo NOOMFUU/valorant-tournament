@@ -898,17 +898,26 @@
 
                 const displayDiscord = member.discordName || '';
                 const isVerified = !!member.discordId;
+                const accountLevel = member.accountLevel || '-';
+                const playerCardStyle = member.playerCard ? `background-image: url('${member.playerCard}'); background-size: cover; background-position: center 20%;` : '';
 
                 return `
                 <div class="relative bg-[#15171a] border ${borderColor} p-1 transition-all duration-300 roster-card-hover group">
-                    <div class="bg-[#0f1113] p-5 h-full relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition pointer-events-none">
+                    <div class="bg-[#0f1113] p-5 h-full relative overflow-hidden flex flex-col justify-between">
+                        <!-- Background Player Card -->
+                        ${member.playerCard ? `<div class="absolute inset-0 opacity-10 group-hover:opacity-30 transition-opacity duration-300" style="${playerCardStyle}"></div>
+                        <div class="absolute inset-0 bg-gradient-to-b from-[#0f1113]/40 via-[#0f1113]/80 to-[#0f1113] pointer-events-none z-0"></div>` : ''}
+
+                        <div class="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition pointer-events-none z-0">
                             <i class="fa-solid fa-user-astronaut text-7xl"></i>
                         </div>
                         
                         <div class="flex justify-between items-start mb-6 relative z-10">
                             <div>
-                                <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-widest mb-1">${label}</div>
+                                <div class="text-[10px] text-[#ff4655] font-bold uppercase tracking-widest mb-1 flex items-center gap-2">
+                                    ${label} 
+                                    ${member.accountLevel ? `<span class="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded text-[8px]">LVL ${accountLevel}</span>` : ''}
+                                </div>
                                 <div class="w-8 h-1 bg-[#ff4655]"></div>
                             </div>
                             <div class="w-2 h-2 rounded-full ${statusColor} shadow-[0_0_10px_currentColor]"></div>

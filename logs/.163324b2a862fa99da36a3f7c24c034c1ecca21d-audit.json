@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\.163324b2a862fa99da36a3f7c24c034c1ecca21d-audit.json",
+    "files": [
+        {
+            "date": 1777102282518,
+            "name": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\combined-2026-04-25.log",
+            "hash": "a25194360205d400bad6ec12479f8481682be32f28bb93cd789697f2bc55aff2"
+        }
+    ],
+    "hashType": "sha256"
+}

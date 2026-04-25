@@ -17,6 +17,8 @@ const csv = require('csv-parser');
 const helmet = require('helmet');
 const compression = require('compression');
 
+const logger = require('./utils/logger'); // [NEW] Winston Logger
+
 // Import Managers
 const VetoManager = require('./managers/vetoManager');
 const BracketManager = require('./managers/bracketManager');
@@ -90,19 +92,19 @@ app.set('sendBracketAnnouncement', discordService.sendBracketAnnouncement.bind(d
 // --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney')
     .then(async () => {
-        console.log('✅ MongoDB Connected');
+        logger.info('✅ MongoDB Connected');
 
         // [ADDED] กู้คืน Timer ของ Veto กรณี Server รีสตาร์ท
         if (vetoMgr.restoreTimers) {
             await vetoMgr.restoreTimers();
-            console.log('⏱️  Veto Timers Restored');
+            logger.info('⏱️  Veto Timers Restored');
         }
         
         // Start Agenda
         await queueService.start();
-        console.log('📅 Agenda Queue Started');
+        logger.info('📅 Agenda Queue Started');
     })
-    .catch(err => console.error('❌ MongoDB Error:', err));
+    .catch(err => logger.error('❌ MongoDB Error:', { error: err.message }));
 
 
 // --- SYSTEM STATS MONITOR ---
@@ -130,7 +132,7 @@ setInterval(() => {
             concurrent: io.engine.clientsCount,
             uptime: process.uptime()
         });
-    } catch (e) { console.error("Stats Error:", e); }
+    } catch (e) { logger.error("Stats Error:", { error: e.message }); }
 }, 3000);
 
 // --- [NEW] ROUTES IMPORT ---
@@ -150,7 +152,7 @@ app.use('/api', adminRoutes);
 app.use('/api', overlayRoutes);
 
 app.use((err, req, res, next) => {
-    console.error('❌ [Global Error]:', err.message || err);
+    logger.error('❌ [Global Error]:', { error: err.message || err, stack: err.stack, path: req.originalUrl });
     
     const statusCode = err.status || 500;
     const message = process.env.NODE_ENV === 'production' 
@@ -192,4 +194,4 @@ io.on('connection', (socket) => {
     socket.on('veto_action', (d) => vetoMgr.handleAction(d.matchId, d.teamId, d.action, d.map, d.side));
 });
 
-server.listen(process.env.PORT || 3000, () => console.log('🚀 Server Running...'));
+server.listen(process.env.PORT || 3000, () => logger.info(`🚀 Server Running on Port ${process.env.PORT || 3000}...`));
