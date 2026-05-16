@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STANDINGS — VTP VALORANT TOURNAMENT</title>
+    <meta name="description" content="Live tournament standings, leaderboard and player stats for VTP Valorant Tournament Platform">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --navy: #0f1923; --navy-mid: #1a2535; --navy-light: #253545;
+            --red: #ff4655; --red-dark: #c0392b; --paper: #ece8e1;
+            --paper-dim: #9b9b9b; --gold: #f0b429; --green: #00d4aa; --blue: #5edfff;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--navy); color: var(--paper); font-family: 'Rajdhani', sans-serif; min-height: 100vh; }
+
+        /* NAV */
+        nav { background: var(--navy-mid); border-bottom: 1px solid var(--navy-light); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+        .nav-logo { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: 0.1em; color: var(--red); text-decoration: none; }
+        .nav-links { display: flex; gap: 1.5rem; }
+        .nav-links a { color: var(--paper-dim); text-decoration: none; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; transition: color 0.15s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--paper); }
+
+        /* HEADER */
+        .page-header { padding: 3rem 2rem 2rem; max-width: 1200px; margin: 0 auto; }
+        .page-header h1 { font-family: 'Oswald', sans-serif; font-size: 2.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+        .page-header h1 span { color: var(--red); }
+        .page-header p { color: var(--paper-dim); margin-top: 0.5rem; font-size: 1.05rem; }
+
+        /* LIVE BADGE */
+        .live-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(255,70,85,0.15); border: 1px solid var(--red); padding: 0.25rem 0.75rem; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: var(--red); margin-left: 1rem; vertical-align: middle; }
+        .live-dot { width: 6px; height: 6px; background: var(--red); border-radius: 50%; animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } }
+
+        /* CONTROLS */
+        .controls { max-width: 1200px; margin: 0 auto; padding: 0 2rem 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        select { background: var(--navy-mid); color: var(--paper); border: 1px solid var(--navy-light); padding: 0.5rem 1rem; font-family: 'Rajdhani', sans-serif; font-size: 0.95rem; cursor: pointer; outline: none; }
+        select:focus { border-color: var(--red); }
+        .tab-bar { display: flex; gap: 0.25rem; }
+        .tab-btn { background: transparent; color: var(--paper-dim); border: 1px solid var(--navy-light); padding: 0.5rem 1.2rem; font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+        .tab-btn.active { background: var(--red); color: #fff; border-color: var(--red); }
+        .tab-btn:hover:not(.active) { border-color: var(--paper-dim); color: var(--paper); }
+
+        /* MAIN */
+        .main { max-width: 1200px; margin: 0 auto; padding: 0 2rem 4rem; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* STANDINGS TABLE */
+        .section-label { font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--red); border-bottom: 1px solid var(--navy-light); padding-bottom: 0.5rem; margin-bottom: 1rem; margin-top: 2rem; }
+        .standings-table { width: 100%; border-collapse: collapse; }
+        .standings-table th { background: var(--navy-light); font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.75rem 1rem; text-align: left; color: var(--paper-dim); }
+        .standings-table th.num { text-align: center; }
+        .standings-table td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(37,53,69,0.6); font-size: 1rem; font-weight: 500; }
+        .standings-table td.num { text-align: center; font-family: 'Courier New', monospace; }
+        .standings-table tr:hover td { background: rgba(255,70,85,0.04); }
+        .rank { font-family: 'Oswald', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--paper-dim); }
+        .rank.gold { color: var(--gold); }
+        .rank.silver { color: #c0c0c0; }
+        .rank.bronze { color: #cd7f32; }
+        .team-cell { display: flex; align-items: center; gap: 0.75rem; }
+        .team-logo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--navy-light); }
+        .team-logo-placeholder { width: 28px; height: 28px; border-radius: 50%; background: var(--navy-light); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--paper-dim); }
+        .team-name { font-weight: 600; }
+        .team-tag { color: var(--paper-dim); font-size: 0.85rem; margin-left: 0.25rem; }
+        .wins { color: var(--green); font-weight: 700; }
+        .losses { color: var(--red); font-weight: 700; }
+        .diff-pos { color: var(--green); }
+        .diff-neg { color: var(--red); }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; }
+        .badge-advance { background: rgba(0,212,170,0.15); color: var(--green); border: 1px solid var(--green); }
+        .badge-elim { background: rgba(255,70,85,0.15); color: var(--red); border: 1px solid var(--red); }
+
+        /* LEADERBOARD TABLE */
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th { background: var(--navy-light); font-family: 'Oswald', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.75rem 0.75rem; text-align: center; color: var(--paper-dim); }
+        .lb-table th.left { text-align: left; }
+        .lb-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(37,53,69,0.6); font-size: 0.95rem; text-align: center; }
+        .lb-table td.left { text-align: left; }
+        .lb-table tr:hover td { background: rgba(94,223,255,0.04); }
+        .stat-highlight { font-weight: 700; font-size: 1.05rem; }
+        .acs-val { color: var(--blue); }
+        .kd-val { color: var(--gold); }
+        .kast-val { color: var(--green); }
+
+        /* LOADING / EMPTY */
+        .loading { text-align: center; padding: 4rem 2rem; color: var(--paper-dim); font-size: 1rem; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--navy-light); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .page-header h1 { font-size: 1.8rem; }
+            .controls { flex-direction: column; align-items: flex-start; }
+            .lb-table th:nth-child(n+6), .lb-table td:nth-child(n+6) { display: none; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <a class="nav-logo" href="/">⬡ VTP</a>
+    <div class="nav-links">
+        <a href="/">HOME</a>
+        <a href="/tournament_view.html">BRACKET</a>
+        <a href="/standings.html" class="active">STANDINGS</a>
+        <a href="/schedule.html">SCHEDULE</a>
+        <a href="/team.html">TEAMS</a>
+    </div>
+</nav>
+
+<div class="page-header">
+    <h1>STANDINGS <span>&amp;</span> STATS <span class="live-badge"><span class="live-dot"></span>LIVE</span></h1>
+    <p>Real-time team standings and player performance leaderboard</p>
+</div>
+
+<div class="controls">
+    <select id="tournamentSelect">
+        <option value="">Loading tournaments...</option>
+    </select>
+    <select id="stageSelect">
+        <option value="">All Stages</option>
+    </select>
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('standings')">STANDINGS</button>
+        <button class="tab-btn" onclick="switchTab('leaderboard')">PLAYER STATS</button>
+    </div>
+</div>
+
+<div class="main">
+    <!-- STANDINGS PANEL -->
+    <div id="standingsPanel" class="panel active">
+        <div id="standingsContent">
+            <div class="loading"><div class="loading-spinner"></div>Select a tournament to view standings</div>
+        </div>
+    </div>
+
+    <!-- LEADERBOARD PANEL -->
+    <div id="leaderboardPanel" class="panel">
+        <div id="leaderboardContent">
+            <div class="loading"><div class="loading-spinner"></div>Select a tournament to view player stats</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const socket = io();
+let currentTournamentId = null;
+let currentStageIndex = null;
+let currentTab = 'standings';
+let tournamentsData = [];
+
+// Tab switching
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+        b.classList.toggle('active', (i === 0 && tab === 'standings') || (i === 1 && tab === 'leaderboard'));
+    });
+    document.getElementById('standingsPanel').classList.toggle('active', tab === 'standings');
+    document.getElementById('leaderboardPanel').classList.toggle('active', tab === 'leaderboard');
+    if (currentTournamentId) {
+        tab === 'standings' ? loadStandings() : loadLeaderboard();
+    }
+}
+
+// Load tournaments
+async function loadTournaments() {
+    const res = await fetch('/api/tournaments');
+    tournamentsData = await res.json();
+    const sel = document.getElementById('tournamentSelect');
+    sel.innerHTML = '<option value="">— SELECT TOURNAMENT —</option>';
+    tournamentsData.forEach(t => {
+        sel.innerHTML += `<option value="${t._id}">${t.name}</option>`;
+    });
+    if (tournamentsData.length > 0) {
+        sel.value = tournamentsData[0]._id;
+        onTournamentChange();
+    }
+}
+
+function onTournamentChange() {
+    currentTournamentId = document.getElementById('tournamentSelect').value;
+    if (!currentTournamentId) return;
+    const t = tournamentsData.find(x => x._id === currentTournamentId);
+    populateStageSelect(t);
+    loadCurrent();
+}
+
+function populateStageSelect(tournament) {
+    const sel = document.getElementById('stageSelect');
+    sel.innerHTML = '<option value="">All Stages</option>';
+    if (tournament && tournament.stages) {
+        tournament.stages.forEach((s, i) => {
+            sel.innerHTML += `<option value="${i}">${s.name} (${s.type})</option>`;
+        });
+        if (tournament.stages.length > 0) {
+            sel.value = tournament.stages.length - 1;
+            currentStageIndex = tournament.stages.length - 1;
+        }
+    }
+}
+
+function onStageChange() {
+    const val = document.getElementById('stageSelect').value;
+    currentStageIndex = val === '' ? null : parseInt(val);
+    loadCurrent();
+}
+
+function loadCurrent() {
+    if (currentTab === 'standings') loadStandings();
+    else loadLeaderboard();
+}
+
+// STANDINGS
+async function loadStandings() {
+    if (!currentTournamentId) return;
+    const content = document.getElementById('standingsContent');
+    content.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Loading standings...</div>';
+    try {
+        const t = tournamentsData.find(x => x._id === currentTournamentId);
+        if (!t || !t.stages || t.stages.length === 0) {
+            content.innerHTML = '<div class="loading">No stages found for this tournament</div>';
+            return;
+        }
+        const stages = currentStageIndex !== null ? [{ stage: t.stages[currentStageIndex], index: currentStageIndex }] : t.stages.map((s, i) => ({ stage: s, index: i }));
+        let html = '';
+        for (const { stage, index } of stages) {
+            if (!['round_robin', 'swiss', 'gsl'].includes(stage.type)) {
+                html += buildBracketStandings(stage, index);
+                continue;
+            }
+            const res = await fetch(`/api/tournaments/${currentTournamentId}/stages/${index}/standings`);
+            const standings = await res.json();
+            html += buildStandingsTable(stage.name, stage.type, standings, stage.settings);
+        }
+        content.innerHTML = html || '<div class="loading">No standing data available</div>';
+    } catch (e) {
+        content.innerHTML = `<div class="loading" style="color:var(--red)">Error loading standings: ${e.message}</div>`;
+    }
+}
+
+function buildStandingsTable(stageName, type, standings, settings) {
+    const advanceCount = settings?.qualifiedCount || settings?.advanceCount || 2;
+    const grouped = {};
+    standings.forEach(s => {
+        const g = s.group || 'Default';
+        if (!grouped[g]) grouped[g] = [];
+        grouped[g].push(s);
+    });
+    let html = '';
+    Object.keys(grouped).sort().forEach(group => {
+        const rows = grouped[group];
+        html += `<div class="section-label">${stageName} ${Object.keys(grouped).length > 1 ? '— ' + group : ''}</div>`;
+        html += `<table class="standings-table"><thead><tr>
+            <th class="num">#</th><th>TEAM</th>
+            <th class="num">W</th><th class="num">L</th>
+            <th class="num">MAP W</th><th class="num">MAP L</th>
+            <th class="num">DIFF</th><th class="num">PTS</th><th>STATUS</th>
+        </tr></thead><tbody>`;
+        rows.forEach((s, i) => {
+            const rank = i + 1;
+            const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+            const diff = (s.mapWins || 0) - (s.mapLosses || 0);
+            const isAdvance = rank <= advanceCount;
+            const statusBadge = isAdvance
+                ? `<span class="badge badge-advance">ADVANCE</span>`
+                : `<span class="badge badge-elim">ELIM</span>`;
+            const logoHtml = s.logo
+                ? `<img class="team-logo" src="${s.logo}" alt="${s.name}" onerror="this.style.display='none'">`
+                : `<div class="team-logo-placeholder">${(s.shortName||s.name||'?')[0]}</div>`;
+            html += `<tr>
+                <td class="num"><span class="rank ${rankClass}">${rank}</span></td>
+                <td><div class="team-cell">${logoHtml}<span class="team-name">${s.name || 'TBD'}</span><span class="team-tag">${s.shortName || ''}</span></div></td>
+                <td class="num wins">${s.wins ?? 0}</td>
+                <td class="num losses">${s.losses ?? 0}</td>
+                <td class="num">${s.mapWins ?? 0}</td>
+                <td class="num">${s.mapLosses ?? 0}</td>
+                <td class="num ${diff >= 0 ? 'diff-pos' : 'diff-neg'}">${diff >= 0 ? '+' : ''}${diff}</td>
+                <td class="num" style="font-weight:700;color:var(--gold)">${s.points ?? (s.wins ?? 0) * 3}</td>
+                <td>${statusBadge}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    });
+    return html;
+}
+
+function buildBracketStandings(stage, index) {
+    return `<div class="section-label">${stage.name} (${stage.type.replace(/_/g,' ')})</div>
+    <div class="loading" style="padding:1.5rem 0;font-size:0.95rem">View bracket in <a href="/tournament_view.html" style="color:var(--blue)">Bracket Viewer</a></div>`;
+}
+
+// LEADERBOARD
+async function loadLeaderboard() {
+    if (!currentTournamentId) return;
+    const content = document.getElementById('leaderboardContent');
+    content.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Loading player stats...</div>';
+    try {
+        const res = await fetch(`/api/tournaments/${currentTournamentId}/leaderboard`);
+        const players = await res.json();
+        if (!players.length) {
+            content.innerHTML = '<div class="loading">No player stats submitted yet for this tournament</div>';
+            return;
+        }
+        let html = `<div class="section-label">PLAYER PERFORMANCE LEADERBOARD</div>
+        <table class="lb-table"><thead><tr>
+            <th class="left" style="width:40px">#</th>
+            <th class="left">PLAYER</th>
+            <th class="left">TEAM</th>
+            <th>MAPS</th>
+            <th>ACS</th>
+            <th>K/D</th>
+            <th>ADR</th>
+            <th>KAST%</th>
+            <th>KILLS</th>
+        </tr></thead><tbody>`;
+        players.forEach((p, i) => {
+            const rank = i + 1;
+            const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+            const teamName = p.team ? `<span class="team-tag">${p.team.shortName || p.team.name}</span>` : '<span style="color:var(--paper-dim)">—</span>';
+            html += `<tr>
+                <td class="left"><span class="rank ${rankClass}">${rank}</span></td>
+                <td class="left"><strong>${p.playerName}</strong><span style="color:var(--paper-dim);margin-left:4px">#${p.playerTag}</span></td>
+                <td class="left">${teamName}</td>
+                <td>${p.maps}</td>
+                <td><span class="stat-highlight acs-val">${p.avgAcs}</span></td>
+                <td><span class="stat-highlight kd-val">${p.kd}</span></td>
+                <td>${p.avgAdr}</td>
+                <td><span class="kast-val">${p.avgKast}%</span></td>
+                <td>${p.totalKills}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = `<div class="loading" style="color:var(--red)">Error: ${e.message}</div>`;
+    }
+}
+
+// Socket real-time
+socket.on('bracket_update', () => { if (currentTournamentId) loadCurrent(); });
+
+// Init
+document.getElementById('tournamentSelect').addEventListener('change', onTournamentChange);
+document.getElementById('stageSelect').addEventListener('change', onStageChange);
+loadTournaments();
+</script>
+</body>
+</html>

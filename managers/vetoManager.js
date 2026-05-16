@@ -64,7 +64,7 @@ class VetoManager {
     async handleChat(matchId, teamId, message) {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if(!match) return;
-        
+
         let senderName = "Unknown";
         if (teamId === 'admin') senderName = "ADMIN";
         else if (match.teamA && match.teamA._id.toString() === teamId) senderName = match.teamA.name;
@@ -75,19 +75,9 @@ class VetoManager {
         this.io.to(matchId).emit('chat_new', { sender: senderName, message, senderId: teamId });
     }
 
-    async handleSetRoomPass(matchId, teamId, password) {
-        const match = await Match.findById(matchId).populate('teamA');
-        if (!match || match.teamA._id.toString() !== teamId) return;
-        match.roomPassword = password;
-        await this.logAction(match, `HOST: Room Code Updated`);
-        await match.save();
-        await this.broadcastState(matchId);
-        this.io.to(matchId).emit('notification', { msg: `Room Password Updated!` });
-    }
-
     async handleReady(matchId, teamId) {
         const match = await Match.findById(matchId).populate('teamA teamB tournament');
-        if (!match || !match.roomPassword) return;
+        if (!match) return;
 
         if (match.teamA._id.toString() === teamId) match.vetoData.teamAReady = true;
         else if (match.teamB._id.toString() === teamId) match.vetoData.teamBReady = true;
@@ -99,7 +89,6 @@ class VetoManager {
             await this.startCoinToss(match);
         }
     }
-
     // --- CORE VETO FLOW ---
     async startCoinToss(match) {
         // [UPDATED] Initialize Pool before starting (Final Sync)
@@ -107,6 +96,15 @@ class VetoManager {
              match.vetoData.mapPool = match.tournament.mapPool;
         } else if (!match.vetoData.mapPool || match.vetoData.mapPool.length === 0) {
              match.vetoData.mapPool = FALLBACK_MAP_POOL;
+        }
+
+        // If 1v1 mode is active and results aren't reported yet, wait
+        if (match.vetoData.priorityMode === '1v1' && !match.vetoData.priorityWinnerId) {
+            match.vetoData.status = 'awaiting_1v1';
+            await this.logAction(match, "PROTOCOL: Awaiting 1v1 Duel Results");
+            await match.save();
+            await this.broadcastState(match._id.toString());
+            return;
         }
 
         match.vetoData.status = 'coin_toss';
@@ -118,16 +116,43 @@ class VetoManager {
             const m = await Match.findById(match._id).populate('teamA teamB tournament');
             if(!m) return;
             
-            const winner = Math.random() < 0.5 ? m.teamA : m.teamB;
+            let winner;
+            if (m.vetoData.priorityWinnerId) {
+                winner = areIdsEqual(m.vetoData.priorityWinnerId, m.teamA._id) ? m.teamA : m.teamB;
+                await this.logAction(m, `1v1 CHALLENGE: ${winner.name} won and earned priority`);
+            } else if (m.vetoData.priorityTeam) {
+                winner = areIdsEqual(m.vetoData.priorityTeam, m.teamA._id) ? m.teamA : m.teamB;
+                await this.logAction(m, `COIN TOSS: ${winner.name} granted PRIORITY`);
+            } else {
+                winner = Math.random() < 0.5 ? m.teamA : m.teamB;
+                await this.logAction(m, `COIN TOSS: ${winner.name} Wins!`);
+            }
+
             m.vetoData.coinTossWinner = winner;
             m.vetoData.status = 'decision';
             
             await this.startTimerLogic(m, 60); 
             
-            await this.logAction(m, `COIN TOSS: ${winner.name} Wins!`);
             await m.save();
             await this.broadcastState(m._id.toString());
         }, 3500); 
+    }
+
+    async handlePriorityReport(matchId, teamId, winnerId) {
+        const match = await Match.findById(matchId).populate('teamA teamB');
+        if (!match || match.vetoData.status !== 'awaiting_1v1') return;
+
+        // Only captains can report
+        if (!areIdsEqual(teamId, match.teamA._id) && !areIdsEqual(teamId, match.teamB._id)) return;
+
+        match.vetoData.priorityReportedBy = teamId;
+        match.vetoData.priorityWinnerId = winnerId;
+        
+        await match.save();
+        await this.logAction(match, `REPORT: ${teamId === match.teamA._id.toString() ? match.teamA.name : match.teamB.name} reported winner`);
+        
+        // Auto-start coin toss phase (which will now skip to decision)
+        await this.startCoinToss(match);
     }
 
     async handleDecision(matchId, teamId, choice) {

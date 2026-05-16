@@ -5,7 +5,7 @@
     <title>VALORANT PROTOCOL // ACCESS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Tungsten:wght@500;600&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -13,8 +13,8 @@
             --val-dark: #0f1923;
             --val-white: #ece8e1;
         }
-        body { font-family: 'Rajdhani', sans-serif; background-color: var(--val-dark); color: var(--val-white); }
-        .font-header { font-family: 'Tungsten', sans-serif; text-transform: uppercase; }
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
         
         .val-input {
             background: rgba(255,255,255,0.05);
@@ -36,7 +36,7 @@
         .val-btn {
             background: var(--val-red);
             color: white;
-            font-family: 'Tungsten', sans-serif;
+            font-family: 'Anton', sans-serif;
             letter-spacing: 2px;
             font-size: 1.5rem;
             padding: 12px;
@@ -75,7 +75,7 @@
         <div class="absolute inset-0 bg-gradient-to-r from-[#0f1923]/80 to-[#0f1923]"></div>
         <div class="absolute bottom-10 left-10">
             <h1 class="text-8xl font-header text-white leading-none mb-2">VALORANT</h1>
-            <h2 class="text-4xl font-header text-[#ff4655] tracking-widest">TOURNAMENT PROTOCOL</h2>
+            <h2 class="text-5xl font-header text-[#ff4655] tracking-widest">TOURNAMENT PROTOCOL</h2>
         </div>
     </div>
 
@@ -83,25 +83,28 @@
         <div class="w-full max-w-[400px] animate-slide-up">
             
             <div class="mb-10 text-center lg:text-left">
-                <h2 id="formTitle" class="text-5xl font-header text-white mb-2">IDENTIFY YOURSELF</h2>
-                <p id="formSub" class="text-gray-500 font-mono text-xs tracking-widest uppercase">Secure Access Required</p>
+                <a href="index.html" class="inline-flex items-center gap-2 text-gray-500 hover:text-[#ff4655] font-mono text-xs font-bold uppercase tracking-widest transition mb-4">
+                    <i class="fa-solid fa-arrow-left"></i> Return to Tournament Hub
+                </a>
+                <h2 id="formTitle" class="text-6xl font-header text-white mb-2">IDENTIFY YOURSELF</h2>
+                <p id="formSub" class="text-gray-500 font-mono text-sm tracking-widest uppercase">Secure Access Required</p>
             </div>
 
             <div class="flex mb-8 border-b border-white/10">
-                <button onclick="setTab('login')" id="tabLogin" class="flex-1 py-3 text-lg font-header tracking-wider tab-active transition-colors">
+                <button onclick="setTab('login')" id="tabLogin" class="flex-1 py-3 text-xl font-header tracking-wider tab-active transition-colors">
                     LOGIN
                 </button>
-                <button onclick="setTab('register')" id="tabRegister" class="flex-1 py-3 text-lg font-header tracking-wider tab-inactive transition-colors">
+                <button onclick="setTab('register')" id="tabRegister" class="flex-1 py-3 text-xl font-header tracking-wider tab-inactive transition-colors">
                     REGISTER TEAM
                 </button>
             </div>
 
             <div id="loginForm" class="space-y-6">
                 <div class="flex gap-4 mb-6">
-                    <button onclick="setRole('team')" id="roleTeam" class="flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all">
+                    <button onclick="setRole('team')" id="roleTeam" class="flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-sm font-bold uppercase tracking-widest transition-all">
                         Team Captain
                     </button>
-                    <button onclick="setRole('admin')" id="roleAdmin" class="flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30">
+                    <button onclick="setRole('admin')" id="roleAdmin" class="flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-sm font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30">
                         Admin
                     </button>
                 </div>
@@ -109,11 +112,11 @@
 
                 <div class="space-y-4">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Username</label>
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Username</label>
                         <input id="lUser" class="val-input" placeholder="AGENT ID">
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Password</label>
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Password</label>
                         <div class="relative">
                             <input id="lPass" type="password" class="val-input pr-10" placeholder="ACCESS CODE">
                             <button onclick="togglePass('lPass')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
@@ -131,11 +134,11 @@
             <div id="registerForm" class="hidden space-y-6 overflow-y-auto custom-scroll max-h-[60vh] pr-2">
                 <div class="space-y-4">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Login Username</label>
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Login Username</label>
                         <input id="rUsername" class="val-input" placeholder="CAPTAIN ID">
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Password</label>
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Password</label>
                         <div class="relative">
                             <input id="rPass" type="password" onkeyup="checkStrength(this.value)" class="val-input pr-10" placeholder="SECURE CODE">
                             <button onclick="togglePass('rPass')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
@@ -147,11 +150,11 @@
                     
                     <div class="grid grid-cols-3 gap-4">
                         <div class="col-span-2 space-y-1">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Team Name</label>
+                            <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Team Name</label>
                             <input id="rName" class="val-input" placeholder="FULL NAME">
                         </div>
                         <div class="space-y-1">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tag</label>
+                            <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Tag</label>
                             <input id="rShort" class="val-input text-center uppercase" placeholder="TAG" maxlength="4">
                         </div>
                     </div>
@@ -159,8 +162,8 @@
                     <div class="relative group cursor-pointer border border-dashed border-white/20 hover:border-[#ff4655] transition p-6 text-center" onclick="document.getElementById('rLogo').click()">
                         <input id="rLogo" type="file" class="hidden" accept="image/*" onchange="previewImage(this)">
                         <div id="logoPreview" class="flex flex-col items-center justify-center">
-                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-500 mb-2 group-hover:text-[#ff4655] transition"></i>
-                            <span id="logoText" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Upload Team Logo</span>
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2 group-hover:text-[#ff4655] transition"></i>
+                            <span id="logoText" class="text-xs font-bold text-gray-500 uppercase tracking-widest">Upload Team Logo</span>
                         </div>
                         <img id="logoImg" class="hidden w-16 h-16 object-contain mx-auto">
                     </div>
@@ -174,7 +177,7 @@
             <div id="msgContainer" class="mt-6 hidden animate-slide-up">
                 <div id="msgBox" class="flex items-center gap-3 p-3 border-l-4 bg-white/5">
                     <i id="msgIcon" class="fa-solid"></i>
-                    <span id="msgText" class="text-xs font-mono font-bold uppercase tracking-wide"></span>
+                    <span id="msgText" class="text-sm font-mono font-bold uppercase tracking-wide"></span>
                 </div>
             </div>
 
@@ -182,7 +185,7 @@
     </div>
 
     <script>
-        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const API_BASE = '';
 
         function togglePass(id) {
             const el = document.getElementById(id);
@@ -224,11 +227,11 @@
             const btnAdmin = document.getElementById('roleAdmin');
 
             if (r === 'team') {
-                btnTeam.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all';
-                btnAdmin.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
+                btnTeam.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-sm font-bold uppercase tracking-widest transition-all';
+                btnAdmin.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-sm font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
             } else {
-                btnAdmin.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-xs font-bold uppercase tracking-widest transition-all';
-                btnTeam.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-xs font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
+                btnAdmin.className = 'flex-1 py-3 border border-[#ff4655] bg-[#ff4655]/10 text-white text-sm font-bold uppercase tracking-widest transition-all';
+                btnTeam.className = 'flex-1 py-3 border border-white/10 bg-transparent text-gray-500 text-sm font-bold uppercase tracking-widest transition-all hover:text-white hover:border-white/30';
             }
         }
 

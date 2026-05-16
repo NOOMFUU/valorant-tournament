@@ -56,18 +56,28 @@ app.use(compression());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// --- [NEW] ROUTES IMPORT ---
+const teamRoutes = require('./routes/teamRoutes');
+const matchRoutes = require('./routes/matchRoutes');
+const tournamentRoutes = require('./routes/tournamentRoutes');
+const discordRoutes = require('./routes/discordRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const overlayRoutes = require('./routes/overlayRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const statsRoutes = require('./routes/statsRoutes');
+
+app.use('/api', teamRoutes);
+app.use('/api', matchRoutes);
+app.use('/api', tournamentRoutes);
+app.use('/api', discordRoutes);
+app.use('/api', adminRoutes);
+app.use('/api', overlayRoutes);
+app.use('/api', notificationRoutes);
+app.use('/api', statsRoutes);
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-
-// --- SECURITY: Rate Limiting ---
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 นาที
-    max: 100, // จำกัด 100 request ต่อ IP
-    message: { msg: "Too many login attempts, please try again later." }
-});
-
-app.use('/api/login', authLimiter);
-app.use('/api/register', authLimiter);
 
 // --- MANAGERS INITIALIZATION ---
 // สร้าง Manager ก่อน Connect DB เพื่อให้พร้อมเรียกใช้ restoreTimers
@@ -103,6 +113,21 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-to
         // Start Agenda
         await queueService.start();
         logger.info('📅 Agenda Queue Started');
+
+        // [SEED] Create Default Admin if none exists
+        const User = require('./models/User');
+        const adminExists = await User.findOne({ role: 'admin' });
+        if (!adminExists) {
+            const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+            const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
+            const hashedPassword = bcrypt.hashSync(adminPassword, 10);
+            await new User({ 
+                username: adminUsername, 
+                password: hashedPassword, 
+                role: 'admin' 
+            }).save();
+            logger.info(`👤 Default Admin Created: ${adminUsername} (Password: ${adminPassword})`);
+        }
     })
     .catch(err => logger.error('❌ MongoDB Error:', { error: err.message }));
 
@@ -133,25 +158,9 @@ setInterval(() => {
             uptime: process.uptime()
         });
     } catch (e) { logger.error("Stats Error:", { error: e.message }); }
-}, 3000);
+    }, 3000);
 
-// --- [NEW] ROUTES IMPORT ---
-// นำเข้า Router ที่แยกไฟล์ไว้
-const teamRoutes = require('./routes/teamRoutes');
-const matchRoutes = require('./routes/matchRoutes');
-const tournamentRoutes = require('./routes/tournamentRoutes');
-const discordRoutes = require('./routes/discordRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const overlayRoutes = require('./routes/overlayRoutes');
-
-app.use('/api', teamRoutes);
-app.use('/api', matchRoutes);
-app.use('/api', tournamentRoutes);
-app.use('/api', discordRoutes);
-app.use('/api', adminRoutes);
-app.use('/api', overlayRoutes);
-
-app.use((err, req, res, next) => {
+    app.use((err, req, res, next) => {
     logger.error('❌ [Global Error]:', { error: err.message || err, stack: err.stack, path: req.originalUrl });
     
     const statusCode = err.status || 500;
@@ -187,7 +196,7 @@ io.on('connection', (socket) => {
         if (socket.matchId && socket.teamId) vetoMgr.handleDisconnection(socket.matchId, socket.teamId);
     });
     socket.on('join_team_room', (teamId) => { socket.join(teamId); });
-    socket.on('set_room_pass', (d) => vetoMgr.handleSetRoomPass(d.matchId, d.teamId, d.password));
+    socket.on('priority_report', (d) => vetoMgr.handlePriorityReport(d.matchId, d.teamId, d.winnerId));
     socket.on('send_chat', (d) => vetoMgr.handleChat(d.matchId, d.teamId, d.message));
     socket.on('team_ready', (d) => vetoMgr.handleReady(d.matchId, d.teamId));
     socket.on('decision_made', (d) => vetoMgr.handleDecision(d.matchId, d.teamId, d.choice));

@@ -129,6 +129,10 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
         const team = await Team.findById(req.user.id);
         const newMembers = req.body.members;
         
+        if (!newMembers || newMembers.length < 5) {
+            return res.status(400).json({ msg: 'A minimum of 5 players is required to complete roster registration.' });
+        }
+        
         const processedMembers = [];
         // [NEW] API Verification Loop
         for (const newM of newMembers) {

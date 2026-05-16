@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REGISTER — VTP VALORANT TOURNAMENT</title>
+    <meta name="description" content="Register your team for the VTP Valorant Tournament. Public signup with admin approval.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0f1923; --navy-mid: #1a2535; --navy-light: #253545;
+            --red: #ff4655; --red-dark: #c0392b; --paper: #ece8e1;
+            --paper-dim: #9b9b9b; --gold: #f0b429; --green: #00d4aa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--navy); color: var(--paper); font-family: 'Rajdhani', sans-serif; min-height: 100vh; }
+
+        nav { background: var(--navy-mid); border-bottom: 1px solid var(--navy-light); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+        .nav-logo { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: 0.1em; color: var(--red); text-decoration: none; }
+        .nav-links { display: flex; gap: 1.5rem; }
+        .nav-links a { color: var(--paper-dim); text-decoration: none; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; transition: color 0.15s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--paper); }
+
+        .page-wrap { max-width: 860px; margin: 0 auto; padding: 3rem 2rem; }
+        .page-title { font-family: 'Oswald', sans-serif; font-size: 2.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+        .page-title span { color: var(--red); }
+        .subtitle { color: var(--paper-dim); margin-bottom: 2.5rem; font-size: 1rem; }
+
+        /* TOURNAMENT SELECTOR */
+        .tournament-select-wrap { margin-bottom: 2rem; }
+        .tournament-select-wrap label { display: block; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); margin-bottom: 0.5rem; }
+        select { width: 100%; background: var(--navy-mid); color: var(--paper); border: 1px solid var(--navy-light); padding: 0.75rem 1rem; font-family: 'Rajdhani', sans-serif; font-size: 1rem; cursor: pointer; outline: none; transition: border-color 0.15s; }
+        select:focus { border-color: var(--red); }
+
+        /* INFO CARD */
+        .info-card { background: var(--navy-mid); border: 1px solid var(--navy-light); padding: 1.5rem; margin-bottom: 2rem; display: none; }
+        .info-card.visible { display: block; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .info-item label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); margin-bottom: 0.3rem; }
+        .info-item span { font-size: 1.05rem; font-weight: 600; }
+        .info-item span.gold { color: var(--gold); }
+        .info-item span.green { color: var(--green); }
+        .info-item span.red { color: var(--red); }
+        .info-desc { color: var(--paper-dim); font-size: 0.95rem; line-height: 1.6; border-top: 1px solid var(--navy-light); padding-top: 1rem; }
+
+        .slots-bar-wrap { margin-top: 1rem; }
+        .slots-bar-wrap label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); margin-bottom: 0.5rem; }
+        .slots-bar { background: var(--navy-light); height: 6px; }
+        .slots-fill { background: var(--green); height: 100%; transition: width 0.4s; }
+        .slots-fill.warn { background: var(--gold); }
+        .slots-fill.full { background: var(--red); }
+
+        /* FORM */
+        .form-section { background: var(--navy-mid); border: 1px solid var(--navy-light); padding: 2rem; margin-bottom: 1.5rem; display: none; }
+        .form-section.visible { display: block; }
+        .form-section h2 { font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red); border-bottom: 1px solid var(--navy-light); padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .form-row.full { grid-template-columns: 1fr; }
+        .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .form-group label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-dim); }
+        .form-group input, .form-group textarea { background: var(--navy); color: var(--paper); border: 1px solid var(--navy-light); padding: 0.65rem 0.85rem; font-family: 'Rajdhani', sans-serif; font-size: 1rem; outline: none; transition: border-color 0.15s; }
+        .form-group input:focus, .form-group textarea:focus { border-color: var(--red); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group .hint { font-size: 0.78rem; color: var(--paper-dim); }
+        .form-group input[type="file"] { padding: 0.5rem; cursor: pointer; }
+
+        /* ROSTER */
+        .roster-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .btn-add { background: transparent; color: var(--green); border: 1px solid var(--green); padding: 0.4rem 1rem; font-family: 'Rajdhani', sans-serif; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+        .btn-add:hover { background: var(--green); color: var(--navy); }
+        .player-row { background: var(--navy); border: 1px solid var(--navy-light); padding: 0.75rem 1rem; margin-bottom: 0.5rem; display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 0.75rem; align-items: center; }
+        .player-row input { background: transparent; color: var(--paper); border: none; border-bottom: 1px solid var(--navy-light); padding: 0.25rem 0; font-family: 'Rajdhani', sans-serif; font-size: 0.95rem; outline: none; width: 100%; }
+        .player-row input:focus { border-bottom-color: var(--red); }
+        .player-row select { background: var(--navy-mid); color: var(--paper); border: none; border-bottom: 1px solid var(--navy-light); padding: 0.25rem 0; font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; cursor: pointer; outline: none; }
+        .btn-remove { background: transparent; color: var(--red); border: none; cursor: pointer; font-size: 1.1rem; padding: 0.25rem; line-height: 1; }
+        .player-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-dim); }
+
+        /* SUBMIT */
+        .btn-submit { width: 100%; background: var(--red); color: #fff; border: none; padding: 1rem; font-family: 'Oswald', sans-serif; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: background 0.15s; margin-top: 0.5rem; }
+        .btn-submit:hover { background: var(--red-dark); }
+        .btn-submit:disabled { background: var(--navy-light); color: var(--paper-dim); cursor: not-allowed; }
+
+        /* ALERTS */
+        .alert { padding: 1rem 1.25rem; margin-bottom: 1rem; font-size: 0.95rem; font-weight: 600; display: none; }
+        .alert.visible { display: block; }
+        .alert-error { background: rgba(255,70,85,0.15); border: 1px solid var(--red); color: var(--red); }
+        .alert-success { background: rgba(0,212,170,0.15); border: 1px solid var(--green); color: var(--green); }
+        .alert-closed { background: rgba(240,180,41,0.1); border: 1px solid var(--gold); color: var(--gold); text-align: center; padding: 2rem; }
+
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+            .player-row { grid-template-columns: 1fr 1fr; }
+            .player-row:last-child { grid-column: 1 / -1; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <a class="nav-logo" href="/">⬡ VTP</a>
+    <div class="nav-links">
+        <a href="/">HOME</a>
+        <a href="/tournament_view.html">BRACKET</a>
+        <a href="/standings.html">STANDINGS</a>
+        <a href="/register.html" class="active">REGISTER</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <h1 class="page-title">TEAM <span>REGISTRATION</span></h1>
+    <p class="subtitle">Register your team to compete. All registrations require admin approval.</p>
+
+    <!-- TOURNAMENT SELECT -->
+    <div class="tournament-select-wrap">
+        <label>Select Tournament</label>
+        <select id="tournamentSelect" onchange="onTournamentChange()">
+            <option value="">Loading...</option>
+        </select>
+    </div>
+
+    <!-- INFO CARD -->
+    <div class="info-card" id="infoCard">
+        <div class="info-grid">
+            <div class="info-item"><label>Status</label><span id="regStatus" class="green">OPEN</span></div>
+            <div class="info-item"><label>Deadline</label><span id="regDeadline" class="gold">—</span></div>
+            <div class="info-item"><label>Slots</label><span id="regSlots">0 / 0</span></div>
+            <div class="info-item"><label>Approval</label><span id="regApproval" class="gold">REQUIRED</span></div>
+        </div>
+        <div class="info-desc" id="regDescription"></div>
+        <div class="slots-bar-wrap">
+            <label>Registration Progress</label>
+            <div class="slots-bar"><div class="slots-fill" id="slotsFill" style="width:0%"></div></div>
+        </div>
+    </div>
+
+    <div class="alert alert-closed" id="closedAlert">
+        ⛔ Registration is currently CLOSED for this tournament. Check back later or contact the organizer.
+    </div>
+
+    <!-- ACCOUNT FORM -->
+    <div class="form-section" id="accountForm">
+        <h2>01 — Account Info</h2>
+        <div id="alertBox" class="alert"></div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Team Username <span style="color:var(--red)">*</span></label>
+                <input type="text" id="username" placeholder="e.g. noomfuu_esports" autocomplete="off">
+                <span class="hint">Used for login. Lowercase, no spaces.</span>
+            </div>
+            <div class="form-group">
+                <label>Password <span style="color:var(--red)">*</span></label>
+                <input type="password" id="password" placeholder="Minimum 6 characters">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Team Display Name <span style="color:var(--red)">*</span></label>
+                <input type="text" id="teamName" placeholder="e.g. NOOMFUU Esports">
+            </div>
+            <div class="form-group">
+                <label>Short Name / Tag <span style="color:var(--red)">*</span></label>
+                <input type="text" id="shortName" placeholder="e.g. NMF" maxlength="4">
+                <span class="hint">Max 4 characters — shown in bracket</span>
+            </div>
+        </div>
+        <div class="form-row full">
+            <div class="form-group">
+                <label>Team Logo</label>
+                <input type="file" id="logo" accept="image/jpeg,image/png,image/webp">
+                <span class="hint">JPEG / PNG / WebP, max 2MB (optional)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROSTER FORM -->
+    <div class="form-section" id="rosterForm">
+        <h2>02 — Player Roster</h2>
+        <p style="color:var(--paper-dim);font-size:0.9rem;margin-bottom:1rem">Minimum 5 main players required. Riot Name#Tag will be verified against Valorant API.</p>
+        <div class="roster-header">
+            <span class="player-label">PLAYERS</span>
+            <button class="btn-add" onclick="addPlayerRow()">+ ADD PLAYER</button>
+        </div>
+        <div id="playerRows"></div>
+    </div>
+
+    <!-- SUBMIT -->
+    <div id="submitWrap" style="display:none">
+        <button class="btn-submit" id="submitBtn" onclick="submitRegistration()">SUBMIT REGISTRATION</button>
+        <p style="color:var(--paper-dim);font-size:0.85rem;margin-top:0.75rem;text-align:center">
+            By submitting, you agree to the tournament rules. Your team will be reviewed by an admin before activation.
+        </p>
+    </div>
+</div>
+
+<script>
+let tournaments = [];
+let selectedTournament = null;
+let playerCount = 0;
+
+async function loadTournaments() {
+    const res = await fetch('/api/tournaments');
+    tournaments = await res.json();
+    const sel = document.getElementById('tournamentSelect');
+    sel.innerHTML = '<option value="">— SELECT TOURNAMENT —</option>';
+    tournaments.forEach(t => sel.innerHTML += `<option value="${t._id}">${t.name}</option>`);
+    if (tournaments.length === 1) { sel.value = tournaments[0]._id; onTournamentChange(); }
+}
+
+async function onTournamentChange() {
+    const id = document.getElementById('tournamentSelect').value;
+    if (!id) { hideAll(); return; }
+    const res = await fetch(`/api/tournaments/${id}/registration`);
+    const data = await res.json();
+    selectedTournament = id;
+    renderRegistrationInfo(data.data);
+}
+
+function renderRegistrationInfo(t) {
+    const reg = t.registration || {};
+    const isOpen = reg.isOpen;
+    const isFull = t.registeredCount >= (reg.maxTeams || 16);
+    const isPastDeadline = reg.deadline && new Date(reg.deadline) < new Date();
+    const canRegister = isOpen && !isFull && !isPastDeadline;
+
+    document.getElementById('infoCard').classList.add('visible');
+    document.getElementById('regStatus').textContent = isOpen ? 'OPEN' : 'CLOSED';
+    document.getElementById('regStatus').className = isOpen ? 'green' : 'red';
+    document.getElementById('regDeadline').textContent = reg.deadline ? new Date(reg.deadline).toLocaleString() : 'No deadline';
+    document.getElementById('regSlots').textContent = `${t.registeredCount} / ${reg.maxTeams || 16}`;
+    document.getElementById('regApproval').textContent = reg.requiresApproval ? 'REQUIRED' : 'AUTO';
+    document.getElementById('regDescription').textContent = reg.description || '';
+
+    const pct = Math.round((t.registeredCount / (reg.maxTeams || 16)) * 100);
+    const fill = document.getElementById('slotsFill');
+    fill.style.width = pct + '%';
+    fill.className = 'slots-fill' + (pct >= 100 ? ' full' : pct >= 75 ? ' warn' : '');
+
+    if (!canRegister) {
+        document.getElementById('closedAlert').classList.add('visible');
+        document.getElementById('closedAlert').textContent = isFull
+            ? '⛔ Registration is FULL for this tournament.'
+            : isPastDeadline
+                ? '⛔ Registration deadline has passed.'
+                : '⛔ Registration is currently CLOSED.';
+        hideAll();
+    } else {
+        document.getElementById('closedAlert').classList.remove('visible');
+        document.getElementById('accountForm').classList.add('visible');
+        document.getElementById('rosterForm').classList.add('visible');
+        document.getElementById('submitWrap').style.display = 'block';
+        initRoster();
+    }
+}
+
+function hideAll() {
+    document.getElementById('accountForm').classList.remove('visible');
+    document.getElementById('rosterForm').classList.remove('visible');
+    document.getElementById('submitWrap').style.display = 'none';
+}
+
+function initRoster() {
+    if (playerCount > 0) return;
+    for (let i = 0; i < 5; i++) addPlayerRow('Main');
+}
+
+function addPlayerRow(role = 'Main') {
+    playerCount++;
+    const id = playerCount;
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    row.id = `prow_${id}`;
+    row.innerHTML = `
+        <div><div class="player-label" style="margin-bottom:4px">RIOT NAME#TAG</div>
+        <input type="text" id="pname_${id}" placeholder="PlayerName#TAG" oninput="formatRiotTag(this)"></div>
+        <div><div class="player-label" style="margin-bottom:4px">DISCORD</div>
+        <input type="text" id="pdiscord_${id}" placeholder="username#0000"></div>
+        <div><div class="player-label" style="margin-bottom:4px">ROLE</div>
+        <select id="prole_${id}"><option value="Main">Main</option><option value="Sub">Sub</option><option value="Coach">Coach</option></select></div>
+        <button class="btn-remove" onclick="removePlayerRow(${id})" title="Remove">✕</button>
+    `;
+    document.getElementById('playerRows').appendChild(row);
+}
+
+function formatRiotTag(input) {
+    // Auto-insert # if not present and user types a space
+    input.value = input.value.replace(/\s+/g, '#').replace(/#{2,}/g, '#');
+}
+
+function removePlayerRow(id) {
+    const row = document.getElementById(`prow_${id}`);
+    if (row) row.remove();
+}
+
+async function submitRegistration() {
+    const btn = document.getElementById('submitBtn');
+    const alert = document.getElementById('alertBox');
+    
+    // Gather inputs
+    const username = document.getElementById('username').value.trim().toLowerCase();
+    const password = document.getElementById('password').value;
+    const teamName = document.getElementById('teamName').value.trim();
+    const shortName = document.getElementById('shortName').value.trim().toUpperCase();
+    const logoFile = document.getElementById('logo').files[0];
+
+    // Basic validation
+    if (!username || !password || !teamName || !shortName) {
+        showAlert('error', 'Please fill in all required fields.');
+        return;
+    }
+    if (password.length < 6) { showAlert('error', 'Password must be at least 6 characters.'); return; }
+    if (shortName.length < 2 || shortName.length > 4) { showAlert('error', 'Short name must be 2–4 characters.'); return; }
+
+    // Collect players
+    const players = [];
+    document.querySelectorAll('.player-row').forEach(row => {
+        const id = row.id.replace('prow_', '');
+        const nameTag = (document.getElementById(`pname_${id}`)?.value || '').trim();
+        const discord = (document.getElementById(`pdiscord_${id}`)?.value || '').trim();
+        const role = document.getElementById(`prole_${id}`)?.value || 'Main';
+        if (!nameTag) return;
+        const parts = nameTag.split('#');
+        players.push({ name: parts[0] || nameTag, tag: parts[1] || '0000', discordName: discord, role });
+    });
+
+    const mainPlayers = players.filter(p => p.role === 'Main');
+    if (mainPlayers.length < 5) { showAlert('error', 'A minimum of 5 Main players is required.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'SUBMITTING...';
+    showAlert('', '');
+
+    try {
+        const fd = new FormData();
+        fd.append('username', username);
+        fd.append('password', password);
+        fd.append('name', teamName);
+        fd.append('shortName', shortName);
+        if (logoFile) fd.append('logo', logoFile);
+
+        const res = await fetch('/api/register', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.msg || 'Registration failed');
+
+        showAlert('success', `✅ Registration submitted! Welcome, ${teamName}. An admin will review and approve your account.`);
+        btn.textContent = 'SUBMITTED ✓';
+    } catch (e) {
+        showAlert('error', e.message);
+        btn.disabled = false;
+        btn.textContent = 'SUBMIT REGISTRATION';
+    }
+}
+
+function showAlert(type, msg) {
+    const el = document.getElementById('alertBox');
+    el.className = 'alert' + (msg ? ' visible' : '');
+    if (type === 'error') el.classList.add('alert-error');
+    if (type === 'success') el.classList.add('alert-success');
+    el.textContent = msg;
+}
+
+loadTournaments();
+</script>
+</body>
+</html>

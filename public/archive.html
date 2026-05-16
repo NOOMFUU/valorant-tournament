@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARCHIVE — VTP VALORANT TOURNAMENT</title>
+    <meta name="description" content="Historical tournament results and archives for the VTP Valorant Tournament Platform">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0f1923; --navy-mid: #1a2535; --navy-light: #253545;
+            --red: #ff4655; --paper: #ece8e1; --paper-dim: #9b9b9b;
+            --gold: #f0b429; --green: #00d4aa; --blue: #5edfff;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--navy); color: var(--paper); font-family: 'Rajdhani', sans-serif; min-height: 100vh; }
+        nav { background: var(--navy-mid); border-bottom: 1px solid var(--navy-light); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+        .nav-logo { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: 0.1em; color: var(--red); text-decoration: none; }
+        .nav-links { display: flex; gap: 1.5rem; }
+        .nav-links a { color: var(--paper-dim); text-decoration: none; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; transition: color 0.15s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--paper); }
+        .page-wrap { max-width: 1000px; margin: 0 auto; padding: 3rem 2rem; }
+        h1 { font-family: 'Oswald', sans-serif; font-size: 2.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+        h1 span { color: var(--red); }
+        .subtitle { color: var(--paper-dim); margin-bottom: 2.5rem; font-size: 1rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .card { background: var(--navy-mid); border: 1px solid var(--navy-light); padding: 1.5rem; transition: border-color 0.15s, box-shadow 0.15s; cursor: pointer; text-decoration: none; color: inherit; display: block; }
+        .card:hover { border-color: var(--red); box-shadow: 0 0 20px rgba(255,70,85,0.08); }
+        .card-name { font-family: 'Oswald', sans-serif; font-size: 1.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+        .card-meta { display: flex; flex-direction: column; gap: 0.3rem; }
+        .meta-row { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--paper-dim); }
+        .meta-row span { color: var(--paper); }
+        .badge-archived { display: inline-block; background: rgba(155,155,155,0.15); border: 1px solid var(--paper-dim); color: var(--paper-dim); padding: 0.15rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.75rem; }
+        .loading { text-align: center; padding: 4rem; color: var(--paper-dim); }
+        .empty { text-align: center; padding: 4rem; color: var(--paper-dim); }
+        .empty h2 { font-family: 'Oswald', sans-serif; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; color: var(--navy-light); margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+<nav>
+    <a class="nav-logo" href="/">⬡ VTP</a>
+    <div class="nav-links">
+        <a href="/">HOME</a>
+        <a href="/tournament_view.html">BRACKET</a>
+        <a href="/standings.html">STANDINGS</a>
+        <a href="/archive.html" class="active">ARCHIVE</a>
+    </div>
+</nav>
+<div class="page-wrap">
+    <h1>TOURNAMENT <span>ARCHIVE</span></h1>
+    <p class="subtitle">Historical tournament results — preserved for competitive record.</p>
+    <div id="content"><div class="loading">Loading archive...</div></div>
+</div>
+<script>
+async function load() {
+    const content = document.getElementById('content');
+    try {
+        const res = await fetch('/api/tournaments/archived');
+        const tournaments = await res.json();
+        if (!tournaments.length) {
+            content.innerHTML = '<div class="empty"><h2>NO ARCHIVED TOURNAMENTS</h2><p>Completed tournaments will appear here after being archived by an admin.</p></div>';
+            return;
+        }
+        content.innerHTML = `<div class="grid">${tournaments.map(t => `
+            <a class="card" href="/tournament_view.html?id=${t._id}">
+                <div class="badge-archived">ARCHIVED</div>
+                <div class="card-name">${t.name}</div>
+                <div class="card-meta">
+                    <div class="meta-row">Archived <span>${new Date(t.archivedAt).toLocaleDateString()}</span></div>
+                    <div class="meta-row">Created <span>${new Date(t.createdAt).toLocaleDateString()}</span></div>
+                    <div class="meta-row">Status <span>${(t.status||'finished').toUpperCase()}</span></div>
+                </div>
+            </a>`).join('')}</div>`;
+    } catch (e) {
+        content.innerHTML = `<div class="loading" style="color:var(--red)">Error: ${e.message}</div>`;
+    }
+}
+load();
+</script>
+</body>
+</html>

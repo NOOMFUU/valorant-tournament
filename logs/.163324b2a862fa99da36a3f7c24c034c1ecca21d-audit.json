@@ -6,9 +6,14 @@
     "auditLog": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\.163324b2a862fa99da36a3f7c24c034c1ecca21d-audit.json",
     "files": [
         {
-            "date": 1777102282518,
-            "name": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\combined-2026-04-25.log",
-            "hash": "a25194360205d400bad6ec12479f8481682be32f28bb93cd789697f2bc55aff2"
+            "date": 1778835269408,
+            "name": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\combined-2026-05-15.log",
+            "hash": "cd5cb3e73bc81df6ab40242353eb428dc764a131d49ca6679185ca59311e8dd2"
+        },
+        {
+            "date": 1778864500290,
+            "name": "C:\\Users\\Saray\\Desktop\\valorant-tourney\\logs\\combined-2026-05-16.log",
+            "hash": "286091e1021d220e4dd00cfe95a256f8e2e703de71bc706c9a7a706dda8b2dff"
         }
     ],
     "hashType": "sha256"

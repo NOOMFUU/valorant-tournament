@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match Schedule | VALORANT TOURNAMENT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+        .font-mono { font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
+        
+        /* Timeline specific styles */
+        .timeline-container {
+            position: relative;
+        }
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: #333;
+            transform: translateX(-50%);
+        }
+        
+        .timeline-item {
+            position: relative;
+            width: 50%;
+            padding: 20px 40px;
+        }
+        
+        .timeline-item.left { left: 0; text-align: right; }
+        .timeline-item.right { left: 50%; text-align: left; }
+        
+        .timeline-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #ff4655;
+            border-radius: 50%;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+        .timeline-item.left .timeline-dot { right: -8px; }
+        .timeline-item.right .timeline-dot { left: -8px; }
+
+        .match-card {
+            background: #1a1d21;
+            border: 1px solid #2d3139;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .match-card:hover {
+            border-color: #ff4655;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1923; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
+
+        @media (max-width: 768px) {
+            .timeline-container::before { left: 20px; }
+            .timeline-item { width: 100%; padding-left: 50px; padding-right: 0; text-align: left !important; left: 0 !important; }
+            .timeline-item .timeline-dot { left: 12px !important; right: auto !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="h-20 bg-[#111] border-b border-[#222] flex items-center px-8 sticky top-0 z-50 shadow-lg">
+        <a href="index.html" class="mr-6 text-gray-500 hover:text-white transition flex items-center gap-2">
+            <i class="fa-solid fa-house"></i>
+            <span class="font-mono text-xs font-bold uppercase tracking-widest hidden md:inline">Home</span>
+        </a>
+        <div class="flex items-center gap-4 mr-12">
+            <div class="w-10 h-10 bg-[#ff4655] flex items-center justify-center rounded">
+                <i class="fa-solid fa-calendar-days text-white text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl font-header tracking-wide text-white leading-none">MATCH SCHEDULE</h1>
+                <div class="text-xs text-gray-500 font-bold uppercase tracking-widest">Protocol Timeline</div>
+            </div>
+        </div>
+        <nav class="hidden md:flex h-full ml-auto">
+            <a href="tournament_view.html" class="flex items-center px-6 text-base font-bold font-header text-gray-400 hover:text-white uppercase transition border-b-2 border-transparent hover:border-[#ff4655]">View Bracket</a>
+        </nav>
+    </header>
+
+    <div id="loading" class="flex-1 flex items-center justify-center">
+        <div class="text-center animate-pulse">
+            <i class="fa-solid fa-circle-notch fa-spin text-5xl text-[#ff4655] mb-4"></i>
+            <p class="font-mono text-sm font-bold uppercase tracking-widest text-gray-500">Compiling Timeline...</p>
+        </div>
+    </div>
+
+    <main id="content" class="hidden flex-1 max-w-6xl mx-auto w-full px-8 py-16">
+        <div class="text-center mb-16">
+            <h2 class="font-header text-6xl text-white tracking-wide mb-4">UPCOMING OPERATIONS</h2>
+            <p class="font-mono text-sm text-gray-500 uppercase tracking-widest">Sync your local time with the protocol via Google Calendar</p>
+        </div>
+
+        <div class="timeline-container" id="timelineList">
+            <!-- Timeline injected here -->
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#111] border-t border-[#222] mt-auto px-8 py-10">
+        <div class="max-w-6xl mx-auto text-center">
+            <h3 class="font-header text-2xl text-white tracking-wide mb-2">TOURNAMENT.EXE</h3>
+            <p class="font-mono text-[10px] text-gray-600 uppercase tracking-[0.2em]">
+                &copy; 2026 VALORANT TOURNAMENT PROTOCOL // TIMELINE SECURED
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = '';
+
+        async function init() {
+            try {
+                const res = await fetch(`${API_BASE}/api/matches`);
+                if (!res.ok) throw new Error("Failed to fetch matches");
+                
+                const matches = await res.json();
+                
+                // Filter and sort matches (Upcoming and Live)
+                const scheduledMatches = matches
+                    .filter(m => m.status === 'scheduled' || m.status === 'live')
+                    .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+
+                renderTimeline(scheduledMatches);
+            } catch (e) {
+                document.getElementById('loading').innerHTML = `<div class="text-red-500 font-bold uppercase">Error loading timeline: ${e.message}</div>`;
+            }
+        }
+
+        function formatGoogleCalendarUrl(match) {
+            const startDate = new Date(match.scheduledTime);
+            // Default 1.5 hours per match for Bo3
+            const endDate = new Date(startDate.getTime() + (90 * 60 * 1000));
+            
+            const formatDT = (d) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            
+            const title = encodeURIComponent(`${match.name}: ${match.teamA?.shortName || 'TBD'} vs ${match.teamB?.shortName || 'TBD'}`);
+            const details = encodeURIComponent(`Format: ${match.format || 'BO3'}\nMatch ID: ${match._id}\nWatch at: ${window.location.origin}/tournament_view.html`);
+            
+            return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatDT(startDate)}/${formatDT(endDate)}&details=${details}`;
+        }
+
+        function renderTimeline(matches) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            const container = document.getElementById('timelineList');
+            
+            if (matches.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-500 font-mono text-base py-12">No upcoming matches found.</div>`;
+                return;
+            }
+
+            let html = '';
+            matches.forEach((m, index) => {
+                const side = index % 2 === 0 ? 'left' : 'right';
+                const isLive = m.status === 'live';
+                const dateObj = new Date(m.scheduledTime);
+                const dateStr = dateObj.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+                const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const gCalUrl = formatGoogleCalendarUrl(m);
+
+                html += `
+                <div class="timeline-item ${side}">
+                    <div class="timeline-dot ${isLive ? 'animate-pulse shadow-[0_0_15px_#ff4655]' : ''}"></div>
+                    <div class="match-card p-6 inline-block w-full max-w-md ${side === 'left' ? 'ml-auto' : ''}">
+                        <div class="flex justify-between items-center mb-4 border-b border-[#333] pb-2">
+                            <span class="text-xs font-bold uppercase tracking-widest ${isLive ? 'text-[#ff4655] animate-pulse' : 'text-gray-500'}">
+                                ${isLive ? 'LIVE NOW' : `${dateStr} // ${timeStr}`}
+                            </span>
+                            <a href="${gCalUrl}" target="_blank" class="text-gray-400 hover:text-white transition" title="Add to Google Calendar">
+                                <i class="fa-brands fa-google text-base"></i>
+                            </a>
+                        </div>
+                        <div class="font-mono text-sm text-gray-500 uppercase tracking-widest mb-4">${m.name}</div>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-8 h-8 bg-[#111] border border-[#333] rounded p-1">
+                                        <img src="${m.teamA?.logo || 'https://via.placeholder.com/40'}" class="w-full h-full object-contain">
+                                    </div>
+                                    <span class="font-header text-3xl text-white tracking-wide">${m.teamA?.name || 'TBD'}</span>
+                                </div>
+                            </div>
+                            <div class="text-center font-mono text-xs text-gray-600">VS</div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-8 h-8 bg-[#111] border border-[#333] rounded p-1">
+                                        <img src="${m.teamB?.logo || 'https://via.placeholder.com/40'}" class="w-full h-full object-contain">
+                                    </div>
+                                    <span class="font-header text-3xl text-white tracking-wide">${m.teamB?.name || 'TBD'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 text-center">
+                            <a href="tournament_view.html" class="inline-block border border-[#333] text-gray-400 hover:text-white hover:border-[#ff4655] px-4 py-2 text-xs font-bold uppercase tracking-widest transition">
+                                Go to Match Center
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        init();
+    </script>
+</body>
+</html>

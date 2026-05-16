@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Overlay - Modern VCT Style</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Tungsten:wght@600&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: transparent; overflow: hidden; font-family: 'Oswald', sans-serif; }
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
         
         /* --- Colors & Variables --- */
         :root {
@@ -79,7 +79,7 @@
             color: #ccc;
             text-align: center;
             padding: 8px 4px;
-            font-family: 'Tungsten', sans-serif;
+            font-family: 'Anton', sans-serif;
             font-size: 15px; /* ลดขนาดลงเพื่อให้พอดี */
             font-weight: 600;
             line-height: 1.1;
@@ -137,7 +137,7 @@
         .map-name {
             position: relative;
             z-index: 10;
-            font-family: 'Tungsten', sans-serif;
+            font-family: 'Anton', sans-serif;
             font-size: 26px;
             font-weight: 600;
             width: 100%;
@@ -188,7 +188,7 @@
             color: white;
             text-align: center;
             padding: 6px 0;
-            font-family: 'Tungsten', sans-serif;
+            font-family: 'Anton', sans-serif;
             font-size: 14px;
             font-weight: 600;
             line-height: 1.1;
@@ -280,7 +280,7 @@
 
     <script>
         const matchId = new URLSearchParams(location.search).get('match');
-        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';
+        const API_BASE = '';
         
         const MAP_IMAGES = {
             'Abyss': 'https://media.valorant-api.com/maps/224b0a95-48b9-f703-1bd8-67aca101a61f/splash.png',
@@ -490,7 +490,7 @@
                         else { footerA = "WAITING"; footerB = "CHOOSING"; }
                     }
 
-                    let centerContent = `<div class="text-6xl font-bold text-white" style="font-family: 'Tungsten', sans-serif;">VS</div>`;
+                    let centerContent = `<div class="text-7xl font-bold text-white" style="font-family: 'Anton', sans-serif;">VS</div>`;
                     
                     if (status === 'coin_toss') {
                         centerContent = `
@@ -622,7 +622,7 @@
             setInterval(update, 2000); 
             requestAnimationFrame(animateTimer); 
         } else {
-            document.body.innerHTML = '<div class="text-white p-4 font-header text-3xl text-center mt-10">NO MATCH ID PROVIDED IN URL (?match=...)</div>';
+            document.body.innerHTML = '<div class="text-white p-4 font-header text-4xl text-center mt-10">NO MATCH ID PROVIDED IN URL (?match=...)</div>';
         }
     </script>
 </body>

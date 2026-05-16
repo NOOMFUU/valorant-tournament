@@ -14,6 +14,7 @@ const MatchSchema = new mongoose.Schema({
     loserMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
     loserMatchSlot: { type: String, enum: ['teamA', 'teamB'] },
 
+    roomName: { type: String, default: '' },
     roomPassword: { type: String, default: '' },
     chat: [{ sender: String, senderId: String, message: String, timestamp: { type: Date, default: Date.now } }],
     
@@ -49,7 +50,9 @@ const MatchSchema = new mongoose.Schema({
         submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
         tempScores: [{ mapName: String, teamAScore: Number, teamBScore: Number, proofImage: String }],
         status: { type: String, default: 'none' },
-        rejectReason: String
+        rejectReason: String,
+        isDisputed: { type: Boolean, default: false },
+        disputeReason: { type: String }
     },
 
     // [NEW] CHECK-IN SYSTEM
@@ -105,6 +108,10 @@ const MatchSchema = new mongoose.Schema({
         turnTimeLimit: { type: Number, default: 45 },
         
         coinTossWinner: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        priorityTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        priorityMode: { type: String, enum: ['random', '1v1', 'bracket'], default: 'random' },
+        priorityReportedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+        priorityWinnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
         decisionChoice: String,
         teamAReady: { type: Boolean, default: false },
         teamBReady: { type: Boolean, default: false }

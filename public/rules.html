@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Official Rulebook | VALORANT TOURNAMENT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Inter', sans-serif; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; }
+        .font-mono { font-family: 'Courier New', monospace; }
+        
+        .rule-section {
+            background: #1a1d21;
+            border: 1px solid #2d3139;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        .rule-section::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px; height: 100%;
+            background: #ff4655;
+        }
+        .rule-num {
+            position: absolute;
+            top: -15px; right: 20px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.05);
+            line-height: 1;
+        }
+
+        ul.vct-list {
+            list-style: none;
+            padding-left: 1.5rem;
+        }
+        ul.vct-list li {
+            position: relative;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+        }
+        ul.vct-list li::before {
+            content: '■';
+            position: absolute;
+            left: -1.5rem;
+            top: 2px;
+            font-size: 0.5rem;
+            color: #ff4655;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1923; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="h-20 bg-[#111] border-b border-[#222] flex items-center px-8 sticky top-0 z-50 shadow-lg">
+        <a href="index.html" class="mr-6 text-gray-500 hover:text-white transition flex items-center gap-2">
+            <i class="fa-solid fa-house"></i>
+            <span class="font-mono text-[10px] font-bold uppercase tracking-widest hidden md:inline">Home</span>
+        </a>
+        <div class="flex items-center gap-4 mr-12">
+            <div class="w-10 h-10 bg-[#ff4655] flex items-center justify-center rounded">
+                <i class="fa-solid fa-book text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-header tracking-wide text-white leading-none">OFFICIAL RULEBOOK</h1>
+                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Version 2.0.4</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl mx-auto w-full px-8 py-16">
+        
+        <div class="text-center mb-16">
+            <h2 class="font-header text-5xl text-white tracking-wide mb-4">TOURNAMENT REGULATIONS</h2>
+            <p class="font-mono text-sm text-gray-500 uppercase tracking-widest">All participants are required to adhere to these rules.</p>
+        </div>
+
+        <div class="rule-section">
+            <div class="rule-num">01</div>
+            <h3 class="font-header text-2xl text-white mb-4">MATCH PROCEDURES</h3>
+            <ul class="vct-list space-y-2">
+                <li>All matches must be played at the scheduled time. Teams have a <strong>15-minute grace period</strong> to join the lobby.</li>
+                <li>Failure to field a full roster (5 players) after the grace period will result in a forfeit.</li>
+                <li>The Match Host (Team A) is responsible for creating the custom lobby and communicating the Riot ID via the dashboard.</li>
+                <li>Server selection must be agreed upon by both teams. Default is Singapore 1.</li>
+            </ul>
+        </div>
+
+        <div class="rule-section">
+            <div class="rule-num">02</div>
+            <h3 class="font-header text-2xl text-white mb-4">VETO PROCESS</h3>
+            <ul class="vct-list space-y-2">
+                <li>The map veto must be conducted entirely through the Tournament Dashboard.</li>
+                <li>Teams have <strong>45 seconds</strong> per turn during the veto phase.</li>
+                <li>Failure to make a selection within the time limit will result in a randomized pick/ban.</li>
+                <li>Teams are permitted <strong>two (2) tactical pauses</strong> during the veto phase, each lasting up to 2 minutes.</li>
+            </ul>
+        </div>
+
+        <div class="rule-section">
+            <div class="rule-num">03</div>
+            <h3 class="font-header text-2xl text-white mb-4">IN-GAME RULES</h3>
+            <ul class="vct-list space-y-2">
+                <li><strong>Pauses:</strong> Each team is allowed two (2) tactical pauses per map. Pauses must be called during the buy phase.</li>
+                <li>Technical pauses must be communicated immediately to an admin via the lobby chat or Discord.</li>
+                <li>Exploits, bugs, or third-party software are strictly prohibited and will result in an immediate ban.</li>
+            </ul>
+        </div>
+
+        <div class="rule-section">
+            <div class="rule-num">04</div>
+            <h3 class="font-header text-2xl text-white mb-4">SCORE REPORTING</h3>
+            <ul class="vct-list space-y-2">
+                <li>The winning team is required to submit the final score and a screenshot of the post-match scoreboard via the dashboard.</li>
+                <li>The opposing team must verify the score. If a score is falsified, use the <strong>Dispute</strong> button.</li>
+                <li>Submitting falsified evidence will result in disqualification.</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#111] border-t border-[#222] mt-auto px-8 py-10">
+        <div class="max-w-6xl mx-auto text-center">
+            <h3 class="font-header text-xl text-white tracking-wide mb-2">TOURNAMENT.EXE</h3>
+            <p class="font-mono text-[9px] text-gray-600 uppercase tracking-[0.2em]">
+                &copy; 2026 VALORANT TOURNAMENT PROTOCOL // NO PERMISSION REQUIRED TO VIEW // DATA SECURED
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>

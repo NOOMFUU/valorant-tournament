@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const User = require('../models/User');
 const AdminLog = require('../models/AdminLog');
+const Notification = require('../models/Notification');
 
 async function sendDiscordLog(req, title, description, fields = [], color = 0x3498db) {
     const discordClient = req.app.get('discordClient');
@@ -26,4 +27,28 @@ async function logAdminAction(req, action, target, details) {
     } catch (e) { console.error("Log Error:", e); }
 }
 
-module.exports = { sendDiscordLog, logAdminAction };
+async function createNotification(req, message, type = 'info', options = {}) {
+    try {
+        const { recipientId, recipientModel, globalRole, title, link } = options;
+        const n = await Notification.create({
+            message,
+            type,
+            recipientId,
+            recipientModel,
+            globalRole,
+            title,
+            link
+        });
+        
+        // Emit via socket if available
+        const io = req.app.get('io');
+        if (io) {
+            if (globalRole === 'all') io.emit('notification', { msg: message, type });
+            else if (recipientId && recipientModel === 'Team') io.to(recipientId.toString()).emit('notification', { msg: message, type });
+            else io.emit('notification', { msg: message, type }); // Fallback broadcast
+        }
+        return n;
+    } catch (e) { console.error("Failed to create notification:", e); }
+}
+
+module.exports = { sendDiscordLog, logAdminAction, createNotification };

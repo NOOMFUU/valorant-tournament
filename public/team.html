@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Profile | VALORANT TOURNAMENT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+        .font-mono { font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
+        
+        .hero-banner {
+            position: relative;
+            background: #111;
+            border-bottom: 1px solid #333;
+            overflow: hidden;
+        }
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 100%, rgba(255, 70, 85, 0.15), transparent 70%);
+            pointer-events: none;
+        }
+
+        .stat-box {
+            background: #1a1d21;
+            border: 1px solid #2d3139;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #ff4655;
+            letter-spacing: 0.05em;
+        }
+        .stat-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #8b978f;
+            letter-spacing: 0.1em;
+            margin-top: 0.5rem;
+        }
+
+        .match-row {
+            transition: all 0.2s;
+            border-left: 2px solid transparent;
+        }
+        .match-row:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-left-color: #ff4655;
+        }
+        .match-win { border-left-color: #1fa474; }
+        .match-loss { border-left-color: #ff4655; }
+
+        .roster-card {
+            background: #1a1d21;
+            border: 1px solid #2d3139;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .roster-card:hover {
+            border-color: #ff4655;
+            transform: translateY(-4px);
+        }
+        .roster-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: #333;
+            transition: all 0.2s;
+        }
+        .roster-card:hover::before { background: #ff4655; }
+        .role-Main::before { background: #1fa474; }
+        .role-Sub::before { background: #dda828; }
+        .role-Coach::before { background: #ff4655; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1923; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="h-20 bg-[#111] border-b border-[#222] flex items-center px-8 sticky top-0 z-50 shadow-lg">
+        <a href="index.html" class="mr-6 text-gray-500 hover:text-white transition flex items-center gap-2">
+            <i class="fa-solid fa-house"></i>
+            <span class="font-mono text-xs font-bold uppercase tracking-widest hidden md:inline">Home</span>
+        </a>
+        <div class="flex items-center gap-4 mr-12">
+            <div class="w-10 h-10 bg-[#ff4655] flex items-center justify-center rounded">
+                <i class="fa-solid fa-shield-halved text-white text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl font-header tracking-wide text-white leading-none">TEAM DOSSIER</h1>
+                <div class="text-xs text-gray-500 font-bold uppercase tracking-widest">Public Database</div>
+            </div>
+        </div>
+        <nav class="hidden md:flex h-full ml-auto">
+            <a href="tournament_view.html" class="flex items-center px-6 text-base font-bold font-header text-gray-400 hover:text-white uppercase transition border-b-2 border-transparent hover:border-[#ff4655]">View Bracket</a>
+        </nav>
+    </header>
+
+    <div id="loading" class="flex-1 flex items-center justify-center">
+        <div class="text-center animate-pulse">
+            <i class="fa-solid fa-circle-notch fa-spin text-5xl text-[#ff4655] mb-4"></i>
+            <p class="font-mono text-sm font-bold uppercase tracking-widest text-gray-500">Retrieving Team Data...</p>
+        </div>
+    </div>
+
+    <div id="content" class="hidden flex-1 flex flex-col">
+        <!-- Hero Section -->
+        <section class="hero-banner pt-16 pb-12 px-8">
+            <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-end gap-10">
+                <div class="w-40 h-40 bg-[#1a1d21] border border-[#333] p-4 rounded shadow-2xl relative z-10 flex shrink-0 items-center justify-center overflow-hidden">
+                    <img id="teamLogo" src="" class="max-w-full max-h-full object-contain filter drop-shadow-lg">
+                </div>
+                <div class="flex-1 text-center md:text-left relative z-10">
+                    <p class="font-mono text-xs font-bold uppercase tracking-[0.3em] text-[#ff4655] mb-2" id="teamShort">TAG</p>
+                    <h1 class="font-header text-6xl md:text-7xl text-white tracking-wider mb-6" id="teamName">TEAM NAME</h1>
+                    <div class="flex flex-wrap justify-center md:justify-start gap-4">
+                        <div class="stat-box min-w-[120px]">
+                            <div class="stat-value text-white" id="statMatches">0</div>
+                            <div class="stat-label">Matches Played</div>
+                        </div>
+                        <div class="stat-box min-w-[120px]">
+                            <div class="stat-value text-[#1fa474]" id="statWins">0</div>
+                            <div class="stat-label">Wins</div>
+                        </div>
+                        <div class="stat-box min-w-[120px]">
+                            <div class="stat-value text-[#ff4655]" id="statLosses">0</div>
+                            <div class="stat-label">Losses</div>
+                        </div>
+                        <div class="stat-box min-w-[120px]">
+                            <div class="stat-value text-[#dda828]" id="statWinRate">0%</div>
+                            <div class="stat-label">Win Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto w-full px-8 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
+            
+            <!-- Left Col: Roster -->
+            <div class="lg:col-span-4 space-y-8">
+                <div>
+                    <h2 class="font-header text-3xl text-white tracking-wide mb-4 border-b border-[#333] pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-users text-[#ff4655]"></i> ACTIVE ROSTER
+                    </h2>
+                    <div class="space-y-3" id="rosterList">
+                        <!-- Roster injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Col: Match History -->
+            <div class="lg:col-span-8 space-y-8">
+                <div>
+                    <h2 class="font-header text-3xl text-white tracking-wide mb-4 border-b border-[#333] pb-2 flex justify-between items-end">
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-[#ff4655]"></i> MATCH HISTORY</span>
+                    </h2>
+                    <div class="bg-[#1a1d21] border border-[#2d3139] rounded overflow-hidden">
+                        <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-[#111] border-b border-[#333] text-xs font-bold text-gray-500 uppercase tracking-widest">
+                            <div class="col-span-2">Date</div>
+                            <div class="col-span-4">Match / Stage</div>
+                            <div class="col-span-4">Opponent</div>
+                            <div class="col-span-2 text-right">Result</div>
+                        </div>
+                        <div id="matchHistoryList" class="divide-y divide-[#222]">
+                            <!-- Matches injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-[#111] border-t border-[#222] mt-auto px-8 py-10">
+        <div class="max-w-6xl mx-auto text-center">
+            <h3 class="font-header text-2xl text-white tracking-wide mb-2">TOURNAMENT.EXE</h3>
+            <p class="font-mono text-[10px] text-gray-600 uppercase tracking-[0.2em]">
+                &copy; 2026 VALORANT TOURNAMENT PROTOCOL // NO PERMISSION REQUIRED TO VIEW // DATA SECURED
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = '';
+        const urlParams = new URLSearchParams(window.location.search);
+        const teamId = urlParams.get('id');
+
+        async function init() {
+            if (!teamId) {
+                showError("NO TEAM ID PROVIDED");
+                return;
+            }
+
+            try {
+                const [tRes, mRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/teams`),
+                    fetch(`${API_BASE}/api/matches`)
+                ]);
+
+                if (!tRes.ok || !mRes.ok) throw new Error("Failed to fetch data");
+
+                const teams = await tRes.json();
+                const matches = await mRes.json();
+
+                const team = teams.find(t => t._id === teamId);
+                if (!team) {
+                    showError("TEAM NOT FOUND IN DATABASE");
+                    return;
+                }
+
+                // Filter matches involving this team
+                const teamMatches = matches.filter(m => 
+                    (m.teamA && m.teamA._id === teamId) || 
+                    (m.teamB && m.teamB._id === teamId)
+                ).sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime));
+
+                renderTeamProfile(team, teamMatches);
+
+            } catch (e) {
+                showError("CONNECTION ERROR: " + e.message);
+            }
+        }
+
+        function showError(msg) {
+            const l = document.getElementById('loading');
+            l.innerHTML = `
+                <div class="text-center">
+                    <i class="fa-solid fa-triangle-exclamation text-7xl text-[#ff4655] mb-4"></i>
+                    <h2 class="font-header text-4xl text-white tracking-widest mb-2">ERROR</h2>
+                    <p class="font-mono text-base text-gray-500 uppercase tracking-widest">${msg}</p>
+                    <a href="index.html" class="inline-block mt-6 px-6 py-2 border border-[#333] text-white hover:border-[#ff4655] transition text-sm font-bold uppercase tracking-widest">Return Home</a>
+                </div>
+            `;
+        }
+
+        function renderTeamProfile(team, matches) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            // Hero
+            document.getElementById('teamName').innerText = team.name;
+            document.getElementById('teamShort').innerText = team.shortName || 'TAG';
+            document.getElementById('teamLogo').src = team.logo || 'https://via.placeholder.com/150';
+
+            // Stats
+            const finishedMatches = matches.filter(m => m.status === 'finished' && m.winner);
+            let wins = 0;
+            let losses = 0;
+
+            finishedMatches.forEach(m => {
+                if (m.winner._id === team._id || m.winner === team._id) wins++;
+                else losses++;
+            });
+
+            // Use DB stats if available, otherwise calculate
+            const totalWins = team.wins !== undefined ? team.wins : wins;
+            const totalLosses = team.losses !== undefined ? team.losses : losses;
+            const totalPlayed = totalWins + totalLosses;
+            const winRate = totalPlayed > 0 ? Math.round((totalWins / totalPlayed) * 100) : 0;
+
+            document.getElementById('statMatches').innerText = totalPlayed;
+            document.getElementById('statWins').innerText = totalWins;
+            document.getElementById('statLosses').innerText = totalLosses;
+            document.getElementById('statWinRate').innerText = `${winRate}%`;
+
+            // Roster
+            const rosterContainer = document.getElementById('rosterList');
+            if (team.members && team.members.length > 0) {
+                rosterContainer.innerHTML = team.members.map(m => {
+                    const roleColor = m.role === 'Main' ? 'text-[#1fa474]' : (m.role === 'Sub' ? 'text-[#dda828]' : 'text-[#ff4655]');
+                    return `
+                        <div class="roster-card role-${m.role} px-5 py-4 flex items-center justify-between group">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-[#222] border border-[#333] flex items-center justify-center text-white font-bold font-header text-2xl group-hover:bg-[#ff4655] transition">
+                                    ${m.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div class="font-header text-2xl text-white tracking-wide group-hover:text-[#ff4655] transition">${m.name}</div>
+                                    <div class="font-mono text-xs text-gray-500 uppercase tracking-widest">#${m.tag || '0000'}</div>
+                                </div>
+                            </div>
+                            <div class="font-bold text-xs uppercase tracking-widest ${roleColor} bg-[#111] px-2 py-1 rounded border border-[#333]">
+                                ${m.role || 'Player'}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                rosterContainer.innerHTML = `<div class="p-6 text-center border border-dashed border-[#333] text-gray-600 italic text-base">No roster information available.</div>`;
+            }
+
+            // Match History
+            const matchContainer = document.getElementById('matchHistoryList');
+            if (matches.length > 0) {
+                matchContainer.innerHTML = matches.map(m => {
+                    const isFinished = m.status === 'finished';
+                    const isLive = m.status === 'live';
+                    const isWinner = m.winner && (m.winner._id === team._id || m.winner === team._id);
+                    
+                    const opponent = (m.teamA && m.teamA._id === team._id) ? m.teamB : m.teamA;
+                    const oppName = opponent ? opponent.name : 'TBD';
+                    const oppLogo = opponent ? (opponent.logo || 'https://via.placeholder.com/30') : 'https://via.placeholder.com/30';
+                    const oppId = opponent ? opponent._id : null;
+                    
+                    const dateStr = m.scheduledTime ? new Date(m.scheduledTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
+                    
+                    let resultBadge = `<span class="bg-[#222] text-gray-400 px-3 py-1 rounded text-xs font-bold uppercase tracking-widest border border-[#333]">UPCOMING</span>`;
+                    let rowClass = 'match-row';
+
+                    if (isLive) {
+                        resultBadge = `<span class="bg-[#ff4655]/20 text-[#ff4655] px-3 py-1 rounded text-xs font-bold uppercase tracking-widest border border-[#ff4655]/50 animate-pulse">LIVE NOW</span>`;
+                    } else if (isFinished) {
+                        if (isWinner) {
+                            resultBadge = `<span class="bg-[#1fa474]/20 text-[#1fa474] px-3 py-1 rounded text-xs font-bold uppercase tracking-widest border border-[#1fa474]/50">VICTORY</span>`;
+                            rowClass += ' match-win';
+                        } else {
+                            resultBadge = `<span class="bg-[#ff4655]/20 text-[#ff4655] px-3 py-1 rounded text-xs font-bold uppercase tracking-widest border border-[#ff4655]/50">DEFEAT</span>`;
+                            rowClass += ' match-loss';
+                        }
+                    }
+
+                    // Score calculation
+                    let scoreTxt = '';
+                    if (isFinished || isLive) {
+                        let wA = 0, wB = 0;
+                        if (m.scores) {
+                            m.scores.forEach(s => {
+                                if (parseInt(s.teamAScore) > parseInt(s.teamBScore)) wA++;
+                                else if (parseInt(s.teamBScore) > parseInt(s.teamAScore)) wB++;
+                            });
+                        }
+                        const isTeamA = m.teamA && m.teamA._id === team._id;
+                        const myScore = isTeamA ? wA : wB;
+                        const oppScore = isTeamA ? wB : wA;
+                        scoreTxt = `<span class="font-header text-2xl ${myScore > oppScore ? 'text-[#1fa474]' : (myScore < oppScore ? 'text-[#ff4655]' : 'text-gray-400')}">${myScore}</span> <span class="text-gray-600">-</span> <span class="font-header text-2xl text-gray-400">${oppScore}</span>`;
+                    }
+
+                    return `
+                        <div class="${rowClass} grid grid-cols-12 gap-4 px-6 py-4 items-center">
+                            <div class="col-span-2 font-mono text-xs text-gray-500 uppercase">${dateStr}</div>
+                            <div class="col-span-4 flex flex-col">
+                                <span class="font-bold text-white text-base truncate">${m.name}</span>
+                                <span class="font-mono text-[10px] text-gray-500 uppercase">${m.format || 'BO3'}</span>
+                            </div>
+                            <div class="col-span-4 flex items-center gap-3">
+                                <img src="${oppLogo}" class="w-6 h-6 object-contain bg-[#111] border border-[#333] rounded p-0.5">
+                                <a href="team.html?id=${oppId}" class="font-bold text-white text-base hover:text-[#ff4655] transition truncate ${!oppId ? 'pointer-events-none' : ''}">${oppName}</a>
+                            </div>
+                            <div class="col-span-2 text-right flex flex-col items-end gap-1">
+                                ${resultBadge}
+                                ${scoreTxt ? `<div class="mt-1">${scoreTxt}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                matchContainer.innerHTML = `<div class="p-8 text-center text-gray-500 italic text-base">No matches scheduled or played yet.</div>`;
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

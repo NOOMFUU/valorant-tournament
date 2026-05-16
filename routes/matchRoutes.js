@@ -104,12 +104,14 @@ router.delete('/matches/:id', auth(['admin']), async (req, res) => {
 // UPDATE Match Info
 router.put('/matches/:id', auth(['admin']), async (req, res) => {
     try {
-        const { format, name, status, scheduledTime } = req.body;
+        const { format, name, status, scheduledTime, roomName, roomPassword } = req.body;
         const update = {};
         if (format) update.format = format;
         if (name) update.name = name;
         if (status) update.status = status;
         if (scheduledTime !== undefined) update.scheduledTime = scheduledTime;
+        if (roomName !== undefined) update.roomName = roomName;
+        if (roomPassword !== undefined) update.roomPassword = roomPassword;
 
         const match = await Match.findByIdAndUpdate(req.params.id, update, { new: true });
         req.app.get('io').emit('match_update', match);
@@ -217,6 +219,30 @@ router.post('/matches/:id/submit-score', auth(['team']), upload.any(), async (re
         match.status = 'pending_approval';
         await match.save();
         req.app.get('io').emit('match_update', match);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// DISPUTE Score
+router.post('/matches/:id/dispute-score', auth(['team']), async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+        
+        if (match.status !== 'pending_approval') return res.status(400).json({ msg: 'No score is pending approval for this match' });
+        if (!reason) return res.status(400).json({ msg: 'Dispute reason is required' });
+
+        match.scoreSubmission.isDisputed = true;
+        match.scoreSubmission.disputeReason = reason;
+        match.markModified('scoreSubmission');
+        await match.save();
+
+        req.app.get('io').emit('match_update', match);
+        
+        const { createNotification } = require('../utils/helpers');
+        await createNotification(req, `⚠️ SCORE DISPUTED: Match #${match.matchNumber} (${match.name})`, 'error', { globalRole: 'admin' });
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
@@ -622,7 +648,24 @@ router.post('/matches/:id/admin-pause', auth(['admin']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
-// RESOLVE Pause
+// SET VETO PRIORITY (Admin Bypass Coin Toss)
+router.post('/matches/:id/priority', auth(['admin']), async (req, res) => {
+    try {
+        const { teamId } = req.body;
+        const match = await Match.findById(req.params.id);
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
+
+        match.vetoData.priorityTeam = teamId;
+        await match.save();
+
+        const vetoMgr = req.app.get('vetoMgr');
+        if (vetoMgr) await vetoMgr.broadcastState(match._id.toString());
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ msg: e.message }); }
+});
+
+// ADMIN RESOLVE Pause
 router.post('/matches/:id/pause/resolve', auth(['admin']), async (req, res) => {
     try {
         const match = await Match.findById(req.params.id);

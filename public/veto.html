@@ -11,7 +11,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Tungsten:wght@600&family=Oswald:wght@400;500;700&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
 
     <style>
         /* --- CORE IDENTITY --- */
@@ -24,13 +24,7 @@
             --sidebar-width: 360px;
         }
 
-        body {
-            background-color: var(--val-dark); /* [MOD] Solid fallback color */
-            color: var(--val-white);
-            font-family: 'Rajdhani', sans-serif;
-            overflow: hidden; 
-            user-select: none;
-        }
+        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
 
         /* --- LAYOUT --- */
         .layout-container { display: flex; height: 100vh; width: 100vw; position: relative; z-index: 10; }
@@ -115,9 +109,9 @@
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
             background-size: 100% 3px, 3px 100%; opacity: 0.2;
         }
-        .font-header { font-family: 'Anton', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
         .font-ui { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .font-mono { font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
         .clip-val { clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px); }
         .clip-diag { clip-path: polygon(0 0, 100% 0, 100% 100%, 15px 100%); }
 
@@ -200,18 +194,18 @@
     <div class="fixed inset-0 z-1 bg-gradient-to-t from-[#0f1923] via-[#0f1923]/50 to-transparent"></div>
 
     <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 opacity-0 -translate-y-8 pointer-events-none">
-        <div class="bg-[#ff4655] text-white px-8 py-3 text-xl font-ui font-bold tracking-widest clip-val shadow-xl flex items-center gap-3">
+        <div class="bg-[#ff4655] text-white px-8 py-3 text-2xl font-ui font-bold tracking-widest clip-val shadow-xl flex items-center gap-3">
             <i class="fa-solid fa-bell"></i> <span id="toastMsg">NOTIFICATION</span>
         </div>
     </div>
 
     <div id="pauseOverlay" class="hidden fixed inset-0 z-[200] flex items-center justify-center">
         <div class="text-center animate-pulse">
-            <i class="fa-solid fa-pause text-6xl text-yellow-500 mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]"></i>
-            <h2 class="text-5xl font-header text-white tracking-[0.2em] mb-2">MATCH PAUSED</h2>
-            <p class="text-gray-400 font-mono text-sm tracking-widest uppercase">Waiting for Admin Resolution</p>
-            <div id="pauseTimerDisplay" class="text-4xl font-mono font-bold text-white mt-4"></div>
-            <button id="resumeBtn" onclick="resumeMatch()" class="hidden mt-6 bg-[#1fa474] hover:bg-white hover:text-[#1fa474] text-white px-8 py-3 font-ui font-bold text-xl clip-val transition shadow-[0_0_20px_rgba(31,164,116,0.4)]">RESUME MATCH</button>
+            <i class="fa-solid fa-pause text-7xl text-yellow-500 mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]"></i>
+            <h2 class="text-6xl font-header text-white tracking-[0.2em] mb-2">MATCH PAUSED</h2>
+            <p class="text-gray-400 font-mono text-base tracking-widest uppercase">Waiting for Admin Resolution</p>
+            <div id="pauseTimerDisplay" class="text-5xl font-mono font-bold text-white mt-4"></div>
+            <button id="resumeBtn" onclick="resumeMatch()" class="hidden mt-6 bg-[#1fa474] hover:bg-white hover:text-[#1fa474] text-white px-8 py-3 font-ui font-bold text-2xl clip-val transition shadow-[0_0_20px_rgba(31,164,116,0.4)]">RESUME MATCH</button>
         </div>
     </div>
 
@@ -219,49 +213,71 @@
         
         <aside class="sidebar-panel">
             <div class="p-5 border-b border-white/10 bg-gradient-to-r from-transparent to-[#ff4655]/10">
-                <h2 class="font-header text-2xl text-white tracking-wider flex items-center gap-2">
-                    <i class="fa-solid fa-layer-group text-[#ff4655]"></i> LOBBY CONTROL
+                <h2 class="font-header text-3xl text-white tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-gamepad text-[#ff4655]"></i> MATCH CONNECTION
                 </h2>
             </div>
 
             <div class="p-4 bg-black/20">
-                <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1">Lobby ID / Password</div>
+                <div class="flex justify-between items-center mb-1">
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest" id="lobbyHostStatus">Add In-Game</div>
+                </div>
                 <div id="lobbyActionArea" class="flex items-center gap-2 bg-[#0f1923] p-3 border border-white/10 cursor-pointer hover:border-white/30 transition group">
-                    <span id="roomPassContent" class="font-mono text-lg text-white font-bold flex-1 truncate tracking-wider">---</span>
+                    <span id="roomPassContent" class="font-mono text-base text-white font-bold flex-1 truncate tracking-wider">WAITING FOR TEAMS...</span>
                     <i class="fa-regular fa-copy text-gray-500 group-hover:text-white transition"></i>
                 </div>
             </div>
 
             <div class="flex-shrink-0 flex flex-col border-b border-white/10 max-h-[40vh]">
-                 <div class="px-4 py-3 text-[10px] text-[#1fa474] font-bold uppercase tracking-widest border-b border-white/5 flex justify-between items-center bg-black/20">
+                 <div class="px-4 py-3 text-xs text-[#1fa474] font-bold uppercase tracking-widest border-b border-white/5 flex justify-between items-center bg-black/20">
                     <span>MAPS TO PLAY</span>
                     <i class="fa-solid fa-map"></i>
                  </div>
                  <div id="miniSummary" class="flex-1 flex flex-col gap-0 overflow-y-auto custom-scroll p-0">
-                     <div class="text-center text-xs text-gray-600 italic py-4">Waiting for picks...</div>
+                     <div class="text-center text-sm text-gray-600 italic py-4">Waiting for picks...</div>
                  </div>
             </div>
 
             <div class="flex mt-2 mx-4 border-b border-white/10">
-                <button onclick="switchSidebarTab('logs')" id="tab-logs" class="flex-1 py-2 text-center text-xs font-bold font-ui tracking-widest text-[#ff4655] border-b-2 border-[#ff4655] transition">LOGS</button>
-                <button onclick="switchSidebarTab('chat')" id="tab-chat" class="flex-1 py-2 text-center text-xs font-bold font-ui tracking-widest text-gray-500 border-b-2 border-transparent hover:text-white transition">CHAT</button>
+                <button onclick="switchSidebarTab('logs')" id="tab-logs" class="flex-1 py-2 text-center text-sm font-bold font-ui tracking-widest text-[#ff4655] border-b-2 border-[#ff4655] transition">LOGS</button>
+                <button onclick="switchSidebarTab('chat')" id="tab-chat" class="flex-1 py-2 text-center text-sm font-bold font-ui tracking-widest text-gray-500 border-b-2 border-transparent hover:text-white transition">CHAT</button>
             </div>
 
             <div class="flex-1 relative bg-black/10 overflow-hidden">
                 <div id="view-logs" class="absolute inset-0 overflow-y-auto p-4 custom-scroll">
-                    <div id="logContainer" class="flex flex-col gap-2 font-mono text-[10px] text-gray-400"></div>
+                    <div id="logContainer" class="flex flex-col gap-2 font-mono text-xs text-gray-400"></div>
                 </div>
                 <div id="view-chat" class="absolute inset-0 hidden flex flex-col">
                     <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll"></div>
                     <div id="chatInputContainer" class="p-3 bg-[#0f1923] border-t border-white/10">
                         <div class="flex gap-2">
-                            <input id="chatInput" class="flex-1 bg-black/50 border border-white/20 px-3 py-2 text-xs text-white focus:border-[#ff4655] outline-none font-mono placeholder-gray-600" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendChat('chatInput')">
-                            <button onclick="sendChat('chatInput')" class="px-3 bg-white/10 hover:bg-[#ff4655] text-white transition border border-white/10"><i class="fa-solid fa-paper-plane text-xs"></i></button>
+                            <input id="chatInput" class="flex-1 bg-black/50 border border-white/20 px-3 py-2 text-sm text-white focus:border-[#ff4655] outline-none font-mono placeholder-gray-600" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendChat('chatInput')">
+                            <button onclick="sendChat('chatInput')" class="px-3 bg-white/10 hover:bg-[#ff4655] text-white transition border border-white/10"><i class="fa-solid fa-paper-plane text-sm"></i></button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="p-2 text-center text-[9px] text-gray-600 font-mono border-t border-white/5 bg-[#0f1923]">VCT // SYSTEM READY</div>
+            <div class="p-2 text-center text-[10px] text-gray-600 font-mono border-t border-white/5 bg-[#0f1923]">VCT // SYSTEM READY</div>
+            
+            <div id="adminPanel" class="hidden p-4 bg-red-900/10 border-t border-red-500/20">
+                <div class="text-[10px] font-bold text-red-500 uppercase tracking-[0.2em] mb-3">Admin Overrides</div>
+                <div class="space-y-2">
+                    <button onclick="adminResetVeto()" class="w-full bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/30 py-2 text-[10px] font-bold uppercase transition clip-val">Emergency Reset</button>
+                    
+                    <div id="priorityTools" class="hidden mt-4 pt-4 border-t border-white/5">
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mb-2">Manual Override</div>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <button id="pBtnA" class="bg-[#1a1d21] border border-[#333] py-2 text-[9px] font-bold uppercase hover:border-[#ff4655] transition text-gray-400"></button>
+                            <button id="pBtnB" class="bg-[#1a1d21] border border-[#333] py-2 text-[9px] font-bold uppercase hover:border-[#ff4655] transition text-gray-400"></button>
+                        </div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mb-2">Priority Mode</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setPriorityMode('random')" id="modeBtnRandom" class="bg-[#1a1d21] border border-[#333] py-1.5 text-[8px] font-bold uppercase hover:border-white transition text-gray-400">RANDOM</button>
+                            <button onclick="setPriorityMode('1v1')" id="modeBtn1v1" class="bg-[#1a1d21] border border-[#333] py-1.5 text-[8px] font-bold uppercase hover:border-white transition text-gray-400">1V1 DUEL</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <main class="main-stage">
@@ -272,7 +288,7 @@
             
             <div class="flex justify-center mt-2 opacity-0 absolute top-6 left-0 right-0 z-50 pointer-events-none" id="topInfo">
                 <div class="bg-black/60 backdrop-blur px-8 py-1 clip-val border-b border-white/10 text-center inline-block">
-                    <div id="phaseText" class="text-[10px] text-[#ff4655] tracking-[0.4em] font-bold uppercase animate-pulse">CONNECTING...</div>
+                    <div id="phaseText" class="text-xs text-[#ff4655] tracking-[0.4em] font-bold uppercase animate-pulse">CONNECTING...</div>
                 </div>
             </div>
 
@@ -282,46 +298,46 @@
                         <div class="flex items-center gap-4 mb-1">
                             <div class="flex items-center gap-2" title="Connection Status">
                                 <div id="cA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
-                                <div id="cA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
+                                <div id="cA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
                             </div>
                             <div class="flex items-center gap-2 opacity-50" id="rA_box">
                                 <div id="sA_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
-                                <div id="sA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
+                                <div id="sA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
                             </div>
                             <div class="flex items-center gap-2 opacity-70" title="Pauses Remaining">
-                                <i class="fa-solid fa-pause text-[10px] text-gray-500"></i>
-                                <div id="pA" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">2/2</div>
+                                <i class="fa-solid fa-pause text-xs text-gray-500"></i>
+                                <div id="pA" class="text-xs font-bold tracking-widest text-gray-500 font-mono">2/2</div>
                             </div>
                         </div>
-                        <h1 id="tA" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM A</h1>
+                        <h1 id="tA" class="font-header text-7xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM A</h1>
                     </div>
 
                     <div class="w-1/3 text-center flex flex-col items-center opacity-0 scale-90 transition-all duration-500" id="headerStatus">
-                        <div id="status" class="bg-white text-black px-12 py-1 font-ui text-5xl font-bold tracking-[0.1em] clip-val shadow-lg z-10 whitespace-nowrap">LOADING</div>
+                        <div id="status" class="bg-white text-black px-12 py-1 font-ui text-6xl font-bold tracking-[0.1em] clip-val shadow-lg z-10 whitespace-nowrap">LOADING</div>
                     </div>
 
                     <div class="w-1/3 text-right opacity-0 translate-x-10 transition-all duration-700" id="headerTB">
                         <div class="flex items-center justify-end gap-4 mb-1">
                             <div class="flex items-center gap-2 opacity-70" title="Pauses Remaining">
-                                <div id="pB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">2/2</div>
-                                <i class="fa-solid fa-pause text-[10px] text-gray-500"></i>
+                                <div id="pB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">2/2</div>
+                                <i class="fa-solid fa-pause text-xs text-gray-500"></i>
                             </div>
                             <div class="flex items-center gap-2 opacity-50" id="rB_box">
-                                <div id="sB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
+                                <div id="sB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">NOT READY</div>
                                 <div id="sB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
                             </div>
                             <div class="flex items-center gap-2" title="Connection Status">
-                                <div id="cB" class="text-[10px] font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
+                                <div id="cB" class="text-xs font-bold tracking-widest text-gray-500 font-mono">OFFLINE</div>
                                 <div id="cB_dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
                             </div>
                         </div>
-                        <h1 id="tB" class="font-header text-6xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM B</h1>
+                        <h1 id="tB" class="font-header text-7xl xl:text-7xl text-white leading-none drop-shadow-2xl">TEAM B</h1>
                     </div>
                 </div>
             </header>
 
             <div class="h-14 flex justify-center items-center shrink-0 z-50 relative">
-                <button id="readyBtn" onclick="socket.emit('team_ready',{matchId,teamId});" class="hidden bg-[#1fa474] text-white font-ui text-xl px-12 py-2 tracking-widest clip-val hover:bg-white hover:text-[#1fa474] transition-all shadow-[0_0_30px_rgba(31,164,116,0.4)] border border-[#1fa474]">
+                <button id="readyBtn" onclick="socket.emit('team_ready',{matchId,teamId});" class="hidden bg-[#1fa474] text-white font-ui text-2xl px-12 py-2 tracking-widest clip-val hover:bg-white hover:text-[#1fa474] transition-all shadow-[0_0_30px_rgba(31,164,116,0.4)] border border-[#1fa474]">
                     <i class="fa-solid fa-lock mr-2"></i> LOCK IN
                 </button>
             </div>
@@ -331,7 +347,7 @@
                 
                 <div id="sequencerContainer" class="timeline-container opacity-0 transition-opacity duration-1000 flex-col gap-3">
                     <div id="sequencerBar" class="flex items-center bg-black/40 px-4 py-2 rounded-lg border border-white/5 backdrop-blur-md"></div>
-                    <button id="pauseBtn" onclick="requestPause()" class="pointer-events-auto bg-yellow-500/10 hover:bg-yellow-500 hover:text-black text-yellow-500 border border-yellow-500/50 px-6 py-2 text-[10px] font-bold uppercase tracking-widest transition clip-val"><i class="fa-solid fa-pause mr-2"></i> PAUSE MATCH</button>
+                    <button id="pauseBtn" onclick="requestPause()" class="pointer-events-auto bg-yellow-500/10 hover:bg-yellow-500 hover:text-black text-yellow-500 border border-yellow-500/50 px-6 py-2 text-xs font-bold uppercase tracking-widest transition clip-val"><i class="fa-solid fa-pause mr-2"></i> PAUSE MATCH</button>
                 </div>
             </div>
         </main>
@@ -349,14 +365,14 @@
             
             <div class="w-full flex justify-between items-start mb-6 border-b border-white/10 pb-4 shrink-0">
                 <div>
-                    <h2 class="text-[#1fa474] font-mono tracking-[0.5em] text-xs mb-1 uppercase">Match Protocol Complete</h2>
-                    <h1 class="text-6xl font-header leading-none text-white drop-shadow-2xl">VETO SUMMARY</h1>
+                    <h2 class="text-[#1fa474] font-mono tracking-[0.5em] text-sm mb-1 uppercase">Match Protocol Complete</h2>
+                    <h1 class="text-7xl font-header leading-none text-white drop-shadow-2xl">VETO SUMMARY</h1>
                 </div>
                 <div class="flex gap-4 items-center" id="endButtons">
-                    <button onclick="toggleEndDrawer()" class="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-ui tracking-widest text-sm clip-val border border-white/10 transition flex items-center gap-2">
+                    <button onclick="toggleEndDrawer()" class="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-ui tracking-widest text-base clip-val border border-white/10 transition flex items-center gap-2">
                         <i class="fa-regular fa-comments"></i> COMMS / LOGS
                     </button>
-                    <a href="/team-dashboard.html" class="bg-[#ff4655] text-white px-8 py-3 font-ui font-bold text-xl clip-val hover:bg-white hover:text-black transition duration-300 shadow-[0_0_20px_rgba(255,70,85,0.4)]">
+                    <a href="/team-dashboard.html" class="bg-[#ff4655] text-white px-8 py-3 font-ui font-bold text-2xl clip-val hover:bg-white hover:text-black transition duration-300 shadow-[0_0_20px_rgba(255,70,85,0.4)]">
                         EXIT TO DASHBOARD
                     </a>
                 </div>
@@ -365,21 +381,21 @@
             <div class="flex-1 grid grid-cols-12 gap-8 h-full overflow-hidden pb-2">
                 <div class="col-span-3 flex flex-col h-full animate-slide-right">
                     <div class="mb-4 border-l-4 border-[#1fa474] pl-4">
-                         <h3 id="endTA" class="text-4xl font-header truncate text-white">TEAM A</h3>
-                         <div class="text-[#1fa474] font-bold tracking-widest text-[10px] uppercase">Roster Verified</div>
+                         <h3 id="endTA" class="text-5xl font-header truncate text-white">TEAM A</h3>
+                         <div class="text-[#1fa474] font-bold tracking-widest text-xs uppercase">Roster Verified</div>
                     </div>
                     <div id="listTA" class="flex-1 flex flex-col justify-start gap-2 overflow-y-auto custom-scroll pr-1"></div>
                 </div>
                 <div class="col-span-6 flex flex-col h-full animate-scale-up delay-100 relative">
                     <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#1fa474]/5 to-transparent pointer-events-none"></div>
                     
-                    <h3 class="font-ui text-xl tracking-[0.5em] text-center text-gray-500 mb-4 uppercase">Map Selection Series</h3>
+                    <h3 class="font-ui text-2xl tracking-[0.5em] text-center text-gray-500 mb-4 uppercase">Map Selection Series</h3>
                     <div id="endMaps" class="flex-1 flex flex-col gap-2 justify-center mb-4 overflow-y-auto custom-scroll px-2"></div>
                 </div>
                 <div class="col-span-3 flex flex-col h-full animate-slide-left items-end">
                     <div class="mb-4 border-r-4 border-[#ff4655] pr-4 text-right">
-                        <h3 id="endTB" class="text-4xl font-header truncate text-white">TEAM B</h3>
-                        <div class="text-[#ff4655] font-bold tracking-widest text-[10px] uppercase">Roster Verified</div>
+                        <h3 id="endTB" class="text-5xl font-header truncate text-white">TEAM B</h3>
+                        <div class="text-[#ff4655] font-bold tracking-widest text-xs uppercase">Roster Verified</div>
                    </div>
                    <div id="listTB" class="flex-1 w-full flex flex-col justify-start gap-2 overflow-y-auto custom-scroll pl-1"></div>
                 </div>
@@ -388,19 +404,19 @@
 
         <div id="endChatDrawer" class="chat-drawer flex flex-col">
             <div class="flex justify-between items-center bg-[#1c252e] p-4 border-b border-white/10">
-                <span class="font-ui tracking-widest text-sm text-white"><i class="fa-solid fa-list-ul mr-2 text-[#ff4655]"></i>MATCH LOGS & CHAT</span>
+                <span class="font-ui tracking-widest text-base text-white"><i class="fa-solid fa-list-ul mr-2 text-[#ff4655]"></i>MATCH LOGS & CHAT</span>
                 <button onclick="toggleEndDrawer()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="flex border-b border-white/10 bg-black/40">
-                <button onclick="switchEndTab('endLogs')" id="tab-endLogs" class="flex-1 py-3 text-xs font-bold tracking-widest text-white border-b-2 border-[#ff4655]">SYSTEM LOGS</button>
-                <button onclick="switchEndTab('endChat')" id="tab-endChat" class="flex-1 py-3 text-xs font-bold tracking-widest text-gray-500 border-b-2 border-transparent">CHAT</button>
+                <button onclick="switchEndTab('endLogs')" id="tab-endLogs" class="flex-1 py-3 text-sm font-bold tracking-widest text-white border-b-2 border-[#ff4655]">SYSTEM LOGS</button>
+                <button onclick="switchEndTab('endChat')" id="tab-endChat" class="flex-1 py-3 text-sm font-bold tracking-widest text-gray-500 border-b-2 border-transparent">CHAT</button>
             </div>
             <div class="flex-1 relative overflow-hidden">
-                <div id="view-endLogs" class="absolute inset-0 overflow-y-auto p-4 font-mono text-[10px] space-y-2 text-gray-400 custom-scroll"></div>
+                <div id="view-endLogs" class="absolute inset-0 overflow-y-auto p-4 font-mono text-xs space-y-2 text-gray-400 custom-scroll"></div>
                 <div id="view-endChat" class="absolute inset-0 hidden flex flex-col">
                     <div id="endChatBox" class="flex-1 overflow-y-auto p-4 space-y-2 custom-scroll bg-black/20"></div>
                     <div class="p-3 bg-[#1c252e] border-t border-white/10">
-                        <input id="endChatInput" class="w-full bg-black/50 border border-white/20 px-3 py-2 text-xs text-white focus:border-[#ff4655] outline-none font-mono" placeholder="Message..." onkeypress="if(event.key==='Enter') sendChat('endChatInput')">
+                        <input id="endChatInput" class="w-full bg-black/50 border border-white/20 px-3 py-2 text-sm text-white focus:border-[#ff4655] outline-none font-mono" placeholder="Message..." onkeypress="if(event.key==='Enter') sendChat('endChatInput')">
                     </div>
                 </div>
             </div>
@@ -408,7 +424,7 @@
     </div>
 
     <script>
-        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' ? 'http://localhost:3000' : '';        
+        const API_BASE = '';        
         const socket = io(API_BASE || undefined);
         const matchId = new URLSearchParams(location.search).get('match');
         const teamId = localStorage.getItem('id');
@@ -550,7 +566,7 @@
         socket.on('notification', (d) => showToast(d.msg));
         socket.on('chat_new', (data) => {
             const isMe = data.senderId === teamId;
-            const html = `<div class="flex flex-col ${isMe?'items-end':'items-start'} mb-2"><div class="text-[9px] text-gray-500 mb-0.5 font-bold uppercase">${data.sender}</div><div class="${isMe?'bg-[#1fa474] text-white border-[#1fa474]':'bg-[#1f2731] text-gray-300 border-white/10'} px-3 py-2 rounded-sm text-xs max-w-[90%] border shadow-md font-mono break-words">${data.message}</div></div>`;
+            const html = `<div class="flex flex-col ${isMe?'items-end':'items-start'} mb-2"><div class="text-[10px] text-gray-500 mb-0.5 font-bold uppercase">${data.sender}</div><div class="${isMe?'bg-[#1fa474] text-white border-[#1fa474]':'bg-[#1f2731] text-gray-300 border-white/10'} px-3 py-2 rounded-sm text-sm max-w-[90%] border shadow-md font-mono break-words">${data.message}</div></div>`;
             const box = document.getElementById('chatBox');
             box.insertAdjacentHTML('beforeend', html);
             box.scrollTop = box.scrollHeight;
@@ -589,32 +605,44 @@
             
             const passEl = document.getElementById('roomPassContent');
             const lobbyCont = document.getElementById('lobbyActionArea');            
+            const hostStatus = document.getElementById('lobbyHostStatus');
             lobbyCont.removeAttribute('onclick'); 
             
+            const getCaptain = (team) => {
+                if (!team || !team.members || team.members.length === 0) return null;
+                return team.members.find(x => x.role === 'Main') || team.members[0];
+            };
+
             if (isSpectator) {
-                passEl.innerText = "LOBBY ID HIDDEN";
+                hostStatus.innerText = "Match Connection";
+                passEl.innerText = "HIDDEN FOR SPECTATORS";
                 passEl.classList.add('text-gray-500');
                 passEl.classList.remove('text-[#ff4655]', 'text-white');
-            } else if(m.roomPassword) {
-                passEl.innerText = m.roomPassword;
-                passEl.classList.add('text-white');
-                passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
-                lobbyCont.onclick = function(e) { copyLobbyID(e); };
-                if(isA) passEl.innerHTML += ` <i class="fa-solid fa-pen text-[10px] text-gray-500 hover:text-[#ff4655] ml-2" onclick="event.stopPropagation(); setRoomPass()"></i>`;
-            } else if(isA) {
-                passEl.innerHTML = `SET CODE <i class="fa-solid fa-pen ml-2"></i>`;
-                passEl.classList.remove('text-white', 'text-gray-500');
-                passEl.classList.add('text-[#ff4655]');
-                lobbyCont.onclick = function() { setRoomPass(); };
             } else {
-                 passEl.innerText = "WAITING FOR HOST";
-                 passEl.classList.add('text-gray-500');
-                 passEl.classList.remove('text-[#ff4655]', 'text-white');
+                const opponentTeam = isA ? m.teamB : m.teamA;
+                const oppCaptain = getCaptain(opponentTeam);
+                
+                if (oppCaptain && oppCaptain.name && oppCaptain.tag) {
+                    const riotId = `${oppCaptain.name}#${oppCaptain.tag}`;
+                    hostStatus.innerText = isA ? "Invite Opponent Captain" : "Add Host In-Game";
+                    passEl.innerText = riotId;
+                    passEl.classList.add('text-white');
+                    passEl.classList.remove('text-[#ff4655]', 'text-gray-500');
+                    lobbyCont.onclick = function(e) { 
+                        navigator.clipboard.writeText(riotId);
+                        showToast("RIOT ID COPIED");
+                    };
+                } else {
+                    hostStatus.innerText = "Match Connection";
+                    passEl.innerText = "OPPONENT ROSTER INCOMPLETE";
+                    passEl.classList.add('text-gray-500');
+                    passEl.classList.remove('text-[#ff4655]', 'text-white');
+                }
             }
 
             const amIReady = isA ? v.teamAReady : v.teamBReady;
             const rBtn = document.getElementById('readyBtn');
-            if(!isSpectator && m.roomPassword && !amIReady && v.status === 'pending') {
+            if(!isSpectator && !amIReady && v.status === 'pending') {
                 rBtn.classList.remove('hidden');
             } else {
                 rBtn.classList.add('hidden');
@@ -648,7 +676,63 @@
             handleModals(v, teamId);
 
             if(v.status === 'completed' || m.status === 'live') showEndScreen(m);
+
+            // [NEW] Show Admin Panel if applicable
+            if (userRole === 'admin') {
+                document.getElementById('adminPanel').classList.remove('hidden');
+                const priorityTools = document.getElementById('priorityTools');
+                if (v.status === 'pending' || v.status === 'awaiting_1v1') {
+                    priorityTools.classList.remove('hidden');
+                    const btnA = document.getElementById('pBtnA');
+                    const btnB = document.getElementById('pBtnB');
+                    btnA.innerText = `${m.teamA.shortName}`;
+                    btnB.innerText = `${m.teamB.shortName}`;
+                    
+                    const isPriA = v.priorityTeam && areIdsEqual(v.priorityTeam, m.teamA._id);
+                    const isPriB = v.priorityTeam && areIdsEqual(v.priorityTeam, m.teamB._id);
+                    
+                    btnA.className = `py-2 text-[9px] font-bold uppercase transition rounded ${isPriA ? 'bg-[#ff4655] text-white border-white/20' : 'bg-[#1a1d21] border border-[#333] text-gray-500 hover:border-[#ff4655]'}`;
+                    btnB.className = `py-2 text-[9px] font-bold uppercase transition rounded ${isPriB ? 'bg-[#ff4655] text-white border-white/20' : 'bg-[#1a1d21] border border-[#333] text-gray-500 hover:border-[#ff4655]'}`;
+                    
+                    btnA.onclick = () => setPriority(m.teamA._id);
+                    btnB.onclick = () => setPriority(m.teamB._id);
+
+                    // Mode buttons
+                    document.getElementById('modeBtnRandom').className = `py-1.5 text-[8px] font-bold uppercase transition border ${v.priorityMode === 'random' ? 'bg-[#ff4655] text-white border-[#ff4655]' : 'bg-[#1a1d21] border-[#333] text-gray-500'}`;
+                    document.getElementById('modeBtn1v1').className = `py-1.5 text-[8px] font-bold uppercase transition border ${v.priorityMode === '1v1' ? 'bg-[#ff4655] text-white border-[#ff4655]' : 'bg-[#1a1d21] border-[#333] text-gray-500'}`;
+                } else {
+                    priorityTools.classList.add('hidden');
+                }
+            }
         });
+
+        // [NEW] Admin Actions
+        async function setPriority(teamId) {
+            const res = await fetch(`${API_BASE}/api/matches/${matchId}/priority`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId })
+            });
+            if (res.ok) showToast('Priority Set Successfully');
+        }
+
+        async function setPriorityMode(mode) {
+             const res = await fetch(`${API_BASE}/api/matches/${matchId}/priority-mode`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            if (res.ok) showToast(`Priority Mode: ${mode.toUpperCase()}`);
+        }
+
+        async function adminResetVeto() {
+            if(!confirm("ARE YOU SURE? This will wipe all picks/bans and return both teams to Ready phase.")) return;
+            const res = await fetch(`${API_BASE}/api/matches/${matchId}/reset-veto`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (res.ok) showToast('Veto Reset by Admin');
+        }
 
         function handleAudioCues(v, m) {
             // Status Change
@@ -694,16 +778,16 @@
             document.getElementById('tB').innerText = m.teamB.name;
             
             // Ready Status
-            const setSt = (id, r) => { const el=document.getElementById(id), d=document.getElementById(id+'_dot'), box=document.getElementById(id.replace('s','r')+'_box'); if(r){ el.innerText="READY"; el.className="text-[10px] font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; box.classList.remove('opacity-50'); } else{ el.innerText="NOT READY"; el.className="text-[10px] font-bold tracking-widest text-gray-500 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; box.classList.add('opacity-50'); } }
+            const setSt = (id, r) => { const el=document.getElementById(id), d=document.getElementById(id+'_dot'), box=document.getElementById(id.replace('s','r')+'_box'); if(r){ el.innerText="READY"; el.className="text-xs font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; box.classList.remove('opacity-50'); } else{ el.innerText="NOT READY"; el.className="text-xs font-bold tracking-widest text-gray-500 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; box.classList.add('opacity-50'); } }
             setSt('sA', v.teamAReady); setSt('sB', v.teamBReady);
             
             // Connection Status
             const setConn = (id, tid) => {
                 const el = document.getElementById(id), d = document.getElementById(id+'_dot');
                 const p = m.presence && m.presence[tid] ? m.presence[tid] : null;
-                if (!p) { el.innerText="OFFLINE"; el.className="text-[10px] font-bold tracking-widest text-gray-600 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; }
-                else if (p.isAway) { el.innerText="AWAY"; el.className="text-[10px] font-bold tracking-widest text-yellow-500 font-mono"; d.className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_10px_#eab308]"; }
-                else { el.innerText="CONNECTED"; el.className="text-[10px] font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; }
+                if (!p) { el.innerText="OFFLINE"; el.className="text-xs font-bold tracking-widest text-gray-600 font-mono"; d.className="w-2 h-2 rounded-full bg-gray-600"; }
+                else if (p.isAway) { el.innerText="AWAY"; el.className="text-xs font-bold tracking-widest text-yellow-500 font-mono"; d.className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_10px_#eab308]"; }
+                else { el.innerText="CONNECTED"; el.className="text-xs font-bold tracking-widest text-[#1fa474] font-mono"; d.className="w-2 h-2 rounded-full bg-[#1fa474] shadow-[0_0_10px_#1fa474]"; }
             };
             setConn('cA', m.teamA._id);
             setConn('cB', m.teamB._id);
@@ -722,7 +806,7 @@
                 const step = v.sequence[v.sequenceIndex];
                 const act = step.act.toUpperCase();
                 st.innerText = act;
-                st.className = act==='BAN' ? "bg-[#ff4655] text-white px-12 py-2 font-ui text-6xl font-bold clip-val shadow-[0_0_40px_rgba(255,70,85,0.5)] z-20" : "bg-[#1fa474] text-white px-12 py-2 font-ui text-6xl font-bold clip-val shadow-[0_0_40px_rgba(31,164,116,0.5)] z-20";
+                st.className = act==='BAN' ? "bg-[#ff4655] text-white px-12 py-2 font-ui text-7xl font-bold clip-val shadow-[0_0_40px_rgba(255,70,85,0.5)] z-20" : "bg-[#1fa474] text-white px-12 py-2 font-ui text-7xl font-bold clip-val shadow-[0_0_40px_rgba(31,164,116,0.5)] z-20";
                 const activeA = areIdsEqual(step.team, m.teamA._id);
                 document.getElementById('headerTA').style.opacity = activeA ? '1' : '0.2';
                 document.getElementById('headerTB').style.opacity = activeA ? '0.2' : '1';
@@ -740,7 +824,7 @@
                 document.getElementById('appBody').classList.toggle('your-turn-pulse', isMyTurn);
             } else {
                 st.innerText = v.status === 'pending' ? 'PRE-MATCH' : v.status.toUpperCase();
-                st.className = "bg-white text-black px-12 py-2 font-ui text-4xl font-bold clip-val z-20";
+                st.className = "bg-white text-black px-12 py-2 font-ui text-5xl font-bold clip-val z-20";
                 document.getElementById('headerTA').style.opacity = '1'; document.getElementById('headerTB').style.opacity = '1';
                 document.getElementById('appBody').classList.remove('your-turn-pulse');
                 document.getElementById('grid').classList.remove('grid-dimmed');
@@ -768,7 +852,7 @@
                     el.setAttribute('data-action', step.act);
                     const color = step.act==='ban' ? 'bg-[#ff4655]' : 'bg-[#1fa474]';
                     const icon = step.act==='ban' ? 'fa-ban' : 'fa-check';
-                    html += `<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition duration-300 z-30 backdrop-blur-sm cursor-pointer" onclick="socket.emit('veto_action',{matchId,teamId,action:'${step.act}',map:'${map}'})"><div class="w-16 h-16 ${color} rounded-full flex items-center justify-center mb-2 shadow-[0_0_20px_currentColor] scale-90 group-hover:scale-100 transition"><i class="fa-solid ${icon} text-3xl text-white"></i></div><span class="font-ui text-3xl text-white tracking-widest drop-shadow-md">${step.act.toUpperCase()}</span></div>`;
+                    html += `<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-10 flex flex-col items-center justify-center transition duration-300 z-30 backdrop-blur-sm cursor-pointer" onclick="socket.emit('veto_action',{matchId,teamId,action:'${step.act}',map:'${map}'})"><div class="w-16 h-16 ${color} rounded-full flex items-center justify-center mb-2 shadow-[0_0_20px_currentColor] scale-90 group-hover:scale-100 transition"><i class="fa-solid ${icon} text-4xl text-white"></i></div><span class="font-ui text-4xl text-white tracking-widest drop-shadow-md">${step.act.toUpperCase()}</span></div>`;
                 }
                 el.innerHTML = html;
                 
@@ -794,8 +878,8 @@
                     sideA = p.teamAStartingSide === 'atk' ? '<span class="text-[#ff4655] font-bold">ATK</span>' : '<span class="text-[#1fa474] font-bold">DEF</span>';
                     sideB = p.teamBStartingSide === 'atk' ? '<span class="text-[#ff4655] font-bold">ATK</span>' : '<span class="text-[#1fa474] font-bold">DEF</span>';
                 } else {
-                    sideA = '<span class="text-[9px] text-gray-500">DECIDING</span>';
-                    sideB = '<span class="text-[9px] text-gray-500">SIDE</span>';
+                    sideA = '<span class="text-[10px] text-gray-500">DECIDING</span>';
+                    sideB = '<span class="text-[10px] text-gray-500">SIDE</span>';
                 }
 
                 html += `
@@ -805,11 +889,11 @@
                     
                     <div class="relative z-10 h-full flex items-center justify-between px-4">
                         <div class="flex flex-col">
-                            <span class="font-header text-xl text-white leading-none tracking-wide drop-shadow">${p.map.toUpperCase()}</span>
-                            <span class="text-[9px] text-gray-400 font-mono mt-0.5">PICKED BY: <span class="text-white font-bold">${picker}</span></span>
+                            <span class="font-header text-2xl text-white leading-none tracking-wide drop-shadow">${p.map.toUpperCase()}</span>
+                            <span class="text-[10px] text-gray-400 font-mono mt-0.5">PICKED BY: <span class="text-white font-bold">${picker}</span></span>
                         </div>
                         
-                        <div class="flex flex-col items-end text-[10px] font-mono">
+                        <div class="flex flex-col items-end text-xs font-mono">
                             <div class="flex gap-2 mb-0.5">
                                 <span class="text-gray-400">${tA.shortName}</span> ${sideA}
                             </div>
@@ -821,7 +905,7 @@
                 </div>`; 
             });
 
-            if(html === '') html = `<div class="text-center text-xs text-gray-600 italic py-8">No maps picked yet.</div>`;
+            if(html === '') html = `<div class="text-center text-sm text-gray-600 italic py-8">No maps picked yet.</div>`;
             container.innerHTML = html;
         }
 
@@ -846,15 +930,15 @@
                     if(align === 'left') {
                         return `
                         <div class="roster-card w-full mb-1 flex items-center gap-3 p-2 group ${borderColor} border-l-[4px]">
-                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-lg text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
+                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-xl text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
                                 ${initial}
                             </div>
                             <div class="flex flex-col justify-center min-w-0">
                                 <div class="flex items-baseline gap-2">
-                                    <span class="font-ui text-2xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#1fa474] transition">${p.name||'Unknown'}</span>
-                                    <span class="text-[10px] font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
+                                    <span class="font-ui text-3xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#1fa474] transition">${p.name||'Unknown'}</span>
+                                    <span class="text-xs font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
                                 </div>
-                                ${p.role ? `<div class="text-[9px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
+                                ${p.role ? `<div class="text-[10px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
                             </div>
                         </div>`;
                     } 
@@ -864,12 +948,12 @@
                         <div class="roster-card w-full mb-1 flex items-center justify-end gap-3 p-2 group ${borderColor} border-l-[0px] border-r-[4px] text-right" style="clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);">
                             <div class="flex flex-col justify-center items-end min-w-0">
                                 <div class="flex items-baseline gap-2 justify-end">
-                                    <span class="text-[10px] font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
-                                    <span class="font-ui text-2xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#ff4655] transition">${p.name||'Unknown'}</span>
+                                    <span class="text-xs font-mono text-gray-400 tracking-wider">#${p.tag||'000'}</span>
+                                    <span class="font-ui text-3xl leading-none text-white tracking-wide uppercase truncate group-hover:text-[#ff4655] transition">${p.name||'Unknown'}</span>
                                 </div>
-                                ${p.role ? `<div class="text-[9px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
+                                ${p.role ? `<div class="text-[10px] font-bold uppercase tracking-widest ${roleColor}">[${p.role}]</div>` : ''}
                             </div>
-                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-lg text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
+                            <div class="w-10 h-10 bg-[#2a3038] flex items-center justify-center font-bold text-xl text-white group-hover:bg-white group-hover:text-black transition shadow shrink-0 clip-diag">
                                 ${initial}
                             </div>
                         </div>`;
@@ -887,22 +971,22 @@
                 
                 // Badges for ATK/DEF
                 const sideA = p.teamAStartingSide === 'atk' 
-                    ? '<span class="bg-[#ff4655] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
-                    : '<span class="bg-[#1fa474] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>';
+                    ? '<span class="bg-[#ff4655] text-white text-[10px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
+                    : '<span class="bg-[#1fa474] text-white text-[10px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>';
                 
                 const sideB = p.teamBStartingSide === 'atk' 
-                    ? '<span class="bg-[#ff4655] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
-                    : '<span class="bg-[#1fa474] text-white text-[9px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>'; 
+                    ? '<span class="bg-[#ff4655] text-white text-[10px] px-1.5 py-0.5 rounded ml-1 tracking-wider">ATK</span>' 
+                    : '<span class="bg-[#1fa474] text-white text-[10px] px-1.5 py-0.5 rounded ml-1 tracking-wider">DEF</span>'; 
 
                 return `
                 <div class="end-map-card group w-full bg-[#1c252e] flex relative overflow-hidden shrink-0 min-h-[80px]">
                     <div class="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition duration-500" style="background-image: url('${maps[p.map]}');"></div>
                     <div class="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-black/90"></div>
                     <div class="relative z-10 w-full flex items-center justify-between px-6">
-                        <div class="text-5xl font-header text-white/10 group-hover:text-white/20 transition">0${i+1}</div>
+                        <div class="text-6xl font-header text-white/10 group-hover:text-white/20 transition">0${i+1}</div>
                         <div class="text-center">
-                            <div class="text-3xl font-header text-white drop-shadow-lg tracking-wider">${p.map.toUpperCase()}</div>
-                            <div class="flex items-center gap-3 text-[10px] font-mono font-bold mt-1 bg-black/60 px-3 py-1 rounded-full border border-white/10">
+                            <div class="text-4xl font-header text-white drop-shadow-lg tracking-wider">${p.map.toUpperCase()}</div>
+                            <div class="flex items-center gap-3 text-xs font-mono font-bold mt-1 bg-black/60 px-3 py-1 rounded-full border border-white/10">
                                 <div class="flex items-center text-gray-300"><span>${tAS}</span> ${sideA}</div>
                                 <div class="text-gray-600 mx-1">VS</div>
                                 <div class="flex items-center text-gray-300"><span>${tBS}</span> ${sideB}</div>
@@ -1043,14 +1127,38 @@
                 if (p <= 0) clearInterval(timerInt); 
             }, 50); 
         }
-        function handleModals(v, myId) { 
+
+                function handleModals(v, myId) { 
             const m = document.getElementById('modal'); 
             const c = document.getElementById('modalContent'); 
             const isSpectator = currentMatchData && !areIdsEqual(myId, currentMatchData.teamA._id) && !areIdsEqual(myId, currentMatchData.teamB._id);
 
-            if(v.status==='decision' || (v.sequence[v.sequenceIndex]?.act === 'side' && areIdsEqual(v.sequence[v.sequenceIndex].team, myId))) { 
+            if(v.status==='awaiting_1v1' || v.status==='decision' || (v.sequence[v.sequenceIndex]?.act === 'side' && areIdsEqual(v.sequence[v.sequenceIndex].team, myId))) { 
                 m.classList.remove('hidden'); m.classList.add('flex'); 
-                if(v.status==='decision' && !coinFlipDone) { 
+
+                if (v.status === 'awaiting_1v1') {
+                    if (isSpectator) {
+                        c.innerHTML = `<div class="text-white font-header text-6xl tracking-widest mb-4">1v1 DUEL</div><div class="text-gray-400 font-mono animate-pulse">Awaiting duel results from teams...</div>`;
+                    } else {
+                        const tA = currentMatchData.teamA; const tB = currentMatchData.teamB;
+                        c.innerHTML = `
+                            <div class="text-[#ff4655] font-mono tracking-[0.4em] text-sm mb-2 uppercase">Priority Protocol: 1v1 Challenge</div>
+                            <h2 class="text-6xl font-header text-white mb-8">WHO WON THE DUEL?</h2>
+                            <p class="text-gray-500 font-mono text-xs mb-10 max-w-lg mx-auto uppercase">The winning team captain must report the victory to proceed to the Veto phase.</p>
+                            <div class="flex gap-8 justify-center">
+                                <button onclick="socket.emit('priority_report',{matchId,teamId,winnerId:'${tA._id}'})" class="group w-64 p-6 bg-[#1a1d21] border border-white/10 hover:border-[#1fa474] transition flex flex-col items-center clip-val">
+                                    <img src="${tA.logo || 'https://via.placeholder.com/100'}" class="w-20 h-20 object-contain mb-4">
+                                    <span class="font-header text-2xl text-white group-hover:text-[#1fa474]">${tA.name}</span>
+                                </button>
+                                <button onclick="socket.emit('priority_report',{matchId,teamId,winnerId:'${tB._id}'})" class="group w-64 p-6 bg-[#1a1d21] border border-white/10 hover:border-[#1fa474] transition flex flex-col items-center clip-val">
+                                    <img src="${tB.logo || 'https://via.placeholder.com/100'}" class="w-20 h-20 object-contain mb-4">
+                                    <span class="font-header text-2xl text-white group-hover:text-[#1fa474]">${tB.name}</span>
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+                else if(v.status==='decision' && !coinFlipDone) { 
                     coinFlipDone=true; 
                     isAnimatingCoin=true;
                     const tA = currentMatchData.teamA;
@@ -1058,40 +1166,46 @@
                     const winnerId = v.coinTossWinner._id || v.coinTossWinner;
                     const isHeads = areIdsEqual(winnerId, tA._id);
                     
+                    if (v.priorityWinnerId || v.priorityTeam) {
+                         isAnimatingCoin = false; renderCoinResult(v, myId); return;
+                    }
+
                     c.innerHTML=`
                         <div class="coin-container">
                             <div id="coin" class="coin">
-                                <div class="coin-face face-heads"><img src="${tA.logo || DEFAULT_LOGO}"></div>
-                                <div class="coin-face face-tails"><img src="${tB.logo || DEFAULT_LOGO}"></div>
+                                <div class="coin-face face-heads"><img src="${tA.logo || 'https://via.placeholder.com/150'}"></div>
+                                <div class="coin-face face-tails"><img src="${tB.logo || 'https://via.placeholder.com/150'}"></div>
                             </div>
                         </div>
-                        <div class="text-white font-header text-5xl mt-12 tracking-widest drop-shadow-2xl">COIN TOSS</div>
-                        <div class="text-gray-400 font-mono text-sm tracking-widest mt-2">DETERMINING PRIORITY...</div>
+                        <div class="text-white font-header text-6xl mt-12 tracking-widest drop-shadow-2xl">COIN TOSS</div>
+                        <div class="text-gray-400 font-mono text-base tracking-widest mt-2">DETERMINING PRIORITY...</div>
                     `; 
                     setTimeout(()=>{ document.getElementById('coin').className = isHeads ? "coin spin-to-heads" : "coin spin-to-tails"; setTimeout(()=>{ isAnimatingCoin=false; renderCoinResult(v,myId); }, 3500); }, 100); 
                 } else if(v.status==='decision' && !isAnimatingCoin) {
                     renderCoinResult(v,myId);
-                } else if(v.sequence[v.sequenceIndex].act === 'side' && !isSpectator) { 
+                } else if(v.sequence[v.sequenceIndex]?.act === 'side' && !isSpectator) { 
                     const map = v.pickedMaps.find(p=>!p.selectedSide).map; 
-                    c.innerHTML=`<div class="text-[#1fa474] font-mono tracking-widest text-sm mb-2">MAP SELECTED</div><h2 class="text-8xl font-header text-white mb-12 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">${map}</h2><div class="flex gap-12 justify-center"><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'atk'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#ff4655] hover:shadow-[0_0_30px_rgba(255,70,85,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#ff4655] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-crosshairs text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">ATTACK</span></button><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'def'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#1fa474] hover:shadow-[0_0_30px_rgba(31,164,116,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#1fa474] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-shield-halved text-5xl mb-4 text-white relative z-10"></i><span class="font-ui text-3xl text-white relative z-10 tracking-widest">DEFENSE</span></button></div>`; 
+                    c.innerHTML=`<div class="text-[#1fa474] font-mono tracking-widest text-base mb-2">MAP SELECTED</div><h2 class="text-8xl font-header text-white mb-12 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">${map}</h2><div class="flex gap-12 justify-center"><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'atk'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#ff4655] hover:shadow-[0_0_30px_rgba(255,70,85,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#ff4655] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-crosshairs text-6xl mb-4 text-white relative z-10"></i><span class="font-ui text-4xl text-white relative z-10 tracking-widest">ATTACK</span></button><button onclick="socket.emit('veto_action',{matchId,teamId,action:'side',side:'def'})" class="group w-72 h-48 bg-[#0f1923] border border-white/20 hover:border-[#1fa474] hover:shadow-[0_0_30px_rgba(31,164,116,0.4)] transition flex flex-col items-center justify-center relative overflow-hidden"><div class="absolute inset-0 bg-[#1fa474] opacity-0 group-hover:opacity-10 transition"></div><i class="fa-solid fa-shield-halved text-6xl mb-4 text-white relative z-10"></i><span class="font-ui text-4xl text-white relative z-10 tracking-widest">DEFENSE</span></button></div>`; 
                 } 
             } else { 
                 m.classList.add('hidden'); m.classList.remove('flex'); 
                 coinFlipDone = false; isAnimatingCoin = false;
             } 
         }
+
         function renderCoinResult(v, myId) { 
-            const win = areIdsEqual(myId, v.coinTossWinner._id); 
+            const winnerId = v.coinTossWinner._id || v.coinTossWinner;
+            const win = areIdsEqual(myId, winnerId); 
             const c = document.getElementById('modalContent'); 
             const isSpectator = currentMatchData && !areIdsEqual(myId, currentMatchData.teamA._id) && !areIdsEqual(myId, currentMatchData.teamB._id);
 
             if(win) { 
-                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-4 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-4">You won the coin toss. Choose your advantage.</div><div id="modalTimer" class="text-6xl font-header text-white mb-8">--</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-2xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-2xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; 
+                c.innerHTML=`<div class="text-[#1fa474] font-ui text-7xl mb-4 font-bold tracking-widest shadow-green-500 drop-shadow-2xl">VICTORY</div><div class="text-gray-400 font-mono mb-4">You won priority. Choose your advantage.</div><div id="modalTimer" class="text-7xl font-header text-white mb-8">--</div><div class="flex gap-6 justify-center"><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'first'})" class="bg-white text-black px-12 py-5 font-bold font-ui text-3xl hover:bg-[#1fa474] hover:text-white transition clip-val">PICK FIRST</button><button onclick="socket.emit('decision_made',{matchId,teamId,choice:'second'})" class="border-2 border-white text-white px-12 py-5 font-bold font-ui text-3xl hover:bg-white hover:text-black transition clip-val">PICK SECOND</button></div>`; 
             } else if (isSpectator) {
                 const winnerName = v.coinTossWinner.name || 'TEAM';
-                c.innerHTML=`<div class="text-[#1fa474] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">COIN TOSS</div><div class="text-white font-mono tracking-widest mb-2">WINNER: <span class="text-[#1fa474] font-bold">${winnerName}</span></div><div class="text-gray-500 font-mono animate-pulse tracking-widest text-xs">WAITING FOR DECISION...</div>`;
+                c.innerHTML=`<div class="text-[#1fa474] font-ui text-7xl mb-4 font-bold tracking-widest drop-shadow-2xl">COIN TOSS</div><div class="text-white font-mono tracking-widest mb-2">WINNER: <span class="text-[#1fa474] font-bold">${winnerName}</span></div><div class="text-gray-500 font-mono animate-pulse tracking-widest text-sm">WAITING FOR DECISION...</div>`;
             } else { 
-                c.innerHTML=`<div class="text-[#ff4655] font-ui text-6xl mb-4 font-bold tracking-widest drop-shadow-2xl">DEFEAT</div><div class="text-gray-500 font-mono animate-pulse tracking-widest">OPPONENT IS DECIDING...</div>`; 
+                c.innerHTML=`<div class="text-[#ff4655] font-ui text-7xl mb-4 font-bold tracking-widest drop-shadow-2xl">DEFEAT</div><div class="text-gray-500 font-mono animate-pulse tracking-widest">OPPONENT IS DECIDING...</div>`; 
             } 
         }
     </script>

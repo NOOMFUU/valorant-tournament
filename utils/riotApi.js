@@ -13,11 +13,11 @@ async function verifyRiotAccount(name, tag) {
     try {
         const encodedName = encodeURIComponent(name.trim());
         const encodedTag = encodeURIComponent(tag.trim().replace('#', ''));
-        
+
         // Note: As of latest HenrikDev API updates, a token is generally recommended but v1/account often works without one.
         // We configure a timeout so the request doesn't hang the backend.
         const response = await axios.get(`${HENRIK_API_BASE}/v1/account/${encodedName}/${encodedTag}`, {
-            timeout: 8000 
+            timeout: 8000
         });
 
         if (response.data && response.data.data) {
@@ -35,11 +35,11 @@ async function verifyRiotAccount(name, tag) {
             return null;
         }
         // Log standard API errors or rate limits
-        logger.error(`Riot API Error for ${name}#${tag}:`, { 
-            message: error.message, 
-            status: error.response?.status 
+        logger.error(`Riot API Error for ${name}#${tag}:`, {
+            message: error.message,
+            status: error.response?.status
         });
-        
+
         // Throw an explicit error to distinguish between "Not Found" and "API Service Down"
         throw new Error('RIOT_API_DOWN');
     }
