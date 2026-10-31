@@ -24,16 +24,22 @@ const { swapTeamsSchema, validateScoreSchema } = require('../utils/schemas');
 const { upload, getFileUrl } = require('../middleware/upload');
 const { logAdminAction } = require('../utils/helpers');
 
+// Fields that must never leave the server through match responses
+const SAFE_TEAM_FIELDS = '-password -members.puuid -members.discordId';
+const SAFE_TOURNAMENT_FIELDS = '-inviteCode -pendingRegistrations';
+
+const populateSafe = (q) => q
+    .populate({ path: 'teamA', select: SAFE_TEAM_FIELDS })
+    .populate({ path: 'teamB', select: SAFE_TEAM_FIELDS })
+    .populate({ path: 'winner', select: SAFE_TEAM_FIELDS })
+    .populate({ path: 'tournament', select: SAFE_TOURNAMENT_FIELDS });
+
 // --- ROUTES ---
 
-// GET All Matches
+// GET All Matches (public: roomPassword excluded)
 router.get('/matches', async (req, res) => {
     try {
-        const matches = await Match.find()
-            .populate({ path: 'teamA', populate: { path: 'members' } })
-            .populate({ path: 'teamB', populate: { path: 'members' } })
-            .populate('winner')
-            .populate('tournament');
+        const matches = await populateSafe(Match.find().select('-roomPassword'));
 
         const vetoMgr = req.app.get('vetoMgr');
         const matchesWithPresence = matches.map(m => {
@@ -42,18 +48,18 @@ router.get('/matches', async (req, res) => {
             return obj;
         });
         res.json(matchesWithPresence);
-    } catch (e) { res.status(500).json({ msg: e.message }); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// GET Upcoming Matches (Team)
+// GET Upcoming Matches (Team) — roomPassword only for the two teams in the match
 router.get('/matches/upcoming', auth(['team']), async (req, res) => {
     try {
         const teamId = req.user.id;
-        const matches = await Match.find({
+        const matches = await populateSafe(Match.find({
             $or: [{ teamA: teamId }, { teamB: teamId }],
             status: { $in: ['scheduled', 'live', 'pending_approval'] }
-        }).populate('teamA teamB tournament').sort({ scheduledTime: 1 });
-        
+        })).sort({ scheduledTime: 1 });
+
         const vetoMgr = req.app.get('vetoMgr');
         const matchesWithPresence = matches.map(m => {
             const obj = m.toObject();
@@ -61,29 +67,28 @@ router.get('/matches/upcoming', auth(['team']), async (req, res) => {
             return obj;
         });
         res.json(matchesWithPresence);
-    } catch (e) { res.status(500).json({ msg: e.message }); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // GET Match History (Team)
 router.get('/matches/history', auth(['team']), async (req, res) => {
     try {
         const teamId = req.user.id;
-        const matches = await Match.find({
+        const matches = await populateSafe(Match.find({
             $or: [{ teamA: teamId }, { teamB: teamId }],
             status: 'finished'
-        }).populate('teamA teamB tournament').sort({ updatedAt: -1 });
+        }).select('-roomPassword')).sort({ updatedAt: -1 });
         res.json(matches);
-    } catch (e) { res.status(500).json({ msg: e.message }); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// GET Single Match
+// GET Single Match (public: roomPassword excluded)
 router.get('/matches/:id', async (req, res) => {
     try {
-        const match = await Match.findById(req.params.id)
-            .populate({ path: 'teamA', populate: { path: 'members' } })
-            .populate({ path: 'teamB', populate: { path: 'members' } });
+        const match = await populateSafe(Match.findById(req.params.id).select('-roomPassword'));
+        if (!match) return res.status(404).json({ msg: 'Match not found' });
         res.json(match);
-    } catch (e) { res.status(500).json({ msg: e.message }); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // DELETE Match
@@ -132,7 +137,7 @@ router.put('/matches/:id', auth(['admin']), async (req, res) => {
         }
 
         res.json({ success: true, match });
-    } catch (e) { res.status(500).json(e); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // SWAP Teams
@@ -444,7 +449,7 @@ router.post('/matches/:id/reset-veto', auth(['admin']), async (req, res) => {
         await match.save();
         req.app.get('io').emit('match_update', match);
         res.json({ success: true });
-    } catch (e) { res.status(500).json(e); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // RESET Match
@@ -589,7 +594,7 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
             if (channel) {
                 const requesterRole = requesterTeam.discordRoleId ? `<@&${requesterTeam.discordRoleId}>` : requesterTeam.name;
                 const isAccepted = action === 'accept';
-                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
+                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
                 await channel.send({ content: `${requesterRole}`, embeds: [embed], allowedMentions: { parse: ['roles'] } });
             }
         }
