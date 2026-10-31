@@ -10,9 +10,11 @@
 //
 // หมายเหตุ:
 // - ใช้ raw collection เพื่ออ่านข้อมูลเดิมโดยไม่ผ่าน schema ใหม่
-// - tournament ที่ migrate แล้วจะถูกทำเครื่องหมาย relationalMigratedAt และข้ามในการรันครั้งถัดไป
-// - ถ้า run ล้มเหลวกลางทาง ให้ลบ TournamentEntry/Registration/Group/StageEntry ของ tournament นั้นด้วยตนเองก่อนรันใหม่
-// - ชื่อ Group ได้จากชื่อ match เท่านั้น (ข้อมูลเดิมไม่มี group) regex นี้ใช้เฉพาะตอน migrate
+// - idempotent ระดับ tournament: ก่อนเขียน tournament ใด จะลบ Stage/Group/StageEntry/TournamentEntry/Registration
+//   ที่ผูกกับ tournament นั้นก่อน จึงรันซ้ำหลังล้มกลางทางได้โดยไม่เกิดข้อมูลซ้ำ
+// - relationalMigratedAt ถูกตั้งเป็นขั้นตอนสุดท้ายของแต่ละ tournament tournament ที่มี flag แล้วจะถูกข้าม
+// - ชื่อ Group ได้จาก regex ชื่อ match เท่านั้น (ข้อมูลเดิมไม่มี group) regex นี้ใช้เฉพาะตอน migrate
+// - Registration.team เป็น null เพราะข้อมูลเดิมไม่มี link ไปยัง Team ที่สร้างตอน approve (ต้องจับคู่ด้วย teamName ภายหลัง)
 // - ห้ามใช้ --drop-legacy จนกว่า routes และ managers จะอ่านจาก collection ใหม่แล้ว
 
 const mongoose = require('mongoose');
@@ -27,39 +29,56 @@ const DROP_LEGACY = process.argv.includes('--drop-legacy');
 const GROUP_RE = /(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i;
 const { ObjectId } = mongoose.Types;
 
+// ลบข้อมูลเชิง relational ของ tournament นี้ทั้งหมดก่อนเขียนใหม่ (ทำให้รันซ้ำได้)
+async function clearRelational(tid) {
+    const oldStageIds = await Stage.find({ tournament: tid }).distinct('_id');
+    await StageEntry.deleteMany({ stage: { $in: oldStageIds } });
+    await Group.deleteMany({ stage: { $in: oldStageIds } });
+    await Stage.deleteMany({ tournament: tid });
+    await TournamentEntry.deleteMany({ tournament: tid });
+    await Registration.deleteMany({ tournament: tid });
+}
+
 async function migrateTournament(db, t) {
     const tid = t._id;
 
-    // 1. ทีมใน tournament
-    const participants = t.participants || [];
+    // ตัด ObjectId ซ้ำออกก่อน เพราะ TournamentEntry มี unique index (tournament, team)
+    const participants = [...new Map((t.participants || []).map(p => [String(p), p])).values()];
+    const regs = t.pendingRegistrations || [];
+    const legacyStages = t.stages || [];
+
     console.log(`  TournamentEntry: ${participants.length}`);
+    console.log(`  Registration: ${regs.length}`);
+
+    if (APPLY) await clearRelational(tid);
+
+    // 1. ทีมใน tournament
     if (APPLY && participants.length) {
-        await TournamentEntry.bulkWrite(participants.map(team => ({
-            updateOne: {
-                filter: { tournament: tid, team },
-                update: { $setOnInsert: { tournament: tid, team, status: 'registered' } },
-                upsert: true
-            }
+        await TournamentEntry.insertMany(participants.map(team => ({
+            tournament: tid, team, status: 'registered'
         })));
     }
 
-    // 2. คำขอสมัคร
-    const regs = t.pendingRegistrations || [];
-    console.log(`  Registration: ${regs.length}`);
+    // 2. คำขอสมัคร (เก็บ name/role ของสมาชิก และเหตุผลที่ปฏิเสธ)
     if (APPLY && regs.length) {
         await Registration.insertMany(regs.map(r => ({
             tournament: tid,
-            team: null, // ข้อมูลเดิมไม่มี link ไปยัง Team ที่สร้างตอน approve
+            team: null,
             teamName: r.teamName,
             contact: [r.contactName, r.contactDiscord].filter(Boolean).join(' / '),
-            members: (r.members || []).map(m => ({ riotId: m.riotId || '', puuid: '' })),
+            members: (r.members || []).map(m => ({
+                name: m.name || '',
+                role: m.role || 'Main',
+                riotId: m.riotId || '',
+                puuid: ''
+            })),
             status: r.status,
+            rejectionReason: r.rejectionReason || '',
             reviewedAt: null
         })));
     }
 
     // 3. stage, group, stage entry และ match
-    const legacyStages = t.stages || [];
     const stageIds = legacyStages.map(() => new ObjectId());
     const stageDocs = [];
 
@@ -136,7 +155,7 @@ async function migrateTournament(db, t) {
         });
     }
 
-    // 4. Stage เขียนเป็นลำดับท้ายสุด และทำเครื่องหมาย migrate แล้วในคำสั่งเดียวกัน
+    // 4. Stage และ flag migrate เขียนเป็นลำดับท้ายสุดของ tournament นี้
     console.log(`  Stage docs: ${stageDocs.length}`);
     if (APPLY) {
         if (stageDocs.length) await Stage.insertMany(stageDocs);
