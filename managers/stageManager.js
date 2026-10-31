@@ -161,7 +161,8 @@ async function swapTeamsInStage(stageId, teamIdA, teamIdB) {
     entryB.group = groupA;
     await Promise.all([entryA.save(), entryB.save()]);
 
-    // Swap slots in unplayed matches so the bracket follows the new positions
+    // Swap slots in unplayed matches so the bracket follows the new positions.
+    // Rosters follow their team: the slot's roster is reloaded from the team that now occupies it.
     const matches = await Match.find({
         stage: stageId,
         status: 'scheduled',
@@ -170,8 +171,15 @@ async function swapTeamsInStage(stageId, teamIdA, teamIdB) {
     const swap = id => (id && id.toString() === teamIdA.toString()) ? teamIdB
         : (id && id.toString() === teamIdB.toString()) ? teamIdA : id;
     for (const m of matches) {
-        m.teamA = swap(m.teamA);
-        m.teamB = swap(m.teamB);
+        for (const side of ['A', 'B']) {
+            const key = 'team' + side;
+            const newId = swap(m[key]);
+            if (newId && (!m[key] || newId.toString() !== m[key].toString())) {
+                const team = await Team.findById(newId);
+                m[key] = newId;
+                m[`team${side}Roster`] = team ? team.members : [];
+            }
+        }
         await m.save();
     }
     return { swapped: [teamIdA, teamIdB], matchesUpdated: matches.length };

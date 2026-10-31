@@ -445,7 +445,9 @@ class BracketManager {
     async generateStage(tournamentId, stage, teams) {
         const cfg = stage.settings || {};
         if (cfg.usePlaceholders) {
-            throw new Error('Placeholder (TBD) generation is not implemented yet');
+            // Lazy require: stageManager.js requires this module at load time, so a top-level require here would be circular.
+            const stageManager = require('./stageManager');
+            return stageManager.generatePlaceholderMatches(tournamentId, stage);
         }
 
         const list = (teams || []).filter(Boolean);

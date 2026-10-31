@@ -83,8 +83,13 @@ describe('stageManager', () => {
         test('swaps seed and group, and updates unplayed match slots', async () => {
             const entries = setupEntries();
             Match.countDocuments.mockResolvedValue(0);
-            const match = { teamA: 't1', teamB: 't3', save: jest.fn().mockResolvedValue() };
+            const match = {
+                teamA: 't1', teamARoster: ['old1'],
+                teamB: 't3', teamBRoster: ['p3'],
+                save: jest.fn().mockResolvedValue()
+            };
             Match.find.mockResolvedValue([match]);
+            Team.findById.mockImplementation(id => Promise.resolve({ members: id === 't2' ? ['p2'] : [] }));
 
             const result = await swapTeamsInStage('st1', 't1', 't2');
 
@@ -93,7 +98,9 @@ describe('stageManager', () => {
             expect(entries.t2.seed).toBe(1);
             expect(entries.t2.group).toBe('gA');
             expect(match.teamA).toBe('t2');
+            expect(match.teamARoster).toEqual(['p2']);
             expect(match.teamB).toBe('t3');
+            expect(match.teamBRoster).toEqual(['p3']);
             expect(match.save).toHaveBeenCalled();
             expect(result.matchesUpdated).toBe(1);
         });
