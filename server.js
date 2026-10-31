@@ -109,24 +109,29 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-to
             await vetoMgr.restoreTimers();
             logger.info('⏱️  Veto Timers Restored');
         }
-        
+
         // Start Agenda
         await queueService.start();
         logger.info('📅 Agenda Queue Started');
 
-        // [SEED] Create Default Admin if none exists
+        // [SEED] Create Default Admin only if none exists.
+        // ไม่มี fallback password: ต้องตั้ง ADMIN_PASSWORD ใน environment ก่อน จึงจะสร้างบัญชีแรกได้
         const User = require('./models/User');
         const adminExists = await User.findOne({ role: 'admin' });
         if (!adminExists) {
             const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-            const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
-            const hashedPassword = bcrypt.hashSync(adminPassword, 10);
-            await new User({ 
-                username: adminUsername, 
-                password: hashedPassword, 
-                role: 'admin' 
-            }).save();
-            logger.info(`👤 Default Admin Created: ${adminUsername} (Password: ${adminPassword})`);
+            const adminPassword = process.env.ADMIN_PASSWORD;
+            if (!adminPassword) {
+                logger.warn('⚠️ No admin account exists and ADMIN_PASSWORD is not set. Skipping default admin creation.');
+            } else {
+                const hashedPassword = bcrypt.hashSync(adminPassword, 10);
+                await new User({
+                    username: adminUsername,
+                    password: hashedPassword,
+                    role: 'admin'
+                }).save();
+                logger.info(`👤 Default Admin Created: ${adminUsername}`);
+            }
         }
     })
     .catch(err => logger.error('❌ MongoDB Error:', { error: err.message }));
@@ -162,9 +167,9 @@ setInterval(() => {
 
     app.use((err, req, res, next) => {
     logger.error('❌ [Global Error]:', { error: err.message || err, stack: err.stack, path: req.originalUrl });
-    
+
     const statusCode = err.status || 500;
-    const message = process.env.NODE_ENV === 'production' 
+    const message = process.env.NODE_ENV === 'production'
         ? 'Internal Server Error' // ซ่อนรายละเอียด error ในโหมด production
         : err.message;
 
