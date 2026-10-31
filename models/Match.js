@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 
 const MatchSchema = new mongoose.Schema({
     tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament' },
+    // [NEW] Relational refs (set by migration / new bracket code)
+    stage: { type: mongoose.Schema.Types.ObjectId, ref: 'Stage', default: null, index: true },
+    group: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null },
     name: String,
     round: Number,
     matchOrder: Number,
@@ -22,14 +25,17 @@ const MatchSchema = new mongoose.Schema({
     teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     
     // [NEW] Placeholder Logic for TBD Matches
+    // sourceStage = relational ref (ใช้งานใหม่), sourceStageIndex = ฟิลด์เดิม (คงไว้จนกว่า migrate เสร็จ)
     teamAPlaceholder: {
         label: String, // e.g., "Group A #1"
+        sourceStage: { type: mongoose.Schema.Types.ObjectId, ref: 'Stage', default: null },
         sourceStageIndex: Number,
         sourceGroupIndex: Number,
         sourceRank: Number // 1 = 1st place, 2 = 2nd place
     },
     teamBPlaceholder: {
         label: String,
+        sourceStage: { type: mongoose.Schema.Types.ObjectId, ref: 'Stage', default: null },
         sourceStageIndex: Number,
         sourceGroupIndex: Number,
         sourceRank: Number
