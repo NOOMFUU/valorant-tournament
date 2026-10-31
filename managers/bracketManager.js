@@ -10,14 +10,13 @@ class BracketManager {
 
     constructor() {
         this.io = null;
-        this.onMatchReady = null; // Callback for channel creation
+        this.onMatchReady = null;
     }
 
     setIO(io) {
         this.io = io;
     }
 
-    // Pad teams to the next power of 2 with null (BYE slots)
     padTeams(teams) {
         if (!teams || teams.length === 0) return [];
         const power = Math.pow(2, Math.ceil(Math.log2(teams.length)));
@@ -36,13 +35,11 @@ class BracketManager {
         return array;
     }
 
-    // Next match number for the tournament (continues the sequence)
     async getNextMatchNumber(tournamentId) {
         const lastMatch = await Match.findOne({ tournament: tournamentId }).sort({ matchNumber: -1 });
         return (lastMatch && lastMatch.matchNumber) ? lastMatch.matchNumber + 1 : 1;
     }
 
-    // Standard seeding order (1 vs N, 2 vs N-1, ...), returned as 0-based indices
     getSeedingOrder(size) {
         if (size < 2) return [0];
         const rounds = Math.log2(size);
@@ -63,7 +60,221 @@ class BracketManager {
         return GROUP_LETTERS[index] || String(index + 1);
     }
 
-    // Standings for a Stage (by Stage _id). Null-safe for BYE matches (no teamB).
+    // ---- Relational helpers ----
+
+    async createGroups(stage, count, names = []) {
+        const groups = [];
+        for (let i = 0; i < count; i++) {
+            let name = names[i];
+            if (!name) name = count > 1 ? `Group ${this.groupLetter(i)}` : 'Main';
+            const group = await Group.create({ stage: stage._id, order: i, name: name });
+            groups.push(group);
+        }
+        return groups;
+    }
+
+    async createStageEntries(stage, teams, group = null) {
+        const docs = teams.filter(Boolean).map(team => ({
+            stage: stage._id,
+            group: group ? group._id : null,
+            team: team._id
+        }));
+        if (docs.length > 0) await StageEntry.insertMany(docs);
+        return docs;
+    }
+
+    async createMatchDoc(tournamentId, stage, group, data) {
+        const cfg = stage.settings || {};
+        const m = new Match({
+            tournament: tournamentId,
+            stage: stage._id,
+            group: group ? group._id : null,
+            name: data.name,
+            matchNumber: data.matchNumber,
+            round: data.round,
+            matchOrder: data.matchOrder,
+            teamA: data.teamA ? data.teamA._id : null,
+            teamB: data.teamB ? data.teamB._id : null,
+            teamARoster: data.teamA ? data.teamA.members : [],
+            teamBRoster: data.teamB ? data.teamB.members : [],
+            format: data.format || cfg.defaultFormat || 'BO1',
+            status: 'scheduled',
+            vetoData: { status: 'pending' }
+        });
+        await m.save();
+        return m;
+    }
+
+    // BYE: teamA advances automatically, no game played
+    async createByeMatch(tournamentId, stage, group, data) {
+        const m = await this.createMatchDoc(tournamentId, stage, group, { ...data, teamB: null });
+        m.status = 'bye';
+        m.winner = data.teamA._id;
+        await m.save();
+        return m;
+    }
+
+    // ---- ROUND ROBIN ----
+
+    async generateRoundRobin(tournamentId, stage, teams) {
+        const cfg = stage.settings || {};
+        const groupCount = cfg.groupCount || 1;
+        const groups = await this.createGroups(stage, groupCount, cfg.groupNames || []);
+        const buckets = groups.map(() => []);
+        teams.filter(Boolean).forEach((t, i) => buckets[i % groupCount].push(t));
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+
+        for (let g = 0; g < groups.length; g++) {
+            const group = groups[g];
+            const prefix = groupCount > 1 ? `${stage.name} ${group.name}` : stage.name;
+            const pool = [...buckets[g]];
+            await this.createStageEntries(stage, pool, group);
+            if (pool.length % 2 !== 0) pool.push(null);
+
+            const n = pool.length;
+            const roundsPerLeg = n - 1;
+            const legs = cfg.roundCount || 1;
+
+            for (let leg = 0; leg < legs; leg++) {
+                let rotation = [...pool];
+                for (let r = 0; r < roundsPerLeg; r++) {
+                    const roundNum = r + 1 + leg * roundsPerLeg;
+                    for (let m = 0; m < n / 2; m++) {
+                        const tA = rotation[m];
+                        const tB = rotation[n - 1 - m];
+                        if (!tA || !tB) continue;
+                        const home = leg % 2 === 0 ? tA : tB;
+                        const away = leg % 2 === 0 ? tB : tA;
+                        const match = await this.createMatchDoc(tournamentId, stage, group, {
+                            name: `${prefix}: Round ${roundNum}`,
+                            matchNumber: num++,
+                            round: roundNum,
+                            matchOrder: m,
+                            teamA: home,
+                            teamB: away
+                        });
+                        created.push(match._id);
+                    }
+                    rotation.splice(1, 0, rotation.pop());
+                }
+            }
+        }
+        return created;
+    }
+
+    // ---- SWISS ----
+
+    async generateSwissRound1(tournamentId, stage, teams) {
+        const cfg = stage.settings || {};
+        const list = teams.filter(Boolean);
+        if (cfg.randomize) this.shuffle(list);
+        await this.createStageEntries(stage, list, null);
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        for (let i = 0; i + 1 < list.length; i += 2) {
+            const m = await this.createMatchDoc(tournamentId, stage, null, {
+                name: `${stage.name}: R1-M${Math.floor(i / 2) + 1}`,
+                matchNumber: num++,
+                round: 1,
+                matchOrder: Math.floor(i / 2),
+                teamA: list[i],
+                teamB: list[i + 1]
+            });
+            created.push(m._id);
+        }
+        if (list.length % 2 !== 0) {
+            const last = list[list.length - 1];
+            const bye = await this.createByeMatch(tournamentId, stage, null, {
+                name: `${stage.name}: R1-Bye`,
+                matchNumber: num++,
+                round: 1,
+                matchOrder: Math.floor(list.length / 2),
+                teamA: last
+            });
+            created.push(bye._id);
+        }
+        return created;
+    }
+
+    // Pairs teams by current standings, avoiding rematches and repeated byes
+    async generateNextSwissRound(tournamentId, stageId, roundNumber) {
+        const stage = await Stage.findById(stageId);
+        if (!stage) throw new Error('Stage not found');
+
+        const standings = await this.getStageStandings(stageId);
+        const matches = await Match.find({ stage: stageId });
+
+        const played = new Set();
+        const hadBye = new Set();
+        matches.forEach(m => {
+            if (m.teamA && m.teamB) {
+                const a = m.teamA.toString();
+                const b = m.teamB.toString();
+                played.add(a + '|' + b);
+                played.add(b + '|' + a);
+            } else if (m.teamA && !m.teamB) {
+                hadBye.add(m.teamA.toString());
+            }
+        });
+
+        const pool = standings.map(s => s.id);
+        let byeId = null;
+        if (pool.length % 2 !== 0) {
+            for (let i = pool.length - 1; i >= 0; i--) {
+                if (!hadBye.has(pool[i])) {
+                    byeId = pool[i];
+                    pool.splice(i, 1);
+                    break;
+                }
+            }
+            if (!byeId) byeId = pool.pop();
+        }
+
+        const pairs = [];
+        const unpaired = [...pool];
+        while (unpaired.length > 0) {
+            const a = unpaired.shift();
+            let idx = unpaired.findIndex(b => !played.has(a + '|' + b));
+            if (idx === -1) idx = 0; // no fresh opponent left, accept a rematch
+            const b = unpaired.splice(idx, 1)[0];
+            pairs.push([a, b]);
+        }
+
+        const teamDocs = await Team.find({ _id: { $in: standings.map(s => s.id) } });
+        const byId = {};
+        teamDocs.forEach(t => { byId[t._id.toString()] = t; });
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        for (let i = 0; i < pairs.length; i++) {
+            const m = await this.createMatchDoc(tournamentId, stage, null, {
+                name: `${stage.name}: R${roundNumber}-M${i + 1}`,
+                matchNumber: num++,
+                round: roundNumber,
+                matchOrder: i,
+                teamA: byId[pairs[i][0]],
+                teamB: byId[pairs[i][1]]
+            });
+            created.push(m._id);
+        }
+        if (byeId) {
+            const bye = await this.createByeMatch(tournamentId, stage, null, {
+                name: `${stage.name}: R${roundNumber}-Bye`,
+                matchNumber: num++,
+                round: roundNumber,
+                matchOrder: pairs.length,
+                teamA: byId[byeId]
+            });
+            created.push(bye._id);
+        }
+        return created;
+    }
+
+    // ---- STANDINGS (by Stage _id, null-safe for BYE) ----
+
     async getStageStandings(stageId) {
         const stage = await Stage.findById(stageId);
         if (!stage) return [];
@@ -96,11 +307,12 @@ class BracketManager {
         });
 
         matches.forEach(m => {
-            if (m.status !== 'finished' || !m.winner) return;
+            const done = m.status === 'finished' || m.status === 'bye';
+            if (!done || !m.winner) return;
             const winnerId = m.winner.toString();
             if (!stats[winnerId]) return;
 
-            // BYE: only one side present, no game played
+            // BYE: one side only, counts as a win without a game
             if (!m.teamA || !m.teamB) {
                 stats[winnerId].wins++;
                 return;
