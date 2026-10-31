@@ -465,6 +465,80 @@ class BracketManager {
         }
     }
 
+    // ---- MATCH RESULT & PROPAGATION ----
+
+    // Record a finished match and push the winner/loser into their downstream slots
+    async updateMatch(matchId, { winnerId, scores = [] }) {
+        const match = await Match.findById(matchId);
+        if (!match) throw new Error('Match not found');
+        if (match.status === 'finished' || match.status === 'bye') throw new Error('Match already finished');
+
+        const aId = match.teamA ? match.teamA.toString() : null;
+        const bId = match.teamB ? match.teamB.toString() : null;
+        const winner = winnerId ? winnerId.toString() : null;
+        if (!winner || (winner !== aId && winner !== bId)) {
+            throw new Error('Winner must be one of the teams in this match');
+        }
+        const loser = winner === aId ? bId : aId;
+
+        match.scores = scores;
+        match.winner = winner;
+        match.status = 'finished';
+        await match.save();
+
+        await this.propagateMatchResult(match, winner, loser);
+
+        if (this.io) {
+            this.io.emit('match_update', match);
+            this.io.emit('bracket_update');
+        }
+        return match;
+    }
+
+    // Structural note: bracket generation never creates a match with an empty
+    // feeder slot (BYE sources emit no loser, and LB pairs are only built from
+    // real feeders), so no BYE-drop flag is needed like the legacy note-based logic.
+    async propagateMatchResult(match, winnerId, loserId) {
+        if (!winnerId) return;
+        if (match.nextMatchId) {
+            await this.updateMatchSlot(match.nextMatchId, match.nextMatchSlot, winnerId);
+        }
+        if (match.loserMatchId && loserId) {
+            await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loserId);
+        }
+    }
+
+    async updateMatchSlot(matchId, slot, teamId) {
+        if (!matchId || !teamId || !slot) return null;
+        const team = await Team.findById(teamId);
+        if (!team) return null;
+
+        const match = await Match.findByIdAndUpdate(
+            matchId,
+            { [slot]: team._id, [`${slot}Roster`]: team.members },
+            { new: true }
+        );
+
+        if (match && match.teamA && match.teamB && this.onMatchReady) {
+            this.onMatchReady(match);
+        }
+        if (this.io && match) this.io.emit('match_update', match);
+        return match;
+    }
+
+    // Manual match creation used by team management (relational version)
+    async createMatchForManager(tournamentId, stage, group, data) {
+        return this.createMatchDoc(tournamentId, stage, group, {
+            name: data.name,
+            matchNumber: data.matchNumber,
+            round: data.round || 99,
+            matchOrder: data.matchOrder || 0,
+            teamA: data.teamA,
+            teamB: data.teamB,
+            format: data.format
+        });
+    }
+
     // ---- STANDINGS (by Stage _id, null-safe for BYE) ----
 
     async getStageStandings(stageId) {
