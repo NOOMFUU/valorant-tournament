@@ -1,254 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VALORANT TOURNAMENT // HUB</title>
+    <title>Valorant Tournament</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@400;500;600;700;800&family=Anton&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #0f1923; color: #ece8e1; font-family: 'Rajdhani', sans-serif; font-size: 1.125rem; font-weight: 500; }
-        .font-header { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
-        .font-mono { font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
-        
-        .hero-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(5rem, 15vw, 12rem);
-            font-weight: 700;
-            line-height: 0.85;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            text-shadow: 6px 6px 0px rgba(255, 70, 85, 0.2);
-        }
-        
-        .marquee {
-            overflow: hidden;
-            white-space: nowrap;
-            background: #ff4655;
-            color: white;
-            padding: 0.5rem 0;
-            border-top: 1px solid #333;
-            border-bottom: 1px solid #333;
-        }
-        .marquee-content {
-            display: inline-block;
-            animation: marquee 20s linear infinite;
-        }
-        @keyframes marquee {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
-        }
-
-        .match-card {
-            background: #1a1d21;
-            border: 1px solid #2d3139;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .match-card:hover {
-            border-color: #ff4655;
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .match-card.live {
-            border-left: 4px solid #ff4655;
-        }
-
-        .stat-box {
-            background: #1a1d21;
-            border: 1px solid #2d3139;
-            padding: 1.5rem;
-            text-align: center;
-        }
-        .stat-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 4.5rem;
-            font-weight: 700;
-            line-height: 1;
-            color: #ff4655;
-            letter-spacing: 0.05em;
-        }
-        .stat-label {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 0.95rem;
-            text-transform: uppercase;
-            font-weight: 700;
-            color: #8b978f;
-            letter-spacing: 0.1em;
-            margin-top: 0.5rem;
-        }
-
-        .nav-tab {
-            padding: 16px 32px;
-            font-family: 'Oswald', sans-serif;
-            font-weight: 700;
-            color: #8b978f;
-            border-bottom: 4px solid transparent;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            text-decoration: none;
-            letter-spacing: 0.1em; 
-            font-size: 1.25rem;
-        }
-        .nav-tab:hover { color: white; }
-        .nav-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #0f1923; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #ff4655; }
-
-        .lp-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
-        @media (min-width: 640px) { .lp-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (min-width: 1024px) { .lp-grid { grid-template-columns: repeat(4, 1fr); } }
-        @media (min-width: 1280px) { .lp-grid { grid-template-columns: repeat(6, 1fr); } }
+        body { font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif; }
+        .muted { color: #71717a; }
+        .card { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; transition: border-color .15s, box-shadow .15s; }
+        a.card:hover, .card-link:hover { border-color: #a1a1aa; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05); }
+        .label { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #71717a; }
+        .live-dot { width: 8px; height: 8px; border-radius: 9999px; background: #e11d48; display: inline-block; }
+        .avatar { width: 40px; height: 40px; border-radius: 9999px; background: #f4f4f5; border: 1px solid #e4e4e7; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-weight: 600; font-size: 13px; color: #52525b; }
+        .avatar img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="bg-zinc-50 text-zinc-900 antialiased min-h-screen flex flex-col">
 
-    <!-- Header Navigation -->
-    <header class="h-20 bg-[#111] border-b border-[#222] flex items-center px-8 sticky top-0 z-50 shadow-lg">
-        <div class="flex items-center gap-4 mr-12">
-            <div class="w-10 h-10 bg-[#ff4655] flex items-center justify-center rounded">
-                <i class="fa-solid fa-trophy text-white text-2xl"></i>
+    <header class="bg-white/80 backdrop-blur border-b border-zinc-200 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html" class="font-semibold tracking-tight text-zinc-900">Valorant Tournament</a>
+            <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
+                <a href="#matches" class="hover:text-zinc-900 transition">แมตช์</a>
+                <a href="tournament_view.html" class="hover:text-zinc-900 transition">สายการแข่ง</a>
+                <a href="#teams" class="hover:text-zinc-900 transition">ทีม</a>
+                <a href="rules.html" class="hover:text-zinc-900 transition">กติกา</a>
+            </nav>
+            <div class="flex items-center gap-2">
+                <a href="login.html" class="text-sm font-medium text-zinc-600 hover:text-zinc-900 px-3 py-2 rounded-lg transition">เข้าสู่ระบบ</a>
+                <a href="login.html?tab=register" class="text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-4 py-2 rounded-lg transition">สมัครทีม</a>
             </div>
-            <div>
-                <h1 class="text-3xl font-header tracking-wide text-white leading-none">TOURNAMENT.EXE</h1>
-                <div class="text-xs text-gray-500 font-bold uppercase tracking-widest">Protocol Hub</div>
-            </div>
-        </div>
-        <nav class="hidden md:flex h-full">
-            <a href="#matches" class="nav-tab">Matches</a>
-            <a href="tournament_view.html" class="nav-tab">Bracket</a>
-            <a href="#teams" class="nav-tab">Teams</a>
-        </nav>
-        <div class="ml-auto flex gap-4">
-            <a href="login.html" class="text-sm font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors py-2 px-4 border border-[#333] hover:border-[#ff4655] rounded">Login</a>
-            <a href="login.html?tab=register" class="text-sm font-bold text-white bg-[#ff4655] uppercase tracking-widest transition-colors py-2 px-4 rounded hover:bg-[#ff5d6a]">Register</a>
         </div>
     </header>
 
-    <!-- Marquee -->
-    <div class="marquee">
-        <div class="marquee-content font-mono font-bold uppercase tracking-widest text-sm" id="tickerContent">
-            LOADING TOURNAMENT DATA... // VALORANT TOURNAMENT PROTOCOL // LIVE BRACKETS // TEAM REGISTRATION OPEN
-        </div>
-    </div>
-
-    <!-- Hero Section -->
-    <section class="relative overflow-hidden bg-[#0f1923] py-20 md:py-32 px-8 border-b border-[#222]">
-        <div class="absolute inset-0 opacity-10 pointer-events-none">
-            <div class="absolute inset-0 bg-[radial-gradient(#2d3139_1px,transparent_1px)] [background-size:40px_40px]"></div>
-        </div>
-        <div class="max-w-7xl mx-auto relative z-10">
-            <p class="font-mono text-sm font-bold uppercase tracking-[0.5em] text-[#ff4655] mb-6">Established Protocol 2026</p>
-            <h1 class="hero-title mb-12 text-white" id="tourneyName">VALORANT<br>CHAMPIONS</h1>
-            
-            <div class="flex flex-wrap gap-6 mb-12">
-                <a href="tournament_view.html" class="bg-[#ff4655] text-white px-10 py-5 font-header text-4xl tracking-widest hover:bg-white hover:text-black transition-all shadow-[0_0_40px_rgba(255,70,85,0.3)] flex items-center gap-4">
-                    <i class="fa-solid fa-diagram-project"></i> VIEW FULL BRACKET
-                </a>
-                <a href="schedule.html" class="bg-transparent text-white border-2 border-white/20 px-10 py-5 font-header text-4xl tracking-widest hover:border-[#ff4655] hover:text-[#ff4655] transition-all flex items-center gap-4">
-                    <i class="fa-solid fa-calendar-day"></i> TIMELINE
-                </a>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="stat-box">
-                    <div class="stat-value" id="teamCount">0</div>
-                    <div class="stat-label">Competing Teams</div>
+    <main class="flex-1 w-full">
+        <!-- Hero -->
+        <section class="bg-white border-b border-zinc-200">
+            <div class="max-w-6xl mx-auto px-6 py-16 md:py-24">
+                <p class="label mb-4">Valorant Tournament</p>
+                <h1 id="tourneyName" class="text-4xl md:text-6xl font-bold tracking-tight text-zinc-900 leading-tight max-w-3xl">
+                    กำลังโหลดทัวร์นาเมนต์
+                </h1>
+                <div class="mt-8 flex flex-wrap gap-3">
+                    <a href="tournament_view.html" class="inline-flex items-center gap-2 bg-zinc-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-700 transition">
+                        ดูสายการแข่ง
+                    </a>
+                    <a href="schedule.html" class="inline-flex items-center gap-2 bg-white text-zinc-900 border border-zinc-200 text-sm font-medium px-5 py-2.5 rounded-lg hover:border-zinc-400 transition">
+                        ตารางการแข่ง
+                    </a>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="matchCount">0</div>
-                    <div class="stat-label">Matches Completed</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="prizePool">TBA</div>
-                    <div class="stat-label">Total Prize Pool</div>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-8 py-16 space-y-24 w-full">
-
-        <!-- Live / Upcoming Matches -->
-        <section id="matches" class="animate-enter">
-            <div class="flex justify-between items-center mb-8 border-b border-[#333] pb-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-1 h-8 bg-[#ff4655]"></div>
-                    <h2 class="font-header text-4xl text-white tracking-wide">MATCH SCHEDULE</h2>
-                </div>
-                <a href="tournament_view.html" class="text-sm font-bold text-gray-500 hover:text-[#ff4655] uppercase tracking-widest transition flex items-center gap-2">
-                    Full Bracket <i class="fa-solid fa-arrow-right"></i>
-                </a>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="matchGrid">
-                <!-- Matches injected here -->
-                <div class="col-span-full text-center py-12 text-gray-600 italic">Connecting to system...</div>
+                <dl class="mt-14 grid grid-cols-1 sm:grid-cols-3 gap-px bg-zinc-200 rounded-xl overflow-hidden border border-zinc-200">
+                    <div class="bg-white p-6">
+                        <dt class="label">ทีมที่เข้าร่วม</dt>
+                        <dd id="teamCount" class="mt-2 text-3xl font-semibold tracking-tight">0</dd>
+                    </div>
+                    <div class="bg-white p-6">
+                        <dt class="label">แมตช์ที่จบแล้ว</dt>
+                        <dd id="matchCount" class="mt-2 text-3xl font-semibold tracking-tight">0</dd>
+                    </div>
+                    <div class="bg-white p-6">
+                        <dt class="label">รางวัลรวม</dt>
+                        <dd id="prizePool" class="mt-2 text-3xl font-semibold tracking-tight">-</dd>
+                    </div>
+                </dl>
             </div>
         </section>
 
-        <!-- Teams Grid -->
-        <section id="teams" class="animate-enter">
-            <div class="flex justify-between items-center mb-8 border-b border-[#333] pb-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-1 h-8 bg-[#ff4655]"></div>
-                    <h2 class="font-header text-4xl text-white tracking-wide">PARTICIPANTS</h2>
+        <div class="max-w-6xl mx-auto px-6 py-16 space-y-20">
+            <!-- Matches -->
+            <section id="matches">
+                <div class="flex items-end justify-between mb-6">
+                    <div>
+                        <h2 class="text-xl font-semibold tracking-tight">แมตช์ที่กำลังจะถึง</h2>
+                        <p class="text-sm muted mt-1">แมตช์สด และแมตช์ที่กำหนดเวลาไว้แล้ว</p>
+                    </div>
+                    <a href="tournament_view.html" class="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition">ดูทั้งหมด &rarr;</a>
                 </div>
-                <span class="text-sm font-mono text-gray-500 uppercase tracking-widest" id="contenderCount">0 TEAMS</span>
-            </div>
-            <div class="lp-grid" id="teamGrid">
-                <!-- Teams injected here -->
-            </div>
-        </section>
+                <div id="matchGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="col-span-full text-sm muted py-10 text-center">กำลังโหลดข้อมูล...</div>
+                </div>
+            </section>
 
+            <!-- Teams -->
+            <section id="teams">
+                <div class="flex items-end justify-between mb-6">
+                    <div>
+                        <h2 class="text-xl font-semibold tracking-tight">ทีมที่เข้าร่วม</h2>
+                        <p class="text-sm muted mt-1" id="contenderCount">0 ทีม</p>
+                    </div>
+                </div>
+                <div id="teamGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+            </section>
+        </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-[#111] border-t border-[#222] mt-auto px-8 py-16">
-        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div class="col-span-2">
-                <div class="flex items-center gap-4 mb-6">
-                    <div class="w-8 h-8 bg-[#ff4655] flex items-center justify-center rounded">
-                        <i class="fa-solid fa-trophy text-white text-base"></i>
-                    </div>
-                    <h3 class="font-header text-4xl text-white tracking-wide">TOURNAMENT.EXE</h3>
-                </div>
-                <p class="font-mono text-xs text-gray-500 max-w-md uppercase leading-relaxed">
-                    The ultimate competitive protocol for Valorant tournaments. Built for performance, designed for impact. System version 2.0.4 // Access level: Public
-                </p>
-            </div>
+    <footer class="bg-white border-t border-zinc-200">
+        <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-                <h4 class="font-header text-xl text-white mb-6 border-b border-[#333] pb-2">Protocol</h4>
-                <ul class="font-mono text-xs space-y-3 uppercase tracking-widest">
-                    <li><a href="login.html" class="text-gray-500 hover:text-[#ff4655] transition">Admin Login</a></li>
-                    <li><a href="login.html?tab=register" class="text-gray-500 hover:text-[#ff4655] transition">Team Registration</a></li>
-                    <li><a href="tournament_view.html" class="text-gray-500 hover:text-[#ff4655] transition">Full Results</a></li>
-                    <li><a href="rules.html" class="text-gray-500 hover:text-[#ff4655] transition">Official Rulebook</a></li>
-                </ul>
+                <p class="font-semibold tracking-tight">Valorant Tournament</p>
+                <p class="text-sm muted mt-1">ดูข้อมูลได้โดยไม่ต้องเข้าสู่ระบบ</p>
             </div>
-            <div>
-                <h4 class="font-header text-xl text-white mb-6 border-b border-[#333] pb-2">Connect</h4>
-                <div class="flex gap-6 text-2xl">
-                    <a href="#" class="text-gray-500 hover:text-[#ff4655] transition"><i class="fa-brands fa-discord"></i></a>
-                    <a href="#" class="text-gray-500 hover:text-[#ff4655] transition"><i class="fa-brands fa-twitter"></i></a>
-                    <a href="#" class="text-gray-500 hover:text-[#ff4655] transition"><i class="fa-brands fa-twitch"></i></a>
-                </div>
+            <div class="flex gap-6 text-sm font-medium text-zinc-500">
+                <a href="rules.html" class="hover:text-zinc-900 transition">กติกา</a>
+                <a href="archive.html" class="hover:text-zinc-900 transition">ประวัติการแข่งขัน</a>
+                <a href="login.html" class="hover:text-zinc-900 transition">เข้าสู่ระบบ</a>
             </div>
-        </div>
-        <div class="max-w-7xl mx-auto mt-16 pt-8 border-t border-[#222] text-center">
-            <p class="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-600">
-                &copy; 2026 VALORANT TOURNAMENT PROTOCOL // NO PERMISSION REQUIRED TO VIEW // DATA SECURED
-            </p>
         </div>
     </footer>
 
     <script>
         const API_BASE = '';
+
+        const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : null;
+        const initials = (name) => esc((name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase());
+
+        function avatarHtml(logo, name) {
+            const url = safeUrl(logo);
+            return url
+                ? `<div class="avatar"><img src="${esc(url)}" alt=""></div>`
+                : `<div class="avatar">${initials(name)}</div>`;
+        }
+
+        function mapWins(scores) {
+            let a = 0, b = 0;
+            (scores || []).forEach(s => {
+                if (Number(s.teamAScore) > Number(s.teamBScore)) a++;
+                else if (Number(s.teamBScore) > Number(s.teamAScore)) b++;
+            });
+            return { a, b };
+        }
 
         async function init() {
             try {
@@ -257,100 +142,85 @@
                     fetch(`${API_BASE}/api/matches`),
                     fetch(`${API_BASE}/api/teams`)
                 ]);
-
                 const tourneys = await tRes.json();
                 const matches = await mRes.json();
                 const teams = await tmRes.json();
 
+                document.getElementById('teamCount').innerText = teams.length;
+                document.getElementById('contenderCount').innerText = `${teams.length} ทีม`;
+                document.getElementById('matchCount').innerText = matches.filter(m => m.status === 'finished').length;
+
                 if (tourneys.length > 0) {
                     const t = tourneys[0];
-                    document.getElementById('tourneyName').innerHTML = t.name.replace(' ', '<br>');
-                    document.getElementById('prizePool').innerText = t.prizePool || '฿ 50,000';
-                    document.getElementById('teamCount').innerText = teams.length;
-                    document.getElementById('contenderCount').innerText = `${teams.length} TEAMS`;
-                    document.getElementById('matchCount').innerText = matches.filter(m => m.status === 'finished').length;
-
-                    updateTicker(t, matches);
-                    renderMatches(matches);
-                    renderTeams(teams);
+                    document.getElementById('tourneyName').textContent = t.name;
+                    document.getElementById('prizePool').textContent = t.prizePool || '-';
                 }
-            } catch (e) { console.error(e); }
-        }
 
-        function updateTicker(t, matches) {
-            const liveMatch = matches.find(m => m.status === 'live');
-            let text = `ACTIVE PROTOCOL: ${t.name} // `;
-            if (liveMatch) {
-                text += `LIVE NOW: ${liveMatch.teamA?.shortName || 'TBD'} VS ${liveMatch.teamB?.shortName || 'TBD'} // `;
+                renderMatches(matches);
+                renderTeams(teams);
+            } catch (e) {
+                console.error(e);
+                document.getElementById('matchGrid').innerHTML = '<div class="col-span-full text-sm muted py-10 text-center">โหลดข้อมูลไม่สำเร็จ</div>';
             }
-            text += `JOIN THE BATTLE // ${t.participants.length} TEAMS CONFIRMED // `;
-            document.getElementById('tickerContent').innerText = text.repeat(3);
         }
 
         function renderMatches(matches) {
             const grid = document.getElementById('matchGrid');
             const upcoming = matches
                 .filter(m => m.status === 'scheduled' || m.status === 'live')
+                .sort((a, b) => new Date(a.scheduledTime || 0) - new Date(b.scheduledTime || 0))
                 .slice(0, 6);
 
             if (upcoming.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center py-12 font-mono text-gray-500 uppercase tracking-widest text-sm">No upcoming matches scheduled</div>';
+                grid.innerHTML = '<div class="col-span-full text-sm muted py-10 text-center">ยังไม่มีแมตช์ที่กำหนดเวลา</div>';
                 return;
             }
 
             grid.innerHTML = upcoming.map(m => {
                 const isLive = m.status === 'live';
-                const date = new Date(m.scheduledTime);
-                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                const when = m.scheduledTime
+                    ? new Date(m.scheduledTime).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : 'ยังไม่กำหนดเวลา';
+                const { a, b } = mapWins(m.scores);
+                const teamA = m.teamA?.shortName || m.teamA?.name || 'TBD';
+                const teamB = m.teamB?.shortName || m.teamB?.name || 'TBD';
 
                 return `
-                    <div class="match-card p-5 ${isLive ? 'live' : ''}" onclick="location.href='tournament_view.html'">
-                        <div class="flex justify-between items-center mb-6 border-b border-[#222] pb-2">
-                            <span class="text-xs font-bold uppercase tracking-widest ${isLive ? 'text-[#ff4655] animate-pulse' : 'text-gray-500'}">
-                                ${isLive ? 'LIVE NOW' : `${dateStr} // ${timeStr}`}
+                    <a href="tournament_view.html" class="card block p-5">
+                        <div class="flex items-center justify-between mb-5">
+                            <span class="text-xs font-medium ${isLive ? 'text-rose-600' : 'muted'} flex items-center gap-2">
+                                ${isLive ? '<span class="live-dot"></span>กำลังแข่ง' : esc(when)}
                             </span>
-                            <span class="text-xs font-mono text-gray-600 uppercase">${m.name || 'Match'}</span>
+                            <span class="text-xs muted">${esc(m.format || '')}</span>
                         </div>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 bg-black/40 border border-[#333] rounded p-1">
-                                        <img src="${m.teamA?.logo || 'https://via.placeholder.com/40'}" class="w-full h-full object-contain">
+                        <div class="space-y-3">
+                            ${[[m.teamA, teamA, a], [m.teamB, teamB, b]].map(([team, label, score]) => `
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        ${avatarHtml(team?.logo, team?.name)}
+                                        <span class="font-medium truncate">${esc(label)}</span>
                                     </div>
-                                    <span class="font-header text-2xl text-white tracking-wide">${m.teamA?.shortName || 'TBD'}</span>
+                                    <span class="font-semibold tabular-nums ${score ? 'text-zinc-900' : 'text-zinc-300'}">${m.status === 'finished' || score ? score : '-'}</span>
                                 </div>
-                                <span class="font-header text-3xl text-gray-600">0</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 bg-black/40 border border-[#333] rounded p-1">
-                                        <img src="${m.teamB?.logo || 'https://via.placeholder.com/40'}" class="w-full h-full object-contain">
-                                    </div>
-                                    <span class="font-header text-2xl text-white tracking-wide">${m.teamB?.shortName || 'TBD'}</span>
-                                </div>
-                                <span class="font-header text-3xl text-gray-600">0</span>
-                            </div>
+                            `).join('')}
                         </div>
-                    </div>
+                        <div class="mt-5 pt-4 border-t border-zinc-100 text-xs muted truncate">${esc(m.name || 'แมตช์')}</div>
+                    </a>
                 `;
             }).join('');
         }
 
         function renderTeams(teams) {
             const grid = document.getElementById('teamGrid');
+            if (teams.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-sm muted py-10 text-center">ยังไม่มีทีม</div>';
+                return;
+            }
             grid.innerHTML = teams.map(t => `
-                <div class="bg-[#1a1d21] border border-[#333] flex flex-col hover:border-[#ff4655] transition-colors cursor-pointer group" onclick="location.href='team.html?id=${t._id}'">
-                    <div class="bg-[#222] border-b border-[#333] p-2 text-center">
-                        <span class="text-white font-bold text-xs uppercase tracking-widest truncate block">${t.name}</span>
-                    </div>
-                    <div class="h-40 bg-[#0f1113] flex items-center justify-center p-6 relative overflow-hidden">
-                        <img src="${t.logo || 'https://via.placeholder.com/100'}" class="max-h-full max-w-full object-contain opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
-                    </div>
-                    <div class="bg-[#111] p-1 text-center font-mono text-[10px] text-gray-600 uppercase tracking-[0.2em]">
-                        ${t.shortName || 'Participant'}
-                    </div>
-                </div>
+                <a href="team.html?id=${encodeURIComponent(t._id)}" class="card card-link p-4 flex flex-col items-center text-center gap-3">
+                    ${avatarHtml(t.logo, t.name)}
+                    <span class="text-sm font-medium truncate w-full">${esc(t.name)}</span>
+                </a>
             `).join('');
         }
 
