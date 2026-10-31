@@ -1,9 +1,11 @@
 const bracketManager = require('../managers/bracketManager');
 const Match = require('../models/Match');
 const Team = require('../models/Team');
+const stageManager = require('../managers/stageManager');
 
-jest.mock('../models/Match');
-jest.mock('../models/Team');
+jest.mock('../models/Match', () => ({ findByIdAndUpdate: jest.fn() }));
+jest.mock('../models/Team', () => ({ findById: jest.fn() }));
+jest.mock('../managers/stageManager', () => ({ generatePlaceholderMatches: jest.fn() }));
 
 describe('BracketManager Unit Tests', () => {
 
@@ -53,11 +55,12 @@ describe('BracketManager Unit Tests', () => {
 
     describe('updateMatchSlot', () => {
         test('should update match slot and roster', async () => {
-            const team = { _id: 'team123', members: ['p1', 'p2'] };
+            Team.findById.mockResolvedValue({ _id: 'team123', members: ['p1', 'p2'] });
             Match.findByIdAndUpdate.mockResolvedValue({ _id: 'match1', teamA: 'team123' });
 
-            await bracketManager.updateMatchSlot('match1', 'teamA', team);
+            await bracketManager.updateMatchSlot('match1', 'teamA', 'team123');
 
+            expect(Team.findById).toHaveBeenCalledWith('team123');
             expect(Match.findByIdAndUpdate).toHaveBeenCalledWith(
                 'match1',
                 { teamA: 'team123', teamARoster: ['p1', 'p2'] },
@@ -70,7 +73,7 @@ describe('BracketManager Unit Tests', () => {
         test('should advance winner to next match', async () => {
             const match = { nextMatchId: 'next1', nextMatchSlot: 'teamB' };
             const winner = { _id: 'w1', shortName: 'Win', members: [] };
-            
+
             // Mock updateMatchSlot internally used by propagateMatchResult
             const spy = jest.spyOn(bracketManager, 'updateMatchSlot').mockResolvedValue({});
 
@@ -91,6 +94,18 @@ describe('BracketManager Unit Tests', () => {
 
             expect(spy).toHaveBeenCalledWith('loser1', 'teamA', loser);
             spy.mockRestore();
+        });
+    });
+
+    describe('generateStage', () => {
+        test('dispatches usePlaceholders stages to stageManager.generatePlaceholderMatches', async () => {
+            stageManager.generatePlaceholderMatches.mockResolvedValue(['m1']);
+            const stage = { type: 'round_robin', settings: { usePlaceholders: true } };
+
+            const result = await bracketManager.generateStage('tour1', stage, []);
+
+            expect(stageManager.generatePlaceholderMatches).toHaveBeenCalledWith('tour1', stage);
+            expect(result).toEqual(['m1']);
         });
     });
 });
