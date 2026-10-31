@@ -6,14 +6,17 @@ const registrationSchema = new mongoose.Schema({
   teamName: { type: String, required: true, trim: true },
   contact: { type: String, trim: true, default: '' },
   members: [{
-    riotId: { type: String, trim: true },
-    puuid: { type: String, trim: true }
+    name: { type: String, trim: true, default: '' },
+    riotId: { type: String, trim: true, default: '' },
+    puuid: { type: String, trim: true, default: '' },
+    role: { type: String, enum: ['Main', 'Sub', 'Coach'], default: 'Main' }
   }],
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
+  rejectionReason: { type: String, default: '' },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   reviewedAt: { type: Date, default: null }
 }, { timestamps: true });
