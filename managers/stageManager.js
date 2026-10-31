@@ -7,6 +7,70 @@ const bracketManager = require('./bracketManager');
 const DONE_STATUSES = ['finished', 'bye', 'auto_forfeit'];
 const LOCKED_STATUSES = ['live', 'pending_approval', 'finished', 'bye', 'auto_forfeit'];
 
+// Build one slot from a spec: either a known team ({ teamId }) or a placeholder ({ sourceStage, sourceRank, sourceGroupIndex, label }).
+async function buildSlot(side) {
+    if (!side) return { team: null, placeholder: null };
+    if (side.teamId) {
+        const team = await Team.findById(side.teamId);
+        if (!team) throw new Error(`Team not found: ${side.teamId}`);
+        return { team, placeholder: null };
+    }
+    if (!side.sourceStage) throw new Error('Slot needs either teamId or sourceStage');
+    const src = await Stage.findById(side.sourceStage);
+    if (!src) throw new Error(`Source stage not found: ${side.sourceStage}`);
+    return {
+        team: null,
+        placeholder: {
+            label: side.label || '',
+            sourceStage: src._id,
+            sourceRank: side.sourceRank || 1,
+            sourceGroupIndex: (side.sourceGroupIndex === undefined) ? null : side.sourceGroupIndex
+        }
+    };
+}
+
+// Create TBD matches from stage.settings.placeholders = [{ round, matchOrder, name, format, teamA, teamB }].
+// Known teams are registered as StageEntry; placeholder slots are resolved later by resolveStagePlaceholders.
+async function generatePlaceholderMatches(tournamentId, stage) {
+    const specs = (stage.settings && stage.settings.placeholders) || [];
+    if (!Array.isArray(specs) || specs.length === 0) {
+        throw new Error('usePlaceholders requires settings.placeholders');
+    }
+
+    const knownTeams = new Map();
+    const built = [];
+    for (const spec of specs) {
+        const a = await buildSlot(spec.teamA);
+        const b = await buildSlot(spec.teamB);
+        [a.team, b.team].forEach(t => { if (t) knownTeams.set(t._id.toString(), t); });
+        built.push({ spec, a, b });
+    }
+
+    if (knownTeams.size > 0) {
+        await bracketManager.createStageEntries(stage, [...knownTeams.values()], null);
+    }
+
+    let num = await bracketManager.getNextMatchNumber(tournamentId);
+    const created = [];
+    for (let i = 0; i < built.length; i++) {
+        const { spec, a, b } = built[i];
+        const m = await bracketManager.createMatchDoc(tournamentId, stage, null, {
+            name: spec.name || `${stage.name}: TBD ${i + 1}`,
+            matchNumber: num++,
+            round: spec.round || 1,
+            matchOrder: (spec.matchOrder !== undefined && spec.matchOrder !== null) ? spec.matchOrder : i,
+            teamA: a.team,
+            teamB: b.team,
+            format: spec.format
+        });
+        if (a.placeholder) m.teamAPlaceholder = a.placeholder;
+        if (b.placeholder) m.teamBPlaceholder = b.placeholder;
+        if (a.placeholder || b.placeholder) await m.save();
+        created.push(m._id);
+    }
+    return created;
+}
+
 // Fill TBD slots whose source stage has finished, using Stage/StageEntry rankings.
 async function resolveStagePlaceholders(tournamentId, stageId) {
     const pending = await Match.find({
@@ -113,4 +177,4 @@ async function swapTeamsInStage(stageId, teamIdA, teamIdB) {
     return { swapped: [teamIdA, teamIdB], matchesUpdated: matches.length };
 }
 
-module.exports = { resolveStagePlaceholders, addTeamToStage, swapTeamsInStage };
+module.exports = { generatePlaceholderMatches, resolveStagePlaceholders, addTeamToStage, swapTeamsInStage };
