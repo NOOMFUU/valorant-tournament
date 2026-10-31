@@ -114,14 +114,36 @@ class BracketManager {
         return m;
     }
 
+    // Link a source match to the target slot. Saves only the source.
+    async linkMatch(source, target, slot) {
+        if (!source || !target) return;
+        source.nextMatchId = target._id;
+        source.nextMatchSlot = slot;
+        await source.save();
+    }
+
+    // Route the loser of `source` into target slot (loser bracket)
+    async attachLoser(source, target, slot) {
+        source.loserMatchId = target._id;
+        source.loserMatchSlot = slot;
+        await source.save();
+    }
+
+    // Connect a bracket node (match or loser reference) into a target match slot
+    async connect(node, target, slot) {
+        if (!node) return;
+        if (node.type === 'match') await this.linkMatch(node.doc, target, slot);
+        else if (node.type === 'loser_ref') await this.attachLoser(node.doc, target, slot);
+    }
+
     // ---- ROUND ROBIN ----
 
-    async generateRoundRobin(tournamentId, stage, teams) {
+    async generateRoundRobin(tournamentId, stage, list) {
         const cfg = stage.settings || {};
         const groupCount = cfg.groupCount || 1;
         const groups = await this.createGroups(stage, groupCount, cfg.groupNames || []);
         const buckets = groups.map(() => []);
-        teams.filter(Boolean).forEach((t, i) => buckets[i % groupCount].push(t));
+        list.forEach((t, i) => buckets[i % groupCount].push(t));
 
         let num = await this.getNextMatchNumber(tournamentId);
         const created = [];
@@ -166,10 +188,7 @@ class BracketManager {
 
     // ---- SWISS ----
 
-    async generateSwissRound1(tournamentId, stage, teams) {
-        const cfg = stage.settings || {};
-        const list = teams.filter(Boolean);
-        if (cfg.randomize) this.shuffle(list);
+    async generateSwissRound1(tournamentId, stage, list) {
         await this.createStageEntries(stage, list, null);
 
         let num = await this.getNextMatchNumber(tournamentId);
@@ -271,6 +290,179 @@ class BracketManager {
             created.push(bye._id);
         }
         return created;
+    }
+
+    // ---- SINGLE / DOUBLE ELIMINATION (single group, no split) ----
+
+    async generateElimination(tournamentId, stage, list) {
+        const cfg = stage.settings || {};
+        const isDouble = stage.type === 'double_elim';
+        const qualified = cfg.qualifiedCount || 1;
+        if ((cfg.groupCount || 1) > 1) throw new Error('Multi-group elimination is a Phase 3 follow-up');
+        if (cfg.splitParticipants) throw new Error('Split double elimination is a Phase 3 follow-up');
+
+        const [group] = await this.createGroups(stage, 1, cfg.groupNames || []);
+        await this.createStageEntries(stage, list, group);
+
+        const padded = this.padTeams(list);
+        const total = padded.length;
+        if (total < 2) return [];
+
+        const seeding = this.getSeedingOrder(total);
+        let currentNodes = seeding.map(i => padded[i] ? { type: 'team', team: padded[i] } : null);
+        const totalRounds = Math.log2(total);
+
+        let roundsToPlay = totalRounds;
+        if (!isDouble && qualified > 1) {
+            roundsToPlay = Math.max(1, totalRounds - Math.floor(Math.log2(qualified)));
+        }
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        const teamOf = n => (n && n.type === 'team') ? n.team : null;
+        const mk = async (name, round, order, teamA, teamB, format) => {
+            const m = await this.createMatchDoc(tournamentId, stage, group, {
+                name, matchNumber: num++, round, matchOrder: order, teamA, teamB, format
+            });
+            created.push(m._id);
+            return m;
+        };
+
+        // --- UPPER BRACKET ---
+        const ubDrops = {};
+        for (let r = 1; r <= roundsToPlay; r++) {
+            const next = [];
+            const drops = [];
+            for (let i = 0; i < currentNodes.length / 2; i++) {
+                const top = currentNodes[i * 2];
+                const bottom = currentNodes[i * 2 + 1];
+
+                if (!top && !bottom) { next.push(null); drops.push(null); continue; }
+                if (!top || !bottom) { next.push(top || bottom); drops.push(null); continue; } // BYE: advance, no loser
+
+                const isFinal = (r === totalRounds && qualified === 1);
+                const name = isFinal ? `${stage.name} Final` : `${stage.name} UB Round ${r} Match ${i + 1}`;
+                const format = isFinal ? (cfg.finalFormat || 'BO3') : cfg.defaultFormat;
+                const m = await mk(name, r, i, teamOf(top), teamOf(bottom), format);
+                await this.connect(top, m, 'teamA');
+                await this.connect(bottom, m, 'teamB');
+
+                next.push({ type: 'match', doc: m });
+                drops.push({ type: 'match', doc: m });
+            }
+            currentNodes = next;
+            ubDrops[r] = drops;
+        }
+
+        // --- 3RD PLACE (single elim only) ---
+        if (!isDouble && cfg.hasThirdPlace && qualified === 1 && totalRounds >= 2) {
+            const semi = ubDrops[totalRounds - 1];
+            if (semi && semi.length === 2 && semi[0] && semi[1]) {
+                const third = await mk(`${stage.name} 3rd Place`, totalRounds, 1, null, null, cfg.defaultFormat);
+                await this.attachLoser(semi[0].doc, third, 'teamA');
+                await this.attachLoser(semi[1].doc, third, 'teamB');
+            }
+        }
+
+        if (!isDouble) return created;
+
+        // --- LOWER BRACKET (double elim) ---
+        let lbNodes = [];
+        const r1 = ubDrops[1] || [];
+        for (let i = 0; i < r1.length / 2; i++) {
+            const d1 = r1[i * 2];
+            const d2 = r1[i * 2 + 1];
+            if (d1 && d2) {
+                const m = await mk(`${stage.name} LB Round 1 Match ${i + 1}`, 101, i, null, null, cfg.defaultFormat);
+                await this.attachLoser(d1.doc, m, 'teamA');
+                await this.attachLoser(d2.doc, m, 'teamB');
+                lbNodes.push({ type: 'match', doc: m });
+            } else if (d1 || d2) {
+                lbNodes.push({ type: 'loser_ref', doc: (d1 || d2).doc }); // single loser passes through
+            } else {
+                lbNodes.push(null);
+            }
+        }
+
+        let lbRound = 2;
+        for (let r = 2; r <= totalRounds; r++) {
+            // Step 1: LB survivors vs UB drops (reverse seeding)
+            const drops = (ubDrops[r] || []).slice().reverse();
+            const next = [];
+            for (let i = 0; i < lbNodes.length; i++) {
+                const lb = lbNodes[i];
+                const ub = drops[i];
+                if (lb && ub) {
+                    const m = await mk(`${stage.name} LB Round ${lbRound} Match ${i + 1}`, 100 + lbRound, i, null, null, cfg.defaultFormat);
+                    await this.connect(lb, m, 'teamA');
+                    await this.attachLoser(ub.doc, m, 'teamB');
+                    next.push({ type: 'match', doc: m });
+                } else if (lb) {
+                    next.push(lb);
+                } else if (ub) {
+                    next.push({ type: 'loser_ref', doc: ub.doc });
+                } else {
+                    next.push(null);
+                }
+            }
+            lbNodes = next;
+            lbRound++;
+
+            // Step 2: consolidate LB pairs (skipped after last UB round)
+            if (r < totalRounds) {
+                const cons = [];
+                for (let i = 0; i < lbNodes.length / 2; i++) {
+                    const top = lbNodes[i * 2];
+                    const bottom = lbNodes[i * 2 + 1];
+                    if (top && bottom) {
+                        const m = await mk(`${stage.name} LB Round ${lbRound} Match ${i + 1}`, 100 + lbRound, i, null, null, cfg.defaultFormat);
+                        await this.connect(top, m, 'teamA');
+                        await this.connect(bottom, m, 'teamB');
+                        cons.push({ type: 'match', doc: m });
+                    } else {
+                        cons.push(top || bottom || null);
+                    }
+                }
+                lbNodes = cons;
+                lbRound++;
+            }
+        }
+
+        // --- GRAND FINAL ---
+        const ubFinal = currentNodes[0];
+        const lbFinal = lbNodes[0];
+        if (qualified === 1 && ubFinal && lbFinal) {
+            const gf = await mk(`${stage.name} Grand Final`, 999, 0, teamOf(ubFinal), teamOf(lbFinal), cfg.finalFormat || 'BO5');
+            await this.connect(ubFinal, gf, 'teamA');
+            await this.connect(lbFinal, gf, 'teamB');
+        }
+
+        return created;
+    }
+
+    // ---- DISPATCH ----
+
+    async generateStage(tournamentId, stage, teams) {
+        const cfg = stage.settings || {};
+        if (cfg.usePlaceholders) {
+            throw new Error('Placeholder (TBD) generation is not implemented yet');
+        }
+
+        const list = (teams || []).filter(Boolean);
+        if (cfg.randomize && stage.type !== 'cross_group') this.shuffle(list);
+
+        switch (stage.type) {
+            case 'round_robin': return this.generateRoundRobin(tournamentId, stage, list);
+            case 'swiss': return this.generateSwissRound1(tournamentId, stage, list);
+            case 'single_elim':
+            case 'double_elim': return this.generateElimination(tournamentId, stage, list);
+            case 'gsl':
+            case 'cross_group':
+            case 'triple_elim':
+                throw new Error(`${stage.type} is a Phase 3 follow-up`);
+            default:
+                throw new Error(`Unknown stage type: ${stage.type}`);
+        }
     }
 
     // ---- STANDINGS (by Stage _id, null-safe for BYE) ----
