@@ -591,7 +591,7 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
             if (channel) {
                 const requesterRole = requesterTeam.discordRoleId ? `<@&${requesterTeam.discordRoleId}>` : requesterTeam.name;
                 const isAccepted = action === 'accept';
-                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\\\\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
+                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
                 await channel.send({ content: `${requesterRole}`, embeds: [embed], allowedMentions: { parse: ['roles'] } });
             }
         }
