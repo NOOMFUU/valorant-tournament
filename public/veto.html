@@ -517,13 +517,6 @@
             }
         }
 
-        window.setRoomPass = function() {
-            const p = prompt('Set Room Password:');
-            if(p && p.trim() !== "") {
-                socket.emit('set_room_pass', { matchId, teamId, password: p });
-            }
-        }
-
         window.copyLobbyID = function(e) {
             if(e) e.stopPropagation();
             const txt = document.getElementById('roomPassContent').innerText;
