@@ -5,6 +5,7 @@ const StageEntry = require('../models/StageEntry');
 const Team = require('../models/Team');
 
 const GROUP_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const DONE_STATUSES = ['finished', 'bye', 'auto_forfeit'];
 
 class BracketManager {
 
@@ -340,7 +341,8 @@ class BracketManager {
                 if (!top && !bottom) { next.push(null); drops.push(null); continue; }
                 if (!top || !bottom) { next.push(top || bottom); drops.push(null); continue; } // BYE: advance, no loser
 
-                const isFinal = (r === totalRounds && qualified === 1);
+                // Only single elimination gets the "Final" name/format here; the double-elim Grand Final is created below.
+                const isFinal = (!isDouble && r === totalRounds && qualified === 1);
                 const name = isFinal ? `${stage.name} Final` : `${stage.name} UB Round ${r} Match ${i + 1}`;
                 const format = isFinal ? (cfg.finalFormat || 'BO3') : cfg.defaultFormat;
                 const m = await mk(name, r, i, teamOf(top), teamOf(bottom), format);
@@ -473,7 +475,7 @@ class BracketManager {
     async updateMatch(matchId, { winnerId, scores = [] }) {
         const match = await Match.findById(matchId);
         if (!match) throw new Error('Match not found');
-        if (match.status === 'finished' || match.status === 'bye') throw new Error('Match already finished');
+        if (DONE_STATUSES.includes(match.status)) throw new Error('Match already finished');
 
         const aId = match.teamA ? match.teamA.toString() : null;
         const bId = match.teamB ? match.teamB.toString() : null;
@@ -575,7 +577,7 @@ class BracketManager {
         });
 
         matches.forEach(m => {
-            const done = m.status === 'finished' || m.status === 'bye';
+            const done = DONE_STATUSES.includes(m.status);
             if (!done || !m.winner) return;
             const winnerId = m.winner.toString();
             if (!stats[winnerId]) return;

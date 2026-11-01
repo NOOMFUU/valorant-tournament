@@ -72,11 +72,12 @@ async function generatePlaceholderMatches(tournamentId, stage) {
 }
 
 // Fill TBD slots whose source stage has finished, using Stage/StageEntry rankings.
-async function resolveStagePlaceholders(tournamentId, stageId) {
+// `sourceStageId` is the stage that just finished; only placeholders that point at it are considered.
+async function resolveStagePlaceholders(tournamentId, sourceStageId) {
     const pending = await Match.find({
         tournament: tournamentId,
-        $or: [{ teamA: null, 'teamAPlaceholder.sourceStage': { $ne: null } },
-              { teamB: null, 'teamBPlaceholder.sourceStage': { $ne: null } }]
+        $or: [{ teamA: null, 'teamAPlaceholder.sourceStage': sourceStageId },
+              { teamB: null, 'teamBPlaceholder.sourceStage': sourceStageId }]
     });
 
     const resolved = [];
@@ -115,6 +116,10 @@ async function resolveStagePlaceholders(tournamentId, stageId) {
         if (changed) {
             await match.save();
             resolved.push(match._id);
+            // Same readiness hook as updateMatchSlot: notify once both sides are known.
+            if (match.teamA && match.teamB && bracketManager.onMatchReady) {
+                bracketManager.onMatchReady(match);
+            }
         }
     }
     return resolved;
