@@ -60,7 +60,6 @@ app.use(express.urlencoded({ extended: true }));
 // --- [NEW] ROUTES IMPORT ---
 const teamRoutes = require('./routes/teamRoutes');
 const matchRoutes = require('./routes/matchRoutes');
-const roomRoutes = require('./routes/roomRoutes');
 const tournamentRoutes = require('./routes/tournamentRoutes');
 const discordRoutes = require('./routes/discordRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -70,7 +69,6 @@ const statsRoutes = require('./routes/statsRoutes');
 
 app.use('/api', teamRoutes);
 app.use('/api', matchRoutes);
-app.use('/api', roomRoutes);
 app.use('/api', tournamentRoutes);
 app.use('/api', discordRoutes);
 app.use('/api', adminRoutes);
