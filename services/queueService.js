@@ -237,13 +237,16 @@ agenda.scheduleMatchJobs = async (match) => {
     }
 };
 
+// Keep the original Agenda start bound before we override it.
+const originalStart = agenda.start.bind(agenda);
+
 // Start Agenda without ever throwing: retry with backoff so a DNS/Mongo outage
 // does not crash the process or skip the rest of server startup.
-agenda.safeStart = async function () {
+const safeStart = async function () {
     let delay = 2000;
     for (let attempt = 1; ; attempt++) {
         try {
-            await agenda.start();
+            await originalStart();
             logger.info('AGENDA_STARTED', { attempt });
             return true;
         } catch (e) {
@@ -254,11 +257,7 @@ agenda.safeStart = async function () {
     }
 };
 
-// server.js calls queueService.start(); keep that name, but make it non-throwing.
-agenda.start = (function (original) {
-    return function () {
-        return agenda.safeStart();
-    };
-})(agenda.start);
+// server.js calls queueService.start(); make it non-throwing.
+agenda.start = safeStart;
 
 module.exports = agenda;
