@@ -36,10 +36,10 @@ const populateSafe = (q) => q
 
 // --- ROUTES ---
 
-// GET All Matches (public: roomPassword excluded)
+// GET All Matches (public)
 router.get('/matches', async (req, res) => {
     try {
-        const matches = await populateSafe(Match.find().select('-roomPassword'));
+        const matches = await populateSafe(Match.find());
 
         const vetoMgr = req.app.get('vetoMgr');
         const matchesWithPresence = matches.map(m => {
@@ -51,7 +51,7 @@ router.get('/matches', async (req, res) => {
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// GET Upcoming Matches (Team) — roomPassword only for the two teams in the match
+// GET Upcoming Matches (Team)
 router.get('/matches/upcoming', auth(['team']), async (req, res) => {
     try {
         const teamId = req.user.id;
@@ -77,15 +77,15 @@ router.get('/matches/history', auth(['team']), async (req, res) => {
         const matches = await populateSafe(Match.find({
             $or: [{ teamA: teamId }, { teamB: teamId }],
             status: 'finished'
-        }).select('-roomPassword')).sort({ updatedAt: -1 });
+        })).sort({ updatedAt: -1 });
         res.json(matches);
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// GET Single Match (public: roomPassword excluded)
+// GET Single Match (public)
 router.get('/matches/:id', async (req, res) => {
     try {
-        const match = await populateSafe(Match.findById(req.params.id).select('-roomPassword'));
+        const match = await populateSafe(Match.findById(req.params.id));
         if (!match) return res.status(404).json({ msg: 'Match not found' });
         res.json(match);
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
@@ -109,14 +109,13 @@ router.delete('/matches/:id', auth(['admin']), async (req, res) => {
 // UPDATE Match Info
 router.put('/matches/:id', auth(['admin']), async (req, res) => {
     try {
-        const { format, name, status, scheduledTime, roomName, roomPassword } = req.body;
+        const { format, name, status, scheduledTime, roomName } = req.body;
         const update = {};
         if (format) update.format = format;
         if (name) update.name = name;
         if (status) update.status = status;
         if (scheduledTime !== undefined) update.scheduledTime = scheduledTime;
         if (roomName !== undefined) update.roomName = roomName;
-        if (roomPassword !== undefined) update.roomPassword = roomPassword;
 
         const match = await Match.findByIdAndUpdate(req.params.id, update, { new: true });
         req.app.get('io').emit('match_update', match);
@@ -443,7 +442,6 @@ router.post('/matches/:id/reset-veto', auth(['admin']), async (req, res) => {
         const match = await Match.findById(req.params.id);
         match.vetoData = { status: 'pending', mapPool: [], bannedMaps: [], pickedMaps: [], history: [], sequence: [], sequenceIndex: 0, teamAReady: false, teamBReady: false };
         match.status = 'scheduled';
-        match.roomPassword = "";
         match.scores = [];
         match.winner = null;
         await match.save();
@@ -460,7 +458,6 @@ router.post('/matches/:id/reset', auth(['admin']), async (req, res) => {
         match.status = 'scheduled';
         match.winner = null;
         match.scores = [];
-        match.roomPassword = "";
         match.scoreSubmission = { status: 'none', tempScores: [] };
         match.checkIn = { teamA: false, teamB: false, windowOpen: false };
         match.vetoData = { status: 'pending', mapPool: [], bannedMaps: [], pickedMaps: [], history: [], sequence: [], sequenceIndex: 0, teamAReady: false, teamBReady: false };
@@ -594,7 +591,7 @@ router.post('/matches/:id/reschedule/respond', auth(['team']), async (req, res) 
             if (channel) {
                 const requesterRole = requesterTeam.discordRoleId ? `<@&${requesterTeam.discordRoleId}>` : requesterTeam.name;
                 const isAccepted = action === 'accept';
-                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
+                const embed = new EmbedBuilder().setColor(isAccepted ? 0x2ecc71 : 0xe74c3c).setTitle(isAccepted ? '✅ Reschedule Accepted' : '❌ Reschedule Rejected').setDescription(isAccepted ? `**${responderTeam.name}** accepted the reschedule.\\\\n**New Time:** <t:${Math.floor(new Date(proposedTime).getTime() / 1000)}:F>` : `**${responderTeam.name}** rejected the reschedule request.`).setTimestamp();
                 await channel.send({ content: `${requesterRole}`, embeds: [embed], allowedMentions: { parse: ['roles'] } });
             }
         }
