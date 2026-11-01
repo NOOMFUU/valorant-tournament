@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Tournament = require('../models/Tournament');
 const Match = require('../models/Match');
+const Stage = require('../models/Stage');
 const Team = require('../models/Team');
 const BracketManager = require('../managers/bracketManager');
+const stageManager = require('../managers/stageManager');
 const auth = require('../middleware/auth');
 const logger = require('../utils/logger');
 
@@ -277,10 +279,14 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
     }
 });
 
-// AUTH: ADMIN — Resolve placeholders
+// AUTH: ADMIN — Resolve placeholders for TBD slots that point at this stage.
+// :stageIndex is the stage's order (0-based). The resolver is keyed by the Stage _id.
 router.post('/tournaments/:id/stages/:stageIndex/resolve', auth(['admin']), async (req, res) => {
     try {
-        await BracketManager.resolveStagePlaceholders(req.params.id, req.params.stageIndex);
+        const stage = await Stage.findOne({ tournament: req.params.id, order: Number(req.params.stageIndex) });
+        if (!stage) return res.status(404).json({ success: false, msg: 'Stage not found' });
+
+        await stageManager.resolveStagePlaceholders(req.params.id, stage._id);
         req.app.get('io').emit('bracket_update');
         res.json({ success: true, msg: 'Placeholders resolved based on current standings.' });
     } catch (e) {
@@ -438,23 +444,25 @@ router.delete('/tournaments/:id', auth(['admin']), async (req, res) => {
 });
 
 // AUTH: TEAM — Verify score (opposing team confirms)
+// The match stays in 'pending_approval' until updateMatch records the result, so updateMatch's
+// "already finished" guard does not reject it. Winner is derived from the submitted map scores.
 router.post('/matches/:id/verify-score', auth(['team']), async (req, res) => {
     try {
         const match = await Match.findById(req.params.id);
         if (!match) return res.status(404).json({ success: false, msg: 'Match not found' });
         if (match.status !== 'pending_approval') return res.status(400).json({ success: false, msg: 'Match not pending approval' });
 
-        match.status = 'finished';
-        match.scores = match.scoreSubmission.tempScores;
+        const scores = match.scoreSubmission.tempScores;
         let winsA = 0, winsB = 0;
-        match.scores.forEach(s => {
+        scores.forEach(s => {
             if (parseInt(s.teamAScore) > parseInt(s.teamBScore)) winsA++;
             else if (parseInt(s.teamBScore) > parseInt(s.teamAScore)) winsB++;
         });
-        match.winner = winsA > winsB ? match.teamA : match.teamB;
-        await match.save();
-        await BracketManager.updateMatch(match);
-        req.app.get('io').emit('match_update', match);
+        if (winsA === winsB) return res.status(400).json({ success: false, msg: 'Submitted scores do not produce a winner' });
+
+        const winnerId = winsA > winsB ? match.teamA : match.teamB;
+        const updated = await BracketManager.updateMatch(match._id, { winnerId, scores });
+        req.app.get('io').emit('match_update', updated);
         req.app.get('io').emit('bracket_update');
         logger.info('SCORE_TEAM_VERIFIED', { matchId: match._id, teamId: req.user.id });
         res.json({ success: true });
