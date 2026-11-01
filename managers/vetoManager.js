@@ -4,6 +4,12 @@ const discordService = require('../services/discordService');
 // Fallback Map Pool (กรณี Tournament ไม่ได้ตั้งค่าไว้)
 const FALLBACK_MAP_POOL = ['Abyss', 'Ascent', 'Bind', 'Haven', 'Lotus', 'Sunset', 'Pearl'];
 
+// เปรียบเทียบ ObjectId / string ของทีมให้ปลอดภัย (รองรับ null/undefined)
+function areIdsEqual(a, b) {
+    if (!a || !b) return false;
+    return a.toString() === b.toString();
+}
+
 class VetoManager {
     constructor(io) {
         this.io = io;
