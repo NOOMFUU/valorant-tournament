@@ -8,11 +8,9 @@ const rateLimit = require('express-rate-limit');
 let imgbbUploader;
 try { imgbbUploader = require('imgbb-uploader'); } catch (e) {}
 
-// Import Models
 const User = require('../models/User');
 const Team = require('../models/Team');
 
-// --- MIDDLEWARE & HELPERS ---
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { registerSchema, loginSchema } = require('../utils/schemas');
@@ -20,14 +18,11 @@ const { upload, getFileUrl } = require('../middleware/upload');
 const { logAdminAction, sendDiscordLog } = require('../utils/helpers');
 const { verifyRiotAccount } = require('../utils/riotApi');
 
-// --- ROUTES ---
-
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { msg: "Too many login attempts" } });
 
-// ห้ามส่ง password hash ออกไปนอก server
+// ห้ามส่ง password hash ออกนอก server
 const SAFE_TEAM = '-password';
 
-// Login
 router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { username, password, role } = req.body;
@@ -44,7 +39,6 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// Register
 router.post('/register', authLimiter, upload.single('logo'), validate(registerSchema), async (req, res) => {
     try {
         const { username, name, shortName, password } = req.body;
@@ -55,13 +49,12 @@ router.post('/register', authLimiter, upload.single('logo'), validate(registerSc
         if (await Team.findOne({ name: name })) return res.status(400).json({ msg: 'Team Name is already registered' });
 
         await new Team({ username: cleanUsername, name, shortName, password: bcrypt.hashSync(password, 10), logo, status: 'pending' }).save();
-        
+
         await sendDiscordLog(req, '📝 New Team Registered', `Team **${name}** [${shortName}] has registered.`, [{ name: 'Username', value: cleanUsername, inline: true }], 0xf1c40f);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
-// Team Management
 router.post('/teams/:id/approve', auth(['admin']), async (req, res) => { await Team.findByIdAndUpdate(req.params.id, { status: 'approved' }); res.json({ success: true }); });
 router.delete('/teams/:id', auth(['admin']), async (req, res) => { await Team.findByIdAndDelete(req.params.id); res.json({ success: true }); });
 router.get('/teams', async (req, res) => res.json(await Team.find().select(SAFE_TEAM)));
@@ -76,7 +69,6 @@ router.post('/teams/reset-stats', auth(['admin']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
-// Import Teams CSV
 const csvUpload = multer({ storage: multer.memoryStorage() });
 router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (req, res) => {
     try {
@@ -106,6 +98,10 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
             for (let j = 0; j < 2; j++) { const idx = 19 + (j * 3); addMember(cols[idx], cols[idx + 1], cols[idx + 2], 'Sub'); }
             addMember(cols[25], cols[26], cols[27], 'Coach');
 
+            // CSV import: ตั้งกัปตันเป็นผู้เล่น Main คนแรกโดยอัตโนมัติ
+            const firstMain = members.find(m => m.role === 'Main');
+            if (firstMain) firstMain.isCaptain = true;
+
             const cleanUser = username.toLowerCase();
             const existing = await Team.findOne({ username: cleanUser });
 
@@ -126,20 +122,44 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
-// Roster & Team Updates
+// Roster: ต้องมีกัปตันได้คนเดียว (เลือกจาก Main) ใช้ค่าเดิมถ้า client ไม่ได้ส่ง
+// Riot ID ที่เปลี่ยนและ Riot API ยืนยันผ่าน -> อนุมัติอัตโนมัติ
 router.put('/teams/roster', auth(['team']), async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
         const newMembers = req.body.members;
-        
+
         if (!newMembers || newMembers.length < 5) {
             return res.status(400).json({ msg: 'A minimum of 5 players is required to complete roster registration.' });
         }
-        
+
+        const flagged = newMembers.filter(m => m.isCaptain === true && m.role === 'Main');
+        if (flagged.length > 1) {
+            return res.status(400).json({ msg: 'Only one captain is allowed.' });
+        }
+
+        const findOld = (newM) => team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
+
+        let captainIndex = newMembers.findIndex(m => m.isCaptain === true && m.role === 'Main');
+        if (captainIndex === -1) {
+            const oldCaptain = team.members.find(m => m.isCaptain);
+            if (oldCaptain) {
+                captainIndex = newMembers.findIndex(m => {
+                    const old = findOld(m);
+                    return old && old._id.toString() === oldCaptain._id.toString() && m.role === 'Main';
+                });
+            }
+            if (captainIndex === -1) captainIndex = newMembers.findIndex(m => m.role === 'Main');
+        }
+        if (captainIndex === -1) {
+            return res.status(400).json({ msg: 'Roster must include at least one Main player to be captain.' });
+        }
+
         const processedMembers = [];
-        for (const newM of newMembers) {
-            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
-            
+        for (let i = 0; i < newMembers.length; i++) {
+            const newM = newMembers[i];
+            const oldM = findOld(newM);
+
             let status = 'pending';
             let puuid = oldM ? oldM.puuid : '';
             let accountLevel = oldM ? oldM.accountLevel : 0;
@@ -156,7 +176,7 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
                     puuid = riotData.puuid;
                     accountLevel = riotData.level;
                     playerCard = riotData.card;
-                    status = 'pending'; // Require admin approval for new accounts
+                    status = 'approved';
                 } catch (apiError) {
                     return res.status(503).json({ msg: `Riot API Verification Failed. Please try again later. (${apiError.message})` });
                 }
@@ -166,7 +186,15 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
 
             if (!team.rosterLocked) status = 'approved';
 
-            processedMembers.push({ ...newM, status, puuid, accountLevel, playerCard, pendingUpdate: null });
+            processedMembers.push({
+                name: newM.name,
+                tag: newM.tag,
+                role: newM.role,
+                discordName: newM.discordName || '',
+                discordId: newM.discordId || '',
+                isCaptain: i === captainIndex,
+                status, puuid, accountLevel, playerCard, pendingUpdate: null
+            });
         }
 
         team.members = processedMembers;
@@ -178,7 +206,6 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: 'Server Error: ' + e.message }); }
 });
 
-// Upload Logo (Team Self)
 router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
@@ -188,7 +215,6 @@ router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// Upload Logo (Admin for any team)
 router.put('/teams/:id/logo', auth(['admin']), upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
@@ -198,23 +224,22 @@ router.put('/teams/:id/logo', auth(['admin']), upload.single('logo'), async (req
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// Create Team (Admin)
 router.post('/teams', auth(['admin']), upload.single('logo'), async (req, res) => {
     try {
         const { username, name, shortName, password } = req.body;
         if (!username || !name || !shortName || !password) return res.status(400).json({ msg: 'Please enter all fields' });
-        
+
         const cleanUsername = username.toLowerCase().trim();
         if (await Team.findOne({ username: cleanUsername })) return res.status(400).json({ msg: 'Username taken' });
         if (await Team.findOne({ name })) return res.status(400).json({ msg: 'Team Name taken' });
 
         const logo = req.file ? getFileUrl(req.file) : '';
-        const newTeam = new Team({ 
-            username: cleanUsername, name, shortName: shortName.toUpperCase(), 
-            password: bcrypt.hashSync(password, 10), logo, status: 'approved' 
+        const newTeam = new Team({
+            username: cleanUsername, name, shortName: shortName.toUpperCase(),
+            password: bcrypt.hashSync(password, 10), logo, status: 'approved'
         });
         await newTeam.save();
-        
+
         await logAdminAction(req, 'CREATE_TEAM', `Team ${name}`, { username });
         req.app.get('io').emit('teams_update');
         const safeTeam = await Team.findById(newTeam._id).select(SAFE_TEAM);
@@ -274,12 +299,12 @@ router.put('/teams/:id/members/:mid/edit', auth(['admin']), async (req, res) => 
     try {
         const team = await Team.findById(req.params.id);
         const member = team.members.id(req.params.mid);
-        if (member) { 
+        if (member) {
             if (req.body.name) member.name = req.body.name;
             if (req.body.tag) member.tag = req.body.tag;
             if (req.body.discordName) member.discordName = req.body.discordName;
-            
-            await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true }); 
+
+            await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true });
         }
         else res.status(404).json({ msg: 'Member not found' });
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
