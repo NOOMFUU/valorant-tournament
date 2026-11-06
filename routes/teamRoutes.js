@@ -24,6 +24,9 @@ const { verifyRiotAccount } = require('../utils/riotApi');
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { msg: "Too many login attempts" } });
 
+// ห้ามส่ง password hash ออกไปนอก server
+const SAFE_TEAM = '-password';
+
 // Login
 router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
@@ -61,8 +64,8 @@ router.post('/register', authLimiter, upload.single('logo'), validate(registerSc
 // Team Management
 router.post('/teams/:id/approve', auth(['admin']), async (req, res) => { await Team.findByIdAndUpdate(req.params.id, { status: 'approved' }); res.json({ success: true }); });
 router.delete('/teams/:id', auth(['admin']), async (req, res) => { await Team.findByIdAndDelete(req.params.id); res.json({ success: true }); });
-router.get('/teams', async (req, res) => res.json(await Team.find()));
-router.get('/teams/me', auth(['team']), async (req, res) => res.json(await Team.findById(req.user.id)));
+router.get('/teams', async (req, res) => res.json(await Team.find().select(SAFE_TEAM)));
+router.get('/teams/me', auth(['team']), async (req, res) => res.json(await Team.findById(req.user.id).select(SAFE_TEAM)));
 
 router.post('/teams/reset-stats', auth(['admin']), async (req, res) => {
     try {
@@ -134,9 +137,7 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
         }
         
         const processedMembers = [];
-        // [NEW] API Verification Loop
         for (const newM of newMembers) {
-            // Find existing member by ID or Name+Tag
             const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
             
             let status = 'pending';
@@ -144,7 +145,6 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
             let accountLevel = oldM ? oldM.accountLevel : 0;
             let playerCard = oldM ? oldM.playerCard : '';
 
-            // Check if name or tag changed, or if it's a new member (Require Riot API Check)
             const needsVerification = !oldM || oldM.name !== newM.name || oldM.tag !== newM.tag || !puuid;
 
             if (needsVerification) {
@@ -161,10 +161,9 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
                     return res.status(503).json({ msg: `Riot API Verification Failed. Please try again later. (${apiError.message})` });
                 }
             } else {
-                status = oldM.status; // Keep existing status if info didn't change
+                status = oldM.status;
             }
 
-            // Auto-approve if roster is currently unlocked (first time setup)
             if (!team.rosterLocked) status = 'approved';
 
             processedMembers.push({ ...newM, status, puuid, accountLevel, playerCard, pendingUpdate: null });
@@ -179,7 +178,7 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
     } catch (e) { res.status(500).json({ msg: 'Server Error: ' + e.message }); }
 });
 
-// Upload Logo (Team Self) - MOVED UP before /teams/:id
+// Upload Logo (Team Self)
 router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
@@ -189,7 +188,7 @@ router.put('/teams/logo', auth(['team']), upload.single('logo'), async (req, res
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
-// Upload Logo (Admin for any team) - MOVED UP
+// Upload Logo (Admin for any team)
 router.put('/teams/:id/logo', auth(['admin']), upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
@@ -218,7 +217,8 @@ router.post('/teams', auth(['admin']), upload.single('logo'), async (req, res) =
         
         await logAdminAction(req, 'CREATE_TEAM', `Team ${name}`, { username });
         req.app.get('io').emit('teams_update');
-        res.json({ success: true, team: newTeam });
+        const safeTeam = await Team.findById(newTeam._id).select(SAFE_TEAM);
+        res.json({ success: true, team: safeTeam });
     } catch (e) { res.status(500).json({ msg: e.message }); }
 });
 
@@ -234,7 +234,7 @@ router.put('/teams/:id', auth(['admin']), upload.single('logo'), async (req, res
         if (losses !== undefined) updateData.losses = parseInt(losses);
         if (req.file) updateData.logo = getFileUrl(req.file);
 
-        const updatedTeam = await Team.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        const updatedTeam = await Team.findByIdAndUpdate(req.params.id, updateData, { new: true }).select(SAFE_TEAM);
         if (wins !== undefined || losses !== undefined) await logAdminAction(req, 'UPDATE_TEAM', `Team ${updatedTeam.name}`, { wins, losses });
         req.app.get('io').emit('teams_update');
         res.json({ success: true, team: updatedTeam });
@@ -267,7 +267,7 @@ router.put('/teams/:id/members/:mid/status', auth(['admin']), async (req, res) =
             req.app.get('io').emit('teams_update');
             res.json({ success: true });
         } else res.status(404).json({ msg: 'Member not found' });
-    } catch (e) { res.status(500).json(e); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 router.put('/teams/:id/members/:mid/edit', auth(['admin']), async (req, res) => {
@@ -292,7 +292,7 @@ router.delete('/teams/:id/members/:mid', auth(['admin']), async (req, res) => {
         await team.save();
         req.app.get('io').emit('teams_update');
         res.json({ success: true });
-    } catch (e) { res.status(500).json(e); }
+    } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
 });
 
 module.exports = router;
