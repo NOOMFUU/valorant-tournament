@@ -55,7 +55,7 @@ router.post('/register', authLimiter, upload.single('logo'), validate(registerSc
         if (await Team.findOne({ name: name })) return res.status(400).json({ msg: 'Team Name is already registered' });
 
         await new Team({ username: cleanUsername, name, shortName, password: bcrypt.hashSync(password, 10), logo, status: 'pending' }).save();
-        
+
         await sendDiscordLog(req, '📝 New Team Registered', `Team **${name}** [${shortName}] has registered.`, [{ name: 'Username', value: cleanUsername, inline: true }], 0xf1c40f);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ msg: e.message }); }
@@ -106,6 +106,10 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
             for (let j = 0; j < 2; j++) { const idx = 19 + (j * 3); addMember(cols[idx], cols[idx + 1], cols[idx + 2], 'Sub'); }
             addMember(cols[25], cols[26], cols[27], 'Coach');
 
+            // CSV import: ตั้งกัปตันเป็นผู้เล่น Main คนแรกโดยอัตโนมัติ
+            const firstMain = members.find(m => m.role === 'Main');
+            if (firstMain) firstMain.isCaptain = true;
+
             const cleanUser = username.toLowerCase();
             const existing = await Team.findOne({ username: cleanUser });
 
@@ -127,19 +131,46 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
 });
 
 // Roster & Team Updates
+// - กัปตันต้องเป็นผู้เล่น Main และมีได้คนเดียว
+//   ถ้า client ไม่ได้ส่ง isCaptain: ใช้กัปตันเดิม (ถ้ายังอยู่ใน roster) ไม่งั้นใช้ผู้เล่น Main คนแรก
+// - เปลี่ยน Riot ID แล้ว Riot API ยืนยันผ่าน -> อนุมัติอัตโนมัติ
 router.put('/teams/roster', auth(['team']), async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
         const newMembers = req.body.members;
-        
+
         if (!newMembers || newMembers.length < 5) {
             return res.status(400).json({ msg: 'A minimum of 5 players is required to complete roster registration.' });
         }
-        
+
+        const flagged = newMembers.filter(m => m.isCaptain === true && m.role === 'Main');
+        if (flagged.length > 1) {
+            return res.status(400).json({ msg: 'Only one captain is allowed.' });
+        }
+
+        const findOld = (newM) => team.members.find(m => (newM._id && m._id.toString() === String(newM._id)) || (m.name === newM.name && m.tag === newM.tag));
+
+        // ตัดสินกัปตัน
+        let captainIndex = newMembers.findIndex(m => m.isCaptain === true && m.role === 'Main');
+        if (captainIndex === -1) {
+            const oldCaptain = team.members.find(m => m.isCaptain);
+            if (oldCaptain) {
+                captainIndex = newMembers.findIndex(m => {
+                    const old = findOld(m);
+                    return old && old._id.toString() === oldCaptain._id.toString() && m.role === 'Main';
+                });
+            }
+            if (captainIndex === -1) captainIndex = newMembers.findIndex(m => m.role === 'Main');
+        }
+        if (captainIndex === -1) {
+            return res.status(400).json({ msg: 'Roster must include at least one Main player to be captain.' });
+        }
+
         const processedMembers = [];
-        for (const newM of newMembers) {
-            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
-            
+        for (let i = 0; i < newMembers.length; i++) {
+            const newM = newMembers[i];
+            const oldM = findOld(newM);
+
             let status = 'pending';
             let puuid = oldM ? oldM.puuid : '';
             let accountLevel = oldM ? oldM.accountLevel : 0;
@@ -156,7 +187,8 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
                     puuid = riotData.puuid;
                     accountLevel = riotData.level;
                     playerCard = riotData.card;
-                    status = 'pending'; // Require admin approval for new accounts
+                    // Riot API ยืนยันแล้ว -> อนุมัติอัตโนมัติ
+                    status = 'approved';
                 } catch (apiError) {
                     return res.status(503).json({ msg: `Riot API Verification Failed. Please try again later. (${apiError.message})` });
                 }
@@ -166,7 +198,16 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
 
             if (!team.rosterLocked) status = 'approved';
 
-            processedMembers.push({ ...newM, status, puuid, accountLevel, playerCard, pendingUpdate: null });
+            processedMembers.push({
+                _id: oldM ? oldM._id : undefined, // คง _id เดิมไว้ เพื่อให้ route /members/:mid ยังทำงาน
+                name: newM.name,
+                tag: newM.tag,
+                role: newM.role,
+                discordName: newM.discordName || '',
+                discordId: newM.discordId || '',
+                isCaptain: i === captainIndex,
+                status, puuid, accountLevel, playerCard, pendingUpdate: null
+            });
         }
 
         team.members = processedMembers;
@@ -203,18 +244,18 @@ router.post('/teams', auth(['admin']), upload.single('logo'), async (req, res) =
     try {
         const { username, name, shortName, password } = req.body;
         if (!username || !name || !shortName || !password) return res.status(400).json({ msg: 'Please enter all fields' });
-        
+
         const cleanUsername = username.toLowerCase().trim();
         if (await Team.findOne({ username: cleanUsername })) return res.status(400).json({ msg: 'Username taken' });
         if (await Team.findOne({ name })) return res.status(400).json({ msg: 'Team Name taken' });
 
         const logo = req.file ? getFileUrl(req.file) : '';
-        const newTeam = new Team({ 
-            username: cleanUsername, name, shortName: shortName.toUpperCase(), 
-            password: bcrypt.hashSync(password, 10), logo, status: 'approved' 
+        const newTeam = new Team({
+            username: cleanUsername, name, shortName: shortName.toUpperCase(),
+            password: bcrypt.hashSync(password, 10), logo, status: 'approved'
         });
         await newTeam.save();
-        
+
         await logAdminAction(req, 'CREATE_TEAM', `Team ${name}`, { username });
         req.app.get('io').emit('teams_update');
         const safeTeam = await Team.findById(newTeam._id).select(SAFE_TEAM);
@@ -274,12 +315,12 @@ router.put('/teams/:id/members/:mid/edit', auth(['admin']), async (req, res) => 
     try {
         const team = await Team.findById(req.params.id);
         const member = team.members.id(req.params.mid);
-        if (member) { 
+        if (member) {
             if (req.body.name) member.name = req.body.name;
             if (req.body.tag) member.tag = req.body.tag;
             if (req.body.discordName) member.discordName = req.body.discordName;
-            
-            await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true }); 
+
+            await team.save(); req.app.get('io').emit('teams_update'); res.json({ success: true });
         }
         else res.status(404).json({ msg: 'Member not found' });
     } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
