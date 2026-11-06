@@ -1,38 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
+
+// JWT ของทีมและ admin เก็บ id ไว้ที่ req.user.id (ดู routes/teamRoutes.js /login)
+function buildOwnerQuery(user) {
+    const or = [{ globalRole: 'all' }];
+    if (user.role === 'admin') {
+        or.push({ globalRole: 'admin' });
+        or.push({ recipientId: user.id });
+    } else if (user.role === 'team') {
+        or.push({ globalRole: 'team' });
+        or.push({ recipientId: user.id });
+    }
+    return { $or: or };
+}
 
 // Get notifications for logged in user/team
 router.get('/notifications', auth(['admin', 'team']), async (req, res) => {
     try {
-        const query = {
-            $or: [
-                { globalRole: 'all' }
-            ]
-        };
-
-        if (req.user.role === 'admin') {
-            query.$or.push({ globalRole: 'admin' });
-            query.$or.push({ recipientId: req.user.id });
-        } else if (req.user.role === 'team') {
-            query.$or.push({ globalRole: 'team' });
-            query.$or.push({ recipientId: req.user.teamId });
-        }
-
-        const limit = parseInt(req.query.limit) || 20;
-        const notifications = await Notification.find(query).sort({ createdAt: -1 }).limit(limit);
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const notifications = await Notification.find(buildOwnerQuery(req.user)).sort({ createdAt: -1 }).limit(limit);
         res.json(notifications);
     } catch (e) {
         res.status(500).json({ msg: e.message });
     }
 });
 
-// Mark notification as read
+// Mark notification as read (เฉพาะที่เป็นของผู้ใช้เท่านั้น)
 router.put('/notifications/:id/read', auth(['admin', 'team']), async (req, res) => {
     try {
-        const notification = await Notification.findByIdAndUpdate(req.params.id, { isRead: true }, { new: true });
+        const notification = await Notification.findOneAndUpdate(
+            { _id: req.params.id, ...buildOwnerQuery(req.user) },
+            { isRead: true },
+            { new: true }
+        );
         if (!notification) return res.status(404).json({ msg: 'Notification not found' });
         res.json({ success: true, notification });
     } catch (e) {
@@ -43,21 +45,7 @@ router.put('/notifications/:id/read', auth(['admin', 'team']), async (req, res) 
 // Mark all as read
 router.put('/notifications/read/all', auth(['admin', 'team']), async (req, res) => {
     try {
-        const query = {
-            $or: [
-                { globalRole: 'all' }
-            ]
-        };
-
-        if (req.user.role === 'admin') {
-            query.$or.push({ globalRole: 'admin' });
-            query.$or.push({ recipientId: req.user.id });
-        } else if (req.user.role === 'team') {
-            query.$or.push({ globalRole: 'team' });
-            query.$or.push({ recipientId: req.user.teamId });
-        }
-
-        await Notification.updateMany(query, { isRead: true });
+        await Notification.updateMany(buildOwnerQuery(req.user), { isRead: true });
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ msg: e.message });
