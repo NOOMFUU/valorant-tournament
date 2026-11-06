@@ -7,12 +7,16 @@ const discordService = require('./discordService');
 
 const mongoConnectionString = process.env.MONGO_URI || 'mongodb://localhost:27017/valorant-tourney';
 
+// ค่าเดียวกับ routes/matchRoutes.js (check-in): เปิดก่อนแข่ง 30 นาที, ปิดหลังแข่ง 15 นาที
+const CHECKIN_OPEN_BEFORE_MIN = 30;
+const CHECKIN_CLOSE_AFTER_MIN = 15;
+
 const agenda = new Agenda({ 
     db: { address: mongoConnectionString, collection: 'agendaJobs' },
     processEvery: '30 seconds'
 });
 
-// [NEW] Task: แจ้งเตือนก่อนแข่ง 1 ชั่วโมง
+// Task: แจ้งเตือนก่อนแข่ง 1 ชั่วโมง
 agenda.define('match-reminder-1h', async (job) => {
     const { matchId } = job.attrs.data;
     try {
@@ -30,14 +34,13 @@ agenda.define('match-reminder-1h', async (job) => {
     }
 });
 
-// [NEW] Task: แจ้งเตือนก่อนแข่ง 5 นาที (Check-in Reminder)
+// Task: แจ้งเตือนก่อนแข่ง 5 นาที (Check-in Reminder)
 agenda.define('match-reminder-5m', async (job) => {
     const { matchId } = job.attrs.data;
     try {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if (!match || match.status !== 'scheduled' || !match.discordChannelId) return;
 
-        // ถ้า Check-in ครบแล้ว ไม่ต้องเตือน
         if (match.checkIn.teamA && match.checkIn.teamB) return;
 
         const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
@@ -55,14 +58,13 @@ agenda.define('match-reminder-5m', async (job) => {
     } catch (e) { console.error(`Job match-reminder-5m failed for ${matchId}:`, e); }
 });
 
-// [NEW] Task: Late Check-in Reminder (Every 3 mins after start)
+// Task: Late Check-in Reminder (ทุก 3 นาทีหลังเวลาแข่ง จนถึงปิด check-in)
 agenda.define('match-reminder-late', async (job) => {
     const { matchId, minute } = job.attrs.data;
     try {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if (!match || match.status !== 'scheduled' || !match.discordChannelId) return;
 
-        // If both checked in, stop reminding
         if (match.checkIn.teamA && match.checkIn.teamB) return;
 
         const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
@@ -71,7 +73,7 @@ agenda.define('match-reminder-late', async (job) => {
             const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
             
             let msg = "";
-            const remaining = 15 - minute;
+            const remaining = CHECKIN_CLOSE_AFTER_MIN - minute;
             
             if (!match.checkIn.teamA && !match.checkIn.teamB) {
                 msg = `⚠️ **LATE CHECK-IN (${minute}m passed)**\n${roleA} and ${roleB}, you are late! ${remaining} mins remaining before disqualification.`;
@@ -86,7 +88,7 @@ agenda.define('match-reminder-late', async (job) => {
     } catch (e) { console.error(`Job match-reminder-late failed for ${matchId}:`, e); }
 });
 
-// 1. Task: แจ้งเตือนก่อนแข่ง 10 นาที
+// Task: แจ้งเตือนก่อนแข่ง 10 นาที
 agenda.define('match-notification', async (job) => {
     const { matchId } = job.attrs.data;
     try {
@@ -98,7 +100,6 @@ agenda.define('match-notification', async (job) => {
             const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
             const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
             
-            // [NEW] Add Check-in Button
             const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
             const row = new ActionRowBuilder()
                 .addComponents(
@@ -117,84 +118,65 @@ agenda.define('match-notification', async (job) => {
     }
 });
 
-// 2. Task: ตรวจสอบการ Check-in เมื่อถึงเวลาแข่ง
+// Task: ตรวจสอบการ Check-in เมื่อหมดเวลา check-in
+// แก้ N2: เดิม match.winner.toString() พังเมื่อ winner เป็น null (double forfeit)
+// แก้ N7: เขียนผ่าน BracketManager + Team เหมือนเดิม แต่ไม่เขียนทับ winner ที่ไม่มี
 agenda.define('check-in-expiry', async (job) => {
     const { matchId } = job.attrs.data;
     try {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if (!match || match.status !== 'scheduled') return;
 
-        let changed = false;
-        // Team A มา, Team B หาย -> A ชนะ
-        if (match.checkIn.teamA && !match.checkIn.teamB) {
-            match.status = 'finished';
-            match.winner = match.teamA;
-            match.scoreSubmission.status = 'approved';
-            match.scoreSubmission.rejectReason = 'AUTO: Opponent Missed Check-in';
-            match.name += " (Auto Win)";
-            changed = true;
-        }
-        // Team B มา, Team A หาย -> B ชนะ
-        else if (!match.checkIn.teamA && match.checkIn.teamB) {
-            match.status = 'finished';
-            match.winner = match.teamB;
-            match.scoreSubmission.status = 'approved';
-            match.scoreSubmission.rejectReason = 'AUTO: Opponent Missed Check-in';
-            match.name += " (Auto Win)";
-            changed = true;
-        }
-        // [NEW] Both missing
-        else if (!match.checkIn.teamA && !match.checkIn.teamB) {
+        let outcome = null; // 'A' | 'B' | 'none'
+        if (match.checkIn.teamA && !match.checkIn.teamB) outcome = 'A';
+        else if (!match.checkIn.teamA && match.checkIn.teamB) outcome = 'B';
+        else if (!match.checkIn.teamA && !match.checkIn.teamB) outcome = 'none';
+
+        if (!outcome) return;
+
+        if (outcome === 'none') {
             match.status = 'finished';
             match.winner = null;
             match.scoreSubmission.status = 'rejected';
             match.scoreSubmission.rejectReason = 'AUTO: Both Teams Missed Check-in';
             match.name += " (Double Forfeit)";
-            changed = true;
-        }
-
-        if (changed) {
+            await match.save();
+        } else {
+            const winnerTeam = outcome === 'A' ? match.teamA : match.teamB;
+            const loserTeam = outcome === 'A' ? match.teamB : match.teamA;
+            match.status = 'finished';
+            match.winner = winnerTeam._id;
+            match.scoreSubmission.status = 'approved';
+            match.scoreSubmission.rejectReason = 'AUTO: Opponent Missed Check-in';
+            match.name += " (Auto Win)";
             await match.save();
 
-            // [NEW] Notify Discord with Tag
-            if (match.discordChannelId) {
-                const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
-                if (channel) {
-                    const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
-                    const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
-                    let msg = "";
-                    
-                    if (match.scoreSubmission.rejectReason.includes('Both')) {
-                        msg = `❌ **DOUBLE FORFEIT**\n${roleA} and ${roleB} failed to check-in. Match cancelled.`;
-                    } else if (match.winner && match.winner._id.toString() === match.teamA._id.toString()) {
-                        msg = `🏆 **AUTO WIN**\n${roleA} wins! ${roleB} failed to check-in.`;
-                    } else if (match.winner && match.winner._id.toString() === match.teamB._id.toString()) {
-                        msg = `🏆 **AUTO WIN**\n${roleB} wins! ${roleA} failed to check-in.`;
-                    }
-                    
-                    if (msg) await channel.send({ content: msg, allowedMentions: { parse: ['roles'] } });
-                }
-            }
-
-            // [NEW] Send Result to Discord
-            await discordService.sendMatchResultToDiscord(match);
-            
-            // อัปเดต Bracket และ Stats
-            const winnerId = match.winner.toString();
-            const loserId = (winnerId === match.teamA?.toString()) ? match.teamB : match.teamA;
-            const wTeam = await Team.findById(winnerId);
-            const lTeam = loserId ? await Team.findById(loserId) : null;
-
+            const wTeam = await Team.findById(winnerTeam._id);
+            const lTeam = await Team.findById(loserTeam._id);
             await BracketManager.propagateMatchResult(match, wTeam, lTeam);
-            await Team.findByIdAndUpdate(winnerId, { $inc: { wins: 1 } });
-            if (lTeam) await Team.findByIdAndUpdate(lTeam._id, { $inc: { losses: 1 } });
+            await Team.findByIdAndUpdate(winnerTeam._id, { $inc: { wins: 1 } });
+            await Team.findByIdAndUpdate(loserTeam._id, { $inc: { losses: 1 } });
+        }
 
-            // แจ้ง Socket.io (ต้องดึง io จาก app หรือส่งเข้ามา)
-            const io = require('../server').getIO(); 
-            if (io) {
-                io.emit('match_update', match);
-                io.emit('bracket_update');
+        if (match.discordChannelId) {
+            const channel = await discordService.client.channels.fetch(match.discordChannelId).catch(() => null);
+            if (channel) {
+                const roleA = match.teamA.discordRoleId ? `<@&${match.teamA.discordRoleId}>` : match.teamA.name;
+                const roleB = match.teamB.discordRoleId ? `<@&${match.teamB.discordRoleId}>` : match.teamB.name;
+                let msg = "";
+                if (outcome === 'none') msg = `❌ **DOUBLE FORFEIT**\n${roleA} and ${roleB} failed to check-in. Match cancelled.`;
+                else if (outcome === 'A') msg = `🏆 **AUTO WIN**\n${roleA} wins! ${roleB} failed to check-in.`;
+                else msg = `🏆 **AUTO WIN**\n${roleB} wins! ${roleA} failed to check-in.`;
+                await channel.send({ content: msg, allowedMentions: { parse: ['roles'] } });
             }
+        }
+
+        await discordService.sendMatchResultToDiscord(match);
+
+        const io = require('../server').getIO();
+        if (io) {
+            io.emit('match_update', match);
+            io.emit('bracket_update');
         }
     } catch (e) {
         console.error(`Job check-in-expiry failed for ${matchId}:`, e);
@@ -207,14 +189,13 @@ agenda.scheduleMatchJobs = async (match) => {
     
     const matchTime = new Date(match.scheduledTime);
     const notifyTime = new Date(matchTime.getTime() - 10 * 60000);
-    const remind5mTime = new Date(matchTime.getTime() - 5 * 60000); // [NEW] 5 mins before
-    const remind1hTime = new Date(matchTime.getTime() - 60 * 60000); // 1 hour
-    const forfeitTime = new Date(matchTime.getTime() + 15 * 60000); // [NEW] 15 mins grace period
+    const remind5mTime = new Date(matchTime.getTime() - 5 * 60000);
+    const remind1hTime = new Date(matchTime.getTime() - 60 * 60000);
+    // หมดเวลา check-in = เวลาแข่ง + CHECKIN_CLOSE_AFTER_MIN (เดิมใช้ 15 นาทีฮาร์ดโค้ด)
+    const expiryTime = new Date(matchTime.getTime() + CHECKIN_CLOSE_AFTER_MIN * 60000);
 
-    // ลบ Job เก่าของแมตช์นี้ก่อน (กรณี Reschedule)
     await agenda.cancel({ 'data.matchId': match._id });
 
-    // ตั้งเวลาใหม่
     if (remind1hTime > new Date()) {
         await agenda.schedule(remind1hTime, 'match-reminder-1h', { matchId: match._id });
     }
@@ -224,12 +205,11 @@ agenda.scheduleMatchJobs = async (match) => {
     if (remind5mTime > new Date()) {
         await agenda.schedule(remind5mTime, 'match-reminder-5m', { matchId: match._id });
     }
-    if (forfeitTime > new Date()) {
-        await agenda.schedule(forfeitTime, 'check-in-expiry', { matchId: match._id });
+    if (expiryTime > new Date()) {
+        await agenda.schedule(expiryTime, 'check-in-expiry', { matchId: match._id });
     }
 
-    // [NEW] Late Reminders (3, 6, 9, 12 mins after start)
-    for (let i = 3; i < 15; i += 3) {
+    for (let i = 3; i < CHECKIN_CLOSE_AFTER_MIN; i += 3) {
         const lateTime = new Date(matchTime.getTime() + i * 60000);
         if (lateTime > new Date()) {
             await agenda.schedule(lateTime, 'match-reminder-late', { matchId: match._id, minute: i });
