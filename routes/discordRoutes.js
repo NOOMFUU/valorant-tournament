@@ -12,6 +12,9 @@ const { logAdminAction } = require('../utils/helpers');
 
 const csvUpload = multer({ storage: multer.memoryStorage() });
 
+// กัน regex injection จากชื่อทีมใน CSV
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // --- ROUTES ---
 
 // Import Discord IDs from CSV
@@ -25,7 +28,7 @@ router.post('/admin/discord/import', auth(['admin']), csvUpload.single('file'), 
             if (!line) continue;
             const [teamName, playerName, discordId] = line.split(',').map(s => s.trim());
             if (teamName && playerName && discordId) {
-                const team = await Team.findOne({ name: new RegExp(`^${teamName}$`, 'i') });
+                const team = await Team.findOne({ name: new RegExp(`^${escapeRegex(teamName)}$`, 'i') });
                 if (team) {
                     const member = team.members.find(m => m.name.toLowerCase() === playerName.toLowerCase());
                     if (member) { member.discordId = discordId; await team.save(); updated++; } else errors++;
@@ -86,7 +89,8 @@ router.post('/teams/:id/discord/sync-role', auth(['admin']), async (req, res) =>
         const discordClient = req.app.get('discordClient');
         if (!guildId || !discordClient) return res.status(500).json({ msg: 'Discord not configured' });
         const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
-        
+        if (!guild) return res.status(500).json({ msg: 'Guild not found' });
+
         let role;
         if (team.discordRoleId) role = await guild.roles.fetch(team.discordRoleId).catch(() => null);
         if (!role) {
