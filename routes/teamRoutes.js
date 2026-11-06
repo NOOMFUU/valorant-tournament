@@ -106,6 +106,10 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
             for (let j = 0; j < 2; j++) { const idx = 19 + (j * 3); addMember(cols[idx], cols[idx + 1], cols[idx + 2], 'Sub'); }
             addMember(cols[25], cols[26], cols[27], 'Coach');
 
+            // CSV import: ตั้งกัปตันเป็นผู้เล่น Main คนแรกโดยอัตโนมัติ (แก้ให้ถูกต้องภายหลังได้ที่หน้า roster)
+            const firstMain = members.find(m => m.role === 'Main');
+            if (firstMain) firstMain.isCaptain = true;
+
             const cleanUser = username.toLowerCase();
             const existing = await Team.findOne({ username: cleanUser });
 
@@ -127,6 +131,8 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
 });
 
 // Roster & Team Updates
+// - ต้องมีกัปตันพอดี 1 คน และกัปตันต้องเป็นผู้เล่น Main
+// - เปลี่ยน Riot ID แล้ว Riot API ยืนยันผ่าน -> อนุมัติอัตโนมัติ (status approved)
 router.put('/teams/roster', auth(['team']), async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
@@ -134,6 +140,11 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
         
         if (!newMembers || newMembers.length < 5) {
             return res.status(400).json({ msg: 'A minimum of 5 players is required to complete roster registration.' });
+        }
+
+        const captains = newMembers.filter(m => m.isCaptain && m.role === 'Main');
+        if (captains.length !== 1) {
+            return res.status(400).json({ msg: 'Roster must have exactly one captain, chosen from Main players.' });
         }
         
         const processedMembers = [];
@@ -156,7 +167,8 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
                     puuid = riotData.puuid;
                     accountLevel = riotData.level;
                     playerCard = riotData.card;
-                    status = 'pending'; // Require admin approval for new accounts
+                    // Riot API ยืนยันแล้ว -> อนุมัติอัตโนมัติ
+                    status = 'approved';
                 } catch (apiError) {
                     return res.status(503).json({ msg: `Riot API Verification Failed. Please try again later. (${apiError.message})` });
                 }
@@ -166,7 +178,11 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
 
             if (!team.rosterLocked) status = 'approved';
 
-            processedMembers.push({ ...newM, status, puuid, accountLevel, playerCard, pendingUpdate: null });
+            processedMembers.push({
+                ...newM,
+                isCaptain: newM.role === 'Main' && !!newM.isCaptain,
+                status, puuid, accountLevel, playerCard, pendingUpdate: null
+            });
         }
 
         team.members = processedMembers;
