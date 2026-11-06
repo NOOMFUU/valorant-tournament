@@ -7,15 +7,20 @@ const BracketManager = require('../managers/bracketManager');
 const auth = require('../middleware/auth');
 const logger = require('../utils/logger');
 
+// Fields that must never leave the server through public tournament endpoints
+const PRIVATE_TOURNAMENT_FIELDS = '-inviteCode -pendingRegistrations';
+
 // AUTH: PUBLIC — Get all tournaments (non-archived)
 router.get('/tournaments', async (req, res) => {
     try {
         const t = await Tournament.find({ isArchived: { $ne: true } })
-            .populate('participants').sort({ createdAt: -1 });
+            .select(PRIVATE_TOURNAMENT_FIELDS)
+            .populate({ path: 'participants', select: 'name shortName logo wins losses' })
+            .sort({ createdAt: -1 });
         res.json(t);
     } catch (e) {
         logger.error('GET_TOURNAMENTS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load tournaments' });
     }
 });
 
@@ -23,7 +28,7 @@ router.get('/tournaments', async (req, res) => {
 router.get('/tournaments/:id/public', async (req, res) => {
     try {
         const tournament = await Tournament.findById(req.params.id)
-            .select('-stages.matches.roomPassword -stages.matches.chat')
+            .select(`${PRIVATE_TOURNAMENT_FIELDS} -stages.matches.roomPassword -stages.matches.chat`)
             .populate({ path: 'participants', select: 'name shortName logo wins losses' })
             .populate({
                 path: 'stages.matches',
@@ -34,7 +39,7 @@ router.get('/tournaments/:id/public', async (req, res) => {
         res.json(tournament);
     } catch (e) {
         logger.error('GET_TOURNAMENT_PUBLIC_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load tournament' });
     }
 });
 
@@ -67,7 +72,7 @@ router.get('/analytics/maps', async (req, res) => {
         res.json(stats);
     } catch (e) {
         logger.error('GET_MAP_ANALYTICS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load analytics' });
     }
 });
 
@@ -92,7 +97,7 @@ router.get('/analytics/h2h/:team1/:team2', async (req, res) => {
         res.json({ team1Wins: wins1, team2Wins: wins2, totalMatches: matches.length });
     } catch (e) {
         logger.error('GET_H2H_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load head-to-head stats' });
     }
 });
 
@@ -113,7 +118,7 @@ router.post('/tournaments', auth(['admin']), async (req, res) => {
         res.json({ success: true, id: tournament._id });
     } catch (e) {
         logger.error('CREATE_TOURNAMENT_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to create tournament' });
     }
 });
 
@@ -132,7 +137,7 @@ router.put('/tournaments/:id', auth(['admin']), async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         logger.error('UPDATE_TOURNAMENT_FAIL', { error: e.message, tournamentId: req.params.id });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to update tournament' });
     }
 });
 
@@ -152,7 +157,7 @@ router.put('/tournaments/:id/registration', auth(['admin']), async (req, res) =>
         res.json({ success: true, msg: 'Registration settings updated' });
     } catch (e) {
         logger.error('UPDATE_REGISTRATION_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to update registration settings' });
     }
 });
 
@@ -166,7 +171,7 @@ router.get('/tournaments/:id/registration', async (req, res) => {
         res.json({ success: true, data: { ...tournament, registeredCount } });
     } catch (e) {
         logger.error('GET_REGISTRATION_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load registration info' });
     }
 });
 
@@ -182,7 +187,7 @@ router.post('/tournaments/:id/archive', auth(['admin']), async (req, res) => {
         res.json({ success: true, msg: 'Tournament archived' });
     } catch (e) {
         logger.error('ARCHIVE_TOURNAMENT_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to archive tournament' });
     }
 });
 
@@ -194,7 +199,7 @@ router.get('/tournaments/archived', async (req, res) => {
         res.json(archived);
     } catch (e) {
         logger.error('GET_ARCHIVED_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load archived tournaments' });
     }
 });
 
@@ -268,7 +273,7 @@ router.post('/tournaments/:id/stages/generate', auth(['admin']), async (req, res
         res.json({ success: true });
     } catch (e) {
         logger.error('GENERATE_STAGE_FAIL', { error: e.message, stack: e.stack });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to generate stage' });
     }
 });
 
@@ -280,7 +285,7 @@ router.post('/tournaments/:id/stages/:stageIndex/resolve', auth(['admin']), asyn
         res.json({ success: true, msg: 'Placeholders resolved based on current standings.' });
     } catch (e) {
         logger.error('RESOLVE_PLACEHOLDERS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to resolve placeholders' });
     }
 });
 
@@ -297,7 +302,7 @@ router.put('/matches/:id/placeholder', auth(['admin']), async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         logger.error('UPDATE_PLACEHOLDER_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to update placeholder' });
     }
 });
 
@@ -327,7 +332,7 @@ router.post('/tournaments/:id/stages/:stageIndex/matches', auth(['admin']), asyn
         res.json({ success: true, match: savedMatch });
     } catch (e) {
         logger.error('ADD_MATCH_TO_STAGE_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to add match' });
     }
 });
 
@@ -340,7 +345,7 @@ router.post('/tournaments/:id/stages/:stageIndex/swiss-next', auth(['admin']), a
         res.json({ success: true, matchesCreated: newMatches.length });
     } catch (e) {
         logger.error('SWISS_NEXT_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to generate next swiss round' });
     }
 });
 
@@ -355,7 +360,7 @@ router.put('/tournaments/:id/stages/:stageIndex/settings', auth(['admin']), asyn
         res.json({ success: true });
     } catch (e) {
         logger.error('UPDATE_STAGE_SETTINGS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to update stage settings' });
     }
 });
 
@@ -367,7 +372,7 @@ router.post('/tournaments/:id/stages/:stageIndex/teams/add', auth(['admin']), as
         res.json({ success: true });
     } catch (e) {
         logger.error('ADD_TEAM_TO_STAGE_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to add team to stage' });
     }
 });
 
@@ -379,7 +384,7 @@ router.post('/tournaments/:id/stages/:stageIndex/teams/swap', auth(['admin']), a
         res.json({ success: true });
     } catch (e) {
         logger.error('SWAP_TEAMS_IN_STAGE_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to swap teams' });
     }
 });
 
@@ -390,7 +395,7 @@ router.get('/tournaments/:id/stages/:stageIndex/standings', async (req, res) => 
         res.json(standings);
     } catch (e) {
         logger.error('GET_STANDINGS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load standings' });
     }
 });
 
@@ -411,7 +416,7 @@ router.delete('/tournaments/:id/stages/:stageIndex', auth(['admin']), async (req
         res.json({ success: true });
     } catch (e) {
         logger.error('DELETE_STAGE_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to delete stage' });
     }
 });
 
@@ -428,7 +433,7 @@ router.delete('/tournaments/:id', auth(['admin']), async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         logger.error('DELETE_TOURNAMENT_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to delete tournament' });
     }
 });
 
@@ -455,7 +460,7 @@ router.post('/matches/:id/verify-score', auth(['team']), async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         logger.error('VERIFY_SCORE_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to verify score' });
     }
 });
 
@@ -490,7 +495,7 @@ router.get('/tournaments/:id/access', async (req, res) => {
         });
     } catch (e) {
         logger.error('GET_TOURNAMENT_ACCESS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load access info' });
     }
 });
 
@@ -510,7 +515,9 @@ router.post('/tournaments/:id/register', async (req, res) => {
             return res.status(403).json({ success: false, msg: 'This tournament is invite-only. Contact the organizer.' });
         }
         if (t.accessType === 'invite_only') {
-            if (!inviteCode || inviteCode.toUpperCase().trim() !== t.inviteCode.toUpperCase().trim()) {
+            const expected = (t.inviteCode || '').toUpperCase().trim();
+            const provided = String(inviteCode || '').toUpperCase().trim();
+            if (!expected || provided !== expected) {
                 return res.status(403).json({ success: false, msg: 'Invalid invite code.' });
             }
         }
@@ -532,6 +539,7 @@ router.post('/tournaments/:id/register', async (req, res) => {
             return res.status(400).json({ success: false, msg: 'A registration with this team name is already pending.' });
         }
 
+        // Invite code is validated above and intentionally not stored on the registration
         const reg = {
             teamName: teamName.trim(),
             contactName: contactName.trim(),
@@ -541,8 +549,7 @@ router.post('/tournaments/:id/register', async (req, res) => {
                 riotId: m.riotId || '',
                 role: m.role || 'Main'
             })),
-            status: 'pending',
-            inviteCode: inviteCode || ''
+            status: 'pending'
         };
         t.pendingRegistrations.push(reg);
         await t.save();
@@ -553,7 +560,7 @@ router.post('/tournaments/:id/register', async (req, res) => {
         res.json({ success: true, msg: 'Registration submitted! Waiting for admin approval.' });
     } catch (e) {
         logger.error('SUBMIT_REGISTRATION_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to submit registration' });
     }
 });
 
@@ -566,7 +573,7 @@ router.get('/tournaments/:id/registrations', auth(['admin']), async (req, res) =
         res.json({ success: true, data: t.pendingRegistrations || [] });
     } catch (e) {
         logger.error('GET_REGISTRATIONS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to load registrations' });
     }
 });
 
@@ -597,7 +604,6 @@ router.post('/tournaments/:id/registrations/:regId/approve', auth(['admin']), as
         await teamUser.save();
 
         // Create the Team document
-        const Team = require('../models/Team');
         const team = new Team({
             name: reg.teamName,
             shortName: reg.teamName.replace(/\s+/g, '').substring(0, 4).toUpperCase(),
@@ -632,7 +638,7 @@ router.post('/tournaments/:id/registrations/:regId/approve', auth(['admin']), as
         });
     } catch (e) {
         logger.error('APPROVE_REGISTRATION_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to approve registration' });
     }
 });
 
@@ -654,7 +660,7 @@ router.post('/tournaments/:id/registrations/:regId/reject', auth(['admin']), asy
         res.json({ success: true, msg: 'Registration rejected.' });
     } catch (e) {
         logger.error('REJECT_REGISTRATION_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to reject registration' });
     }
 });
 
@@ -677,7 +683,7 @@ router.put('/tournaments/:id/access', auth(['admin']), async (req, res) => {
         res.json({ success: true, msg: 'Access settings updated', inviteCode: t.inviteCode });
     } catch (e) {
         logger.error('UPDATE_ACCESS_FAIL', { error: e.message });
-        res.status(500).json({ success: false, msg: e.message });
+        res.status(500).json({ success: false, msg: 'Failed to update access settings' });
     }
 });
 

@@ -18,7 +18,6 @@ const MatchSchema = new mongoose.Schema({
     loserMatchSlot: { type: String, enum: ['teamA', 'teamB'] },
 
     roomName: { type: String, default: '' },
-    roomPassword: { type: String, default: '' },
     chat: [{ sender: String, senderId: String, message: String, timestamp: { type: Date, default: Date.now } }],
     
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },

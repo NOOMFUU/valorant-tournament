@@ -1,32 +1,33 @@
 const Match = require('../models/Match');
-const Tournament = require('../models/Tournament');
+const Stage = require('../models/Stage');
+const Group = require('../models/Group');
+const StageEntry = require('../models/StageEntry');
 const Team = require('../models/Team');
 
+const GROUP_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
 class BracketManager {
-    
+
     constructor() {
         this.io = null;
-        this.onMatchReady = null; // [NEW] Callback for channel creation
+        this.onMatchReady = null;
     }
 
     setIO(io) {
         this.io = io;
     }
 
-    // เติมทีมให้ครบจำนวน Power of 2 (เช่น 4, 8, 16, 32) ด้วย null (Bye)
     padTeams(teams) {
         if (!teams || teams.length === 0) return [];
-        const count = teams.length;
-        const power = Math.pow(2, Math.ceil(Math.log2(count)));
+        const power = Math.pow(2, Math.ceil(Math.log2(teams.length)));
         const padded = [...teams];
-        while (padded.length < power) { padded.push(null); }
+        while (padded.length < power) padded.push(null);
         return padded;
     }
 
-    // ฟังก์ชันสลับตำแหน่งทีม (Random Seed)
     shuffle(array) {
         let currentIndex = array.length, randomIndex;
-        while (currentIndex != 0) {
+        while (currentIndex !== 0) {
             randomIndex = Math.floor(Math.random() * currentIndex);
             currentIndex--;
             [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
@@ -34,21 +35,18 @@ class BracketManager {
         return array;
     }
 
-    // [NEW] ฟังก์ชันหาเลข Match ล่าสุดเพื่อรันเลขต่อ (001 -> 002)
     async getNextMatchNumber(tournamentId) {
         const lastMatch = await Match.findOne({ tournament: tournamentId }).sort({ matchNumber: -1 });
         return (lastMatch && lastMatch.matchNumber) ? lastMatch.matchNumber + 1 : 1;
     }
 
-    // Generate standard seeding order (1 vs N, 2 vs N-1, etc.)
     getSeedingOrder(size) {
         if (size < 2) return [0];
-        let rounds = Math.log2(size);
+        const rounds = Math.log2(size);
         let seeds = [1, 2];
-        
         for (let i = 0; i < rounds - 1; i++) {
-            let nextSeeds = [];
-            let sum = (Math.pow(2, i + 2)) + 1;
+            const nextSeeds = [];
+            const sum = Math.pow(2, i + 2) + 1;
             for (let j = 0; j < seeds.length; j++) {
                 nextSeeds.push(seeds[j]);
                 nextSeeds.push(sum - seeds[j]);
@@ -58,765 +56,567 @@ class BracketManager {
         return seeds.map(s => s - 1);
     }
 
-    // --- MAIN GENERATION FUNCTION ---
-    async generateStage(tournamentId, stageName, type, teams, settings) {
-        // [MODIFIED] Allow generation without teams if using placeholders
-        const usePlaceholders = settings.usePlaceholders && settings.sourceStageIndex >= 0;
-        if ((!teams || teams.length === 0) && !usePlaceholders) return [];
-
-        let matches = [];
-        const byeMatchesToProcess = [];
-        
-        // 1. RANDOM SEED LOGIC
-        // หากเป็น 'cross_group' (ดึงจาก Stage เก่าแบบไขว้สาย A1 vs B2) ห้าม Random เพื่อรักษาลำดับ
-        if (settings.randomize && settings.advanceMethod !== 'cross_group' && !usePlaceholders) {
-            teams = this.shuffle([...teams]);
-        }
-
-        // [NEW] เตรียมตัวนับเลข Match
-        let currentMatchNum = await this.getNextMatchNumber(tournamentId);
-
-        // Helper สร้าง Match
-        const createMatch = async (name, tA, tB, round, order, format, bracketType = 'upper', placeholders = {}) => {
-            const m = new Match({
-                tournament: tournamentId,
-                name: name,
-                matchNumber: currentMatchNum++, // รันเลข Match ต่อเนื่อง
-                teamA: tA ? tA._id : null,
-                teamB: tB ? tB._id : null,
-                teamAPlaceholder: placeholders.teamA || undefined,
-                teamBPlaceholder: placeholders.teamB || undefined,
-                format: format || settings.defaultFormat || 'BO1',
-                round: round,
-                matchOrder: order,
-                vetoData: { status: 'pending' },
-                teamARoster: tA ? tA.members : [],
-                teamBRoster: tB ? tB.members : []
-            });
-
-            // Handle Auto-Win conditions (Byes)
-            if (tA && !tB) { m.status = 'finished'; m.winner = m.teamA; m.note = "BYE"; }
-            else if (!tA && tB) { m.status = 'finished'; m.winner = m.teamB; m.note = "BYE"; }
-            else if (!tA && !tB) { 
-                if (round === 1) { m.status = 'finished'; m.note = "EMPTY_BYE"; } 
-                else { m.status = 'scheduled'; }
-            }
-
-            await m.save();
-            matches.push(m._id);
-            if (m.note === "BYE" && m.winner) byeMatchesToProcess.push(m);
-            return m;
-        };
-
-        // ==========================================
-        // TYPE: GSL GROUPS (Dual Tournament Format)
-        // ==========================================
-        if (type === 'gsl') {
-            const groupCount = Math.ceil(teams.length / 4);
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            
-            for(let g = 0; g < groupCount; g++) {
-                const groupTeams = teams.slice(g * 4, g * 4 + 4);
-                while(groupTeams.length < 4) groupTeams.push(null);
-
-                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : `Group ${letters[g] || (g + 1)}`;
-                const prefix = `${stageName} ${groupName}`;
-
-                // Opening Matches (Seed 1 vs 4, Seed 2 vs 3)
-                const m1 = await createMatch(`${prefix}: Opening A`, groupTeams[0], groupTeams[3], 1, (g*10)+1);
-                const m2 = await createMatch(`${prefix}: Opening B`, groupTeams[1], groupTeams[2], 1, (g*10)+2);
-
-                // Winners Match (Winner M1 vs Winner M2) -> Winner qualifies as Seed #1
-                const m3 = await createMatch(`${prefix}: Winners`, null, null, 2, (g*10)+3);
-                
-                // Elimination Match (Loser M1 vs Loser M2)
-                const m4 = await createMatch(`${prefix}: Elimination`, null, null, 2, (g*10)+4);
-
-                // Decider Match (Loser Winners vs Winner Elimination) -> Winner qualifies as Seed #2
-                const m5 = await createMatch(`${prefix}: Decider`, null, null, 3, (g*10)+5);
-
-                // Link Logic
-                await this.linkMatch(m1, m3, 'teamA'); // Winner M1 -> Winners A
-                await this.linkMatch(m2, m3, 'teamB'); // Winner M2 -> Winners B
-
-                m1.loserMatchId = m4._id; m1.loserMatchSlot = 'teamA'; await m1.save(); // Loser M1 -> Elim A
-                m2.loserMatchId = m4._id; m2.loserMatchSlot = 'teamB'; await m2.save(); // Loser M2 -> Elim B
-
-                m3.loserMatchId = m5._id; m3.loserMatchSlot = 'teamA'; await m3.save(); // Loser Winners -> Decider A
-                await this.linkMatch(m4, m5, 'teamB'); // Winner Elim -> Decider B
-            }
-        }
-        
-        // ==========================================
-        // TYPE: ROUND ROBIN (LEAGUE)
-        // ==========================================
-        else if (type === 'round_robin') {
-            const groupCount = settings.groupCount || 1;
-            const groups = [];
-
-            if (groupCount > 1) {
-                for (let i = 0; i < groupCount; i++) groups[i] = [];
-                teams.forEach((team, index) => {
-                    groups[index % groupCount].push(team);
-                });
-            } else {
-                groups.push(teams);
-            }
-
-            const groupLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-            for (let g = 0; g < groups.length; g++) {
-                const groupTeams = groups[g];
-                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : (groupCount > 1 ? `Group ${groupLetters[g]}` : '');
-                
-                let teamPool = [...groupTeams];
-                if (teamPool.length % 2 !== 0) teamPool.push(null);
-                const numTeams = teamPool.length;
-                const roundsPerLeg = numTeams - 1;
-                const matchesPerRound = numTeams / 2;
-
-                for (let leg = 0; leg < (settings.roundCount || 1); leg++) {
-                    let rotation = [...teamPool];
-                    for (let r = 0; r < roundsPerLeg; r++) {
-                        const roundNum = r + 1 + (leg * roundsPerLeg);
-                        for (let m = 0; m < matchesPerRound; m++) {
-                            const tA = rotation[m];
-                            const tB = rotation[numTeams - 1 - m];
-                            if (tA && tB) { 
-                                const realA = leg % 2 === 0 ? tA : tB;
-                                const realB = leg % 2 === 0 ? tB : tA;
-                                const matchName = groupName ? `${stageName} ${groupName}: Round ${roundNum}` : `${stageName}: Round ${roundNum}`;
-                                await createMatch(matchName, realA, realB, roundNum, m);
-                            }
-                        }
-                        rotation.splice(1, 0, rotation.pop());
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // TYPE: SWISS SYSTEM
-        // ==========================================
-        else if (type === 'swiss') {
-            const matchCount = Math.floor(teams.length / 2);
-            for (let i = 0; i < matchCount; i++) {
-                // Initial Round (R1)
-                await createMatch(`${stageName}: R1-M${i + 1}`, teams[i * 2], teams[i * 2 + 1], 1, i);
-            }
-            if (teams.length % 2 !== 0) {
-                 await createMatch(`${stageName}: R1-Bye`, teams[teams.length-1], null, 1, matchCount);
-            }
-        }
-
-        // ==========================================
-        // TYPE: CROSS GROUP (Inter-Group Round Robin)
-        // ==========================================
-        else if (type === 'cross_group') {
-            const half = Math.ceil(teams.length / 2);
-            const groupA = teams.slice(0, half);
-            const groupB = teams.slice(half);
-            
-            const maxCount = Math.max(groupA.length, groupB.length);
-            const paddedA = [...groupA]; while(paddedA.length < maxCount) paddedA.push(null);
-            const paddedB = [...groupB]; while(paddedB.length < maxCount) paddedB.push(null);
-
-            for (let r = 0; r < maxCount; r++) {
-                for (let i = 0; i < maxCount; i++) {
-                    const tA = paddedA[i];
-                    const tB = paddedB[(i + r) % maxCount];
-                    if (tA && tB) {
-                        await createMatch(`${stageName}: Round ${r+1}`, tA, tB, r+1, i);
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // TYPE: DOUBLE ELIMINATION (SPLIT PARTICIPANTS)
-        // ==========================================
-        else if (type === 'double_elim' && settings.splitParticipants) {
-            // --- SPLIT PARTICIPANTS MODE ---
-            // Bottom half starts in Losers Bracket
-            const paddedTeams = this.padTeams(teams);
-            const half = paddedTeams.length / 2;
-            const ubTeams = paddedTeams.slice(0, half);
-            const lbTeams = paddedTeams.slice(half);
-
-            const ubTotalRounds = Math.log2(ubTeams.length);
-            const ubMatches = [];
-            const lbMatches = [];
-
-            // 1. Generate Upper Bracket (Half Size)
-            for (let r = 1; r <= ubTotalRounds; r++) {
-                ubMatches[r] = [];
-                const matchCount = ubTeams.length / Math.pow(2, r);
-                for (let i = 0; i < matchCount; i++) {
-                    const isFinal = (r === ubTotalRounds);
-                    const name = isFinal ? `${stageName} UB Final` : `UB R${r}-M${i+1}`;
-                    const tA = (r===1) ? ubTeams[i*2] : null;
-                    const tB = (r===1) ? ubTeams[i*2+1] : null;
-                    ubMatches[r].push(await createMatch(name, tA, tB, r, i, settings.defaultFormat, 'upper'));
-                }
-            }
-            // Link UB
-            for (let r = 1; r < ubTotalRounds; r++) {
-                for (let i = 0; i < ubMatches[r].length; i++) {
-                    await this.linkMatch(ubMatches[r][i], ubMatches[r+1][Math.floor(i/2)], (i%2===0)?'teamA':'teamB');
-                }
-            }
-
-            // 2. Generate Lower Bracket
-            const lbTotalRounds = ubTotalRounds * 2;
-            
-            // LB Round 1 (Starters)
-            lbMatches[1] = [];
-            for(let i=0; i<lbTeams.length/2; i++) {
-                lbMatches[1].push(await createMatch(`LB R1-M${i+1}`, lbTeams[i*2], lbTeams[i*2+1], 101, i, settings.defaultFormat, 'lower'));
-            }
-
-            // LB Round 2 onwards
-            let currentLbCount = lbTeams.length / 2;
-            for(let r=2; r <= lbTotalRounds; r++) {
-                lbMatches[r] = [];
-                if (r % 2 !== 0) currentLbCount /= 2; // Odd rounds consolidate
-                for(let i=0; i<currentLbCount; i++) {
-                    lbMatches[r].push(await createMatch(`LB R${r}-M${i+1}`, null, null, 100+r, i, settings.defaultFormat, 'lower'));
-                }
-            }
-
-            // Link LB Internal
-            for(let r=1; r < lbTotalRounds; r++) {
-                const nextR = r + 1;
-                if (nextR % 2 === 0) { // R1->R2, R3->R4 (Direct feed to Slot A)
-                    for(let i=0; i<lbMatches[r].length; i++) {
-                        await this.linkMatch(lbMatches[r][i], lbMatches[nextR][i], 'teamA');
-                    }
-                } else { // R2->R3, R4->R5 (Consolidate)
-                    for(let i=0; i<lbMatches[r].length; i++) {
-                        await this.linkMatch(lbMatches[r][i], lbMatches[nextR][Math.floor(i/2)], (i%2===0)?'teamA':'teamB');
-                    }
-                }
-            }
-
-            // Link UB Losers -> LB (Slot B)
-            for(let r=1; r <= ubTotalRounds; r++) {
-                const ubRound = ubMatches[r];
-                const lbTargetRoundIdx = r * 2; // UB R1 -> LB R2, UB R2 -> LB R4
-                const lbRound = lbMatches[lbTargetRoundIdx];
-                if (lbRound) {
-                    for(let i=0; i<ubRound.length; i++) {
-                        const targetIndex = (r===1) ? i : (ubRound.length - 1 - i); // Reverse seeding for later rounds
-                        const target = lbRound[targetIndex] || lbRound[0];
-                        if (target) {
-                            ubRound[i].loserMatchId = target._id;
-                            ubRound[i].loserMatchSlot = 'teamB';
-                            await ubRound[i].save();
-                        }
-                    }
-                }
-            }
-
-            // Grand Final
-            const ubFinal = ubMatches[ubTotalRounds][0];
-            const lbFinal = lbMatches[lbTotalRounds][0];
-            const grandFinal = await createMatch(`${stageName} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
-            await this.linkMatch(ubFinal, grandFinal, 'teamA');
-            await this.linkMatch(lbFinal, grandFinal, 'teamB');
-        }
-
-        // ==========================================
-        // TYPE: PLAYOFF WITH PLACEHOLDERS (AUTO-SEEDING)
-        // ==========================================
-        else if (usePlaceholders) {
-            // Calculate total slots needed based on source stage
-            const tournament = await Tournament.findById(tournamentId);
-            const sourceStage = tournament.stages[settings.sourceStageIndex];
-            
-            // Determine number of groups in source stage
-            // Heuristic: Count unique group names or use settings.groupCount
-            const sourceMatches = await Match.find({ _id: { $in: sourceStage.matches } });
-            const groupNames = new Set();
-            sourceMatches.forEach(m => {
-                const matchGroup = m.name.match(/(?:Group|Grp)\s+([A-Z0-9]{1,2})\b/i);
-                if (matchGroup) groupNames.add(matchGroup[1].toUpperCase());
-            });
-            const groupCount = Math.max(groupNames.size, sourceStage.settings.groupCount || 1);
-            const advancePerGroup = settings.advanceCount || 2;
-            const totalTeams = groupCount * advancePerGroup;
-            
-            // Generate Placeholders Array
-            // Logic: Cross Group Seeding (A1 vs B2, B1 vs A2, etc.)
-            const seeds = [];
-            for (let i = 0; i < groupCount; i++) {
-                // 1st place of Group i
-                seeds.push({ label: `Group ${String.fromCharCode(65+i)} #1`, sourceStageIndex: settings.sourceStageIndex, sourceGroupIndex: i, sourceRank: 1 });
-                // 2nd place of Group (i+1) (Circular) - Standard Cross
-                const crossGroupIdx = (i + 1) % groupCount;
-                seeds.push({ label: `Group ${String.fromCharCode(65+crossGroupIdx)} #2`, sourceStageIndex: settings.sourceStageIndex, sourceGroupIndex: crossGroupIdx, sourceRank: 2 });
-            }
-
-            // Generate Bracket Structure (Single/Double Elim) using these seeds
-            // We reuse the logic by passing null teams but attaching placeholder info
-            // NOTE: This requires refactoring the Single/Double Elim block above to accept placeholders
-            // For brevity in this snippet, I will call a specialized internal generator or assume the block above handles it.
-            // In a real implementation, I would refactor the "Single/Double Elim" block to iterate `currentNodes` which can be placeholders.
-            
-            // ... (Implementation detail: The Single/Double Elim block above needs to check for `usePlaceholders` and attach `teamAPlaceholder` from the `seeds` array)
-        }
-
-        // ==========================================
-        // TYPE: SINGLE / DOUBLE ELIMINATION (DEFAULT)
-        // ==========================================
-        else {
-            const groupCount = settings.groupCount || 1;
-            const groups = [];
-
-            if (groupCount > 1) {
-                let teamsToDist = [...teams];
-                for(let i=0; i<groupCount; i++) groups[i] = [];
-                teamsToDist.forEach((t, i) => groups[i % groupCount].push(t));
-            } else {
-                groups.push(teams);
-            }
-            const groupLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-            for (let g = 0; g < groups.length; g++) {
-                const groupTeams = groups[g];
-                const groupName = (settings.groupNames && settings.groupNames[g]) ? settings.groupNames[g] : `Group ${groupLetters[g]}`;
-                const groupPrefix = groupCount > 1 ? `${stageName} ${groupName}` : stageName;
-                
-                let paddedTeams;
-                let placeholderSeeds = [];
-
-                if (usePlaceholders) {
-                    // Generate seeds based on Cross-Group logic defined above
-                    // For simplicity, let's assume we generated `seeds` array in the previous block and passed it here
-                    // Or we generate it on the fly:
-                    // ... (Logic to fill placeholderSeeds)
-                    // paddedTeams will be an array of nulls with same length
-                } else {
-                    paddedTeams = this.padTeams(groupTeams);
-                }
-                
-                const totalTeams = paddedTeams.length;
-                if (totalTeams < 2) continue;
-
-                const seedingOrder = this.getSeedingOrder(totalTeams);
-                // Initial Nodes: Array of { type: 'team', data: team } or null (ghost)
-                let currentNodes = seedingOrder.map(i => paddedTeams[i] ? { type: 'team', data: paddedTeams[i] } : null);
-
-                const totalRounds = Math.log2(totalTeams);
-                const ubDrops = {}; // Map round -> array of drops (match or null)
-                
-                // Determine rounds to play based on qualifiedCount
-                let roundsToPlay = totalRounds;
-                if (type === 'single_elim' && settings.qualifiedCount > 1) {
-                    const reduction = Math.floor(Math.log2(settings.qualifiedCount));
-                    roundsToPlay = Math.max(1, totalRounds - reduction);
-                }
-
-                // --- UPPER BRACKET GENERATION ---
-                for (let r = 1; r <= roundsToPlay; r++) {
-                    const nextNodes = [];
-                    const roundDrops = []; 
-                    const matchCount = currentNodes.length / 2;
-
-                    for (let i = 0; i < matchCount; i++) {
-                        const top = currentNodes[i * 2];
-                        const bottom = currentNodes[i * 2 + 1];
-
-                        // Logic: Avoid creating matches for Byes
-                        if (!top && !bottom) {
-                            nextNodes.push(null);
-                            roundDrops.push(null);
-                        } else if (top && !bottom) {
-                            nextNodes.push(top); // Advance top (Bye)
-                            roundDrops.push(null); // No loser
-                        } else if (!top && bottom) {
-                            nextNodes.push(bottom); // Advance bottom (Bye)
-                            roundDrops.push(null); // No loser
-                        } else {
-                            // Create Real Match
-                            const isFinal = (r === totalRounds && settings.qualifiedCount === 1);
-                            const matchName = isFinal ? `${groupPrefix} Final` : `${groupPrefix} UB Round ${r} Match ${i + 1}`;
-                            const format = isFinal ? (settings.finalFormat || 'BO3') : settings.defaultFormat;
-                            
-                            // [NEW] Attach Placeholders if applicable
-                            const placeholders = {};
-                            // Logic to extract placeholder from `top` and `bottom` nodes if they are type 'placeholder'
-                            // ...
-                            
-                            const match = await createMatch(matchName, null, null, r, i, format, 'upper', placeholders);
-                            
-                            // [FIX] Reset status for Round 1 because createMatch defaults to 'finished' for null vs null
-                            if (r === 1) {
-                                match.status = 'scheduled';
-                                match.note = '';
-                            }
-                            
-                            // [FIX] Reset status for Round 1 because createMatch defaults to 'finished' for null vs null
-                            if (r === 1) {
-                                match.status = 'scheduled';
-                                match.note = '';
-                            }
-                            
-                            // Link Sources
-                            if (top.type === 'team') { match.teamA = top.data._id; match.teamARoster = top.data.members; }
-                            else if (top.type === 'match') { await this.linkMatch(top.data, match, 'teamA'); }
-                            
-                            if (bottom.type === 'team') { match.teamB = bottom.data._id; match.teamBRoster = bottom.data.members; }
-                            else if (bottom.type === 'match') { await this.linkMatch(bottom.data, match, 'teamB'); }
-
-                            await match.save();
-                            nextNodes.push({ type: 'match', data: match });
-                            roundDrops.push({ type: 'match', data: match });
-                        }
-                    }
-                    currentNodes = nextNodes;
-                    ubDrops[r] = roundDrops;
-                }
-
-                // [FEATURE] 3RD PLACE MATCH (Single Elim only)
-                if (type === 'single_elim' && settings.hasThirdPlace && settings.qualifiedCount === 1 && totalRounds >= 2) {
-                    // Logic requires tracking losers of Semis. 
-                    // Since we don't have a simple array of matches, we'd need to look at ubDrops[totalRounds-1] if it exists.
-                    // For simplicity in this optimized version, 3rd place is best handled if we have the semi-final matches.
-                    const semiDrops = ubDrops[totalRounds - 1];
-                    if (semiDrops && semiDrops.length === 2 && semiDrops[0] && semiDrops[1]) {
-                        const thirdPlaceMatch = await createMatch(`${groupPrefix} 3rd Place`, null, null, totalRounds, 1, settings.defaultFormat, 'upper');
-                        semiDrops[0].data.loserMatchId = thirdPlaceMatch._id; semiDrops[0].data.loserMatchSlot = 'teamA'; await semiDrops[0].data.save();
-                        semiDrops[1].data.loserMatchId = thirdPlaceMatch._id; semiDrops[1].data.loserMatchSlot = 'teamB'; await semiDrops[1].data.save();
-                    }
-                }
-
-                // --- DOUBLE ELIMINATION GENERATION ---
-                if (type === 'double_elim') {
-                    let lbNodes = []; 
-                    
-                    // LB Round 1: Pair UB R1 Drops
-                    const lbR1Drops = ubDrops[1] || [];
-                    for (let i = 0; i < lbR1Drops.length / 2; i++) {
-                        const d1 = lbR1Drops[i * 2];
-                        const d2 = lbR1Drops[i * 2 + 1];
-
-                        if (d1 && d2) {
-                            const match = await createMatch(`${groupPrefix} LB Round 1 Match ${i + 1}`, null, null, 101, i, settings.defaultFormat, 'lower');
-                            d1.data.loserMatchId = match._id; d1.data.loserMatchSlot = 'teamA'; await d1.data.save();
-                            d2.data.loserMatchId = match._id; d2.data.loserMatchSlot = 'teamB'; await d2.data.save();
-                            lbNodes.push({ type: 'match', data: match });
-                        } else if (d1) {
-                            lbNodes.push({ type: 'loser_ref', data: d1.data }); // Bye
-                        } else if (d2) {
-                            lbNodes.push({ type: 'loser_ref', data: d2.data }); // Bye
-                        } else {
-                            lbNodes.push(null);
-                        }
-                    }
-
-                    let lbRoundNum = 2;
-                    for (let r = 2; r <= totalRounds; r++) {
-                        // Step 1: Match LB Nodes vs UB Drops (Cross Seeding)
-                        const ubRoundDrops = ubDrops[r] || [];
-                        const ubDropsReversed = [...ubRoundDrops].reverse();
-                        const nextLbNodes = [];
-
-                        for (let i = 0; i < lbNodes.length; i++) {
-                            const lbNode = lbNodes[i];
-                            const ubDrop = ubDropsReversed[i];
-
-                            if (lbNode && ubDrop) {
-                                const match = await createMatch(`${groupPrefix} LB Round ${lbRoundNum} Match ${i + 1}`, null, null, 100 + lbRoundNum, i, settings.defaultFormat, 'lower');
-                                
-                                if (lbNode.type === 'match') await this.linkMatch(lbNode.data, match, 'teamA');
-                                else { lbNode.data.loserMatchId = match._id; lbNode.data.loserMatchSlot = 'teamA'; await lbNode.data.save(); }
-
-                                ubDrop.data.loserMatchId = match._id; ubDrop.data.loserMatchSlot = 'teamB'; await ubDrop.data.save();
-                                nextLbNodes.push({ type: 'match', data: match });
-                            } else if (lbNode) {
-                                nextLbNodes.push(lbNode); // UB Drop was Bye -> Advance
-                            } else if (ubDrop) {
-                                nextLbNodes.push({ type: 'loser_ref', data: ubDrop.data }); // LB Node was empty -> Drop fills slot
-                            } else {
-                                nextLbNodes.push(null);
-                            }
-                        }
-                        lbNodes = nextLbNodes;
-                        lbRoundNum++;
-
-                        // Step 2: Consolidate LB (Pairing) - Skip if this was the last UB round (LB Final handled by GF link)
-                        if (r < totalRounds) {
-                            const consolidatedNodes = [];
-                            for (let i = 0; i < lbNodes.length / 2; i++) {
-                                const top = lbNodes[i * 2];
-                                const bottom = lbNodes[i * 2 + 1];
-                                
-                                if (top && bottom) {
-                                    const match = await createMatch(`${groupPrefix} LB Round ${lbRoundNum} Match ${i + 1}`, null, null, 100 + lbRoundNum, i, settings.defaultFormat, 'lower');
-                                    
-                                    if (top.type === 'match') await this.linkMatch(top.data, match, 'teamA');
-                                    else { top.data.loserMatchId = match._id; top.data.loserMatchSlot = 'teamA'; await top.data.save(); }
-
-                                    if (bottom.type === 'match') await this.linkMatch(bottom.data, match, 'teamB');
-                                    else { bottom.data.loserMatchId = match._id; bottom.data.loserMatchSlot = 'teamB'; await bottom.data.save(); }
-
-                                    consolidatedNodes.push({ type: 'match', data: match });
-                                } else if (top) {
-                                    consolidatedNodes.push(top);
-                                } else if (bottom) {
-                                    consolidatedNodes.push(bottom);
-                                } else {
-                                    consolidatedNodes.push(null);
-                                }
-                            }
-                            lbNodes = consolidatedNodes;
-                            lbRoundNum++;
-                        }
-                    }
-
-                    // Grand Final
-                    if (settings.qualifiedCount === 1) {
-                        const ubFinalNode = currentNodes[0];
-                        const lbFinalNode = lbNodes[0];
-                        
-                        if (ubFinalNode && lbFinalNode) {
-                            const grandFinal = await createMatch(`${groupPrefix} Grand Final`, null, null, 999, 0, settings.finalFormat || 'BO5', 'final');
-                            
-                            if (ubFinalNode.type === 'match') await this.linkMatch(ubFinalNode.data, grandFinal, 'teamA');
-                            else if (ubFinalNode.type === 'team') { grandFinal.teamA = ubFinalNode.data._id; grandFinal.teamARoster = ubFinalNode.data.members; }
-
-                            if (lbFinalNode.type === 'match') await this.linkMatch(lbFinalNode.data, grandFinal, 'teamB');
-                            else if (lbFinalNode.type === 'loser_ref') { lbFinalNode.data.loserMatchId = grandFinal._id; lbFinalNode.data.loserMatchSlot = 'teamB'; await lbFinalNode.data.save(); }
-                            
-                            await grandFinal.save();
-                        }
-                    }
-                }
-            }
-        }
-
-        // Process any automatic Bye wins
-        for (const match of byeMatchesToProcess) {
-            await this.propagateMatchResult(match, match.winner, null);
-        }
-
-        return matches;
+    groupLetter(index) {
+        return GROUP_LETTERS[index] || String(index + 1);
     }
 
-    // --- UTILITY LINKING FUNCTIONS ----
+    // ---- Relational helpers ----
 
+    async createGroups(stage, count, names = []) {
+        const groups = [];
+        for (let i = 0; i < count; i++) {
+            let name = names[i];
+            if (!name) name = count > 1 ? `Group ${this.groupLetter(i)}` : 'Main';
+            const group = await Group.create({ stage: stage._id, order: i, name: name });
+            groups.push(group);
+        }
+        return groups;
+    }
+
+    async createStageEntries(stage, teams, group = null) {
+        const docs = teams.filter(Boolean).map(team => ({
+            stage: stage._id,
+            group: group ? group._id : null,
+            team: team._id
+        }));
+        if (docs.length > 0) await StageEntry.insertMany(docs);
+        return docs;
+    }
+
+    async createMatchDoc(tournamentId, stage, group, data) {
+        const cfg = stage.settings || {};
+        const m = new Match({
+            tournament: tournamentId,
+            stage: stage._id,
+            group: group ? group._id : null,
+            name: data.name,
+            matchNumber: data.matchNumber,
+            round: data.round,
+            matchOrder: data.matchOrder,
+            teamA: data.teamA ? data.teamA._id : null,
+            teamB: data.teamB ? data.teamB._id : null,
+            teamARoster: data.teamA ? data.teamA.members : [],
+            teamBRoster: data.teamB ? data.teamB.members : [],
+            format: data.format || cfg.defaultFormat || 'BO1',
+            status: 'scheduled',
+            vetoData: { status: 'pending' }
+        });
+        await m.save();
+        return m;
+    }
+
+    // BYE: teamA advances automatically, no game played
+    async createByeMatch(tournamentId, stage, group, data) {
+        const m = await this.createMatchDoc(tournamentId, stage, group, { ...data, teamB: null });
+        m.status = 'bye';
+        m.winner = data.teamA._id;
+        await m.save();
+        return m;
+    }
+
+    // Link a source match to the target slot. Saves only the source.
     async linkMatch(source, target, slot) {
-        if(!target) return;
-        if(!source) return;
+        if (!source || !target) return;
         source.nextMatchId = target._id;
         source.nextMatchSlot = slot;
         await source.save();
     }
 
-    async propagateMatchResult(match, winner, loser) {
-        if (!winner) return;
-        if (match.nextMatchId) {
-            await this.updateMatchSlot(match.nextMatchId, match.nextMatchSlot, winner);
-            if(this.io) this.io.emit('notification', { msg: `Bracket: ${winner.shortName} advanced to next round!` });
-        }
-        if (match.loserMatchId) {
-            if (loser) {
-                await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loser);
-                if(this.io) this.io.emit('notification', { msg: `Bracket: ${loser.shortName} dropped to lower bracket.` });
-            } else {
-                // [FIX] Handle BYE drop (no loser) - Propagate BYE to lower bracket
-                await this.handleByeDrop(match.loserMatchId, match.loserMatchSlot);
+    // Route the loser of `source` into target slot (loser bracket)
+    async attachLoser(source, target, slot) {
+        source.loserMatchId = target._id;
+        source.loserMatchSlot = slot;
+        await source.save();
+    }
+
+    // Connect a bracket node (match or loser reference) into a target match slot
+    async connect(node, target, slot) {
+        if (!node) return;
+        if (node.type === 'match') await this.linkMatch(node.doc, target, slot);
+        else if (node.type === 'loser_ref') await this.attachLoser(node.doc, target, slot);
+    }
+
+    // ---- ROUND ROBIN ----
+
+    async generateRoundRobin(tournamentId, stage, list) {
+        const cfg = stage.settings || {};
+        const groupCount = cfg.groupCount || 1;
+        const groups = await this.createGroups(stage, groupCount, cfg.groupNames || []);
+        const buckets = groups.map(() => []);
+        list.forEach((t, i) => buckets[i % groupCount].push(t));
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+
+        for (let g = 0; g < groups.length; g++) {
+            const group = groups[g];
+            const prefix = groupCount > 1 ? `${stage.name} ${group.name}` : stage.name;
+            const pool = [...buckets[g]];
+            await this.createStageEntries(stage, pool, group);
+            if (pool.length % 2 !== 0) pool.push(null);
+
+            const n = pool.length;
+            const roundsPerLeg = n - 1;
+            const legs = cfg.roundCount || 1;
+
+            for (let leg = 0; leg < legs; leg++) {
+                let rotation = [...pool];
+                for (let r = 0; r < roundsPerLeg; r++) {
+                    const roundNum = r + 1 + leg * roundsPerLeg;
+                    for (let m = 0; m < n / 2; m++) {
+                        const tA = rotation[m];
+                        const tB = rotation[n - 1 - m];
+                        if (!tA || !tB) continue;
+                        const home = leg % 2 === 0 ? tA : tB;
+                        const away = leg % 2 === 0 ? tB : tA;
+                        const match = await this.createMatchDoc(tournamentId, stage, group, {
+                            name: `${prefix}: Round ${roundNum}`,
+                            matchNumber: num++,
+                            round: roundNum,
+                            matchOrder: m,
+                            teamA: home,
+                            teamB: away
+                        });
+                        created.push(match._id);
+                    }
+                    rotation.splice(1, 0, rotation.pop());
+                }
             }
+        }
+        return created;
+    }
+
+    // ---- SWISS ----
+
+    async generateSwissRound1(tournamentId, stage, list) {
+        await this.createStageEntries(stage, list, null);
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        for (let i = 0; i + 1 < list.length; i += 2) {
+            const m = await this.createMatchDoc(tournamentId, stage, null, {
+                name: `${stage.name}: R1-M${Math.floor(i / 2) + 1}`,
+                matchNumber: num++,
+                round: 1,
+                matchOrder: Math.floor(i / 2),
+                teamA: list[i],
+                teamB: list[i + 1]
+            });
+            created.push(m._id);
+        }
+        if (list.length % 2 !== 0) {
+            const last = list[list.length - 1];
+            const bye = await this.createByeMatch(tournamentId, stage, null, {
+                name: `${stage.name}: R1-Bye`,
+                matchNumber: num++,
+                round: 1,
+                matchOrder: Math.floor(list.length / 2),
+                teamA: last
+            });
+            created.push(bye._id);
+        }
+        return created;
+    }
+
+    // Pairs teams by current standings, avoiding rematches and repeated byes
+    async generateNextSwissRound(tournamentId, stageId, roundNumber) {
+        const stage = await Stage.findById(stageId);
+        if (!stage) throw new Error('Stage not found');
+
+        const standings = await this.getStageStandings(stageId);
+        const matches = await Match.find({ stage: stageId });
+
+        const played = new Set();
+        const hadBye = new Set();
+        matches.forEach(m => {
+            if (m.teamA && m.teamB) {
+                const a = m.teamA.toString();
+                const b = m.teamB.toString();
+                played.add(a + '|' + b);
+                played.add(b + '|' + a);
+            } else if (m.teamA && !m.teamB) {
+                hadBye.add(m.teamA.toString());
+            }
+        });
+
+        const pool = standings.map(s => s.id);
+        let byeId = null;
+        if (pool.length % 2 !== 0) {
+            for (let i = pool.length - 1; i >= 0; i--) {
+                if (!hadBye.has(pool[i])) {
+                    byeId = pool[i];
+                    pool.splice(i, 1);
+                    break;
+                }
+            }
+            if (!byeId) byeId = pool.pop();
+        }
+
+        const pairs = [];
+        const unpaired = [...pool];
+        while (unpaired.length > 0) {
+            const a = unpaired.shift();
+            let idx = unpaired.findIndex(b => !played.has(a + '|' + b));
+            if (idx === -1) idx = 0; // no fresh opponent left, accept a rematch
+            const b = unpaired.splice(idx, 1)[0];
+            pairs.push([a, b]);
+        }
+
+        const teamDocs = await Team.find({ _id: { $in: standings.map(s => s.id) } });
+        const byId = {};
+        teamDocs.forEach(t => { byId[t._id.toString()] = t; });
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        for (let i = 0; i < pairs.length; i++) {
+            const m = await this.createMatchDoc(tournamentId, stage, null, {
+                name: `${stage.name}: R${roundNumber}-M${i + 1}`,
+                matchNumber: num++,
+                round: roundNumber,
+                matchOrder: i,
+                teamA: byId[pairs[i][0]],
+                teamB: byId[pairs[i][1]]
+            });
+            created.push(m._id);
+        }
+        if (byeId) {
+            const bye = await this.createByeMatch(tournamentId, stage, null, {
+                name: `${stage.name}: R${roundNumber}-Bye`,
+                matchNumber: num++,
+                round: roundNumber,
+                matchOrder: pairs.length,
+                teamA: byId[byeId]
+            });
+            created.push(bye._id);
+        }
+        return created;
+    }
+
+    // ---- SINGLE / DOUBLE ELIMINATION (single group, no split) ----
+
+    async generateElimination(tournamentId, stage, list) {
+        const cfg = stage.settings || {};
+        const isDouble = stage.type === 'double_elim';
+        const qualified = cfg.qualifiedCount || 1;
+        if ((cfg.groupCount || 1) > 1) throw new Error('Multi-group elimination is a Phase 3 follow-up');
+        if (cfg.splitParticipants) throw new Error('Split double elimination is a Phase 3 follow-up');
+
+        const [group] = await this.createGroups(stage, 1, cfg.groupNames || []);
+        await this.createStageEntries(stage, list, group);
+
+        const padded = this.padTeams(list);
+        const total = padded.length;
+        if (total < 2) return [];
+
+        const seeding = this.getSeedingOrder(total);
+        let currentNodes = seeding.map(i => padded[i] ? { type: 'team', team: padded[i] } : null);
+        const totalRounds = Math.log2(total);
+
+        let roundsToPlay = totalRounds;
+        if (!isDouble && qualified > 1) {
+            roundsToPlay = Math.max(1, totalRounds - Math.floor(Math.log2(qualified)));
+        }
+
+        let num = await this.getNextMatchNumber(tournamentId);
+        const created = [];
+        const teamOf = n => (n && n.type === 'team') ? n.team : null;
+        const mk = async (name, round, order, teamA, teamB, format) => {
+            const m = await this.createMatchDoc(tournamentId, stage, group, {
+                name, matchNumber: num++, round, matchOrder: order, teamA, teamB, format
+            });
+            created.push(m._id);
+            return m;
+        };
+
+        // --- UPPER BRACKET ---
+        const ubDrops = {};
+        for (let r = 1; r <= roundsToPlay; r++) {
+            const next = [];
+            const drops = [];
+            for (let i = 0; i < currentNodes.length / 2; i++) {
+                const top = currentNodes[i * 2];
+                const bottom = currentNodes[i * 2 + 1];
+
+                if (!top && !bottom) { next.push(null); drops.push(null); continue; }
+                if (!top || !bottom) { next.push(top || bottom); drops.push(null); continue; } // BYE: advance, no loser
+
+                const isFinal = (r === totalRounds && qualified === 1);
+                const name = isFinal ? `${stage.name} Final` : `${stage.name} UB Round ${r} Match ${i + 1}`;
+                const format = isFinal ? (cfg.finalFormat || 'BO3') : cfg.defaultFormat;
+                const m = await mk(name, r, i, teamOf(top), teamOf(bottom), format);
+                await this.connect(top, m, 'teamA');
+                await this.connect(bottom, m, 'teamB');
+
+                next.push({ type: 'match', doc: m });
+                drops.push({ type: 'match', doc: m });
+            }
+            currentNodes = next;
+            ubDrops[r] = drops;
+        }
+
+        // --- 3RD PLACE (single elim only) ---
+        if (!isDouble && cfg.hasThirdPlace && qualified === 1 && totalRounds >= 2) {
+            const semi = ubDrops[totalRounds - 1];
+            if (semi && semi.length === 2 && semi[0] && semi[1]) {
+                const third = await mk(`${stage.name} 3rd Place`, totalRounds, 1, null, null, cfg.defaultFormat);
+                await this.attachLoser(semi[0].doc, third, 'teamA');
+                await this.attachLoser(semi[1].doc, third, 'teamB');
+            }
+        }
+
+        if (!isDouble) return created;
+
+        // --- LOWER BRACKET (double elim) ---
+        let lbNodes = [];
+        const r1 = ubDrops[1] || [];
+        for (let i = 0; i < r1.length / 2; i++) {
+            const d1 = r1[i * 2];
+            const d2 = r1[i * 2 + 1];
+            if (d1 && d2) {
+                const m = await mk(`${stage.name} LB Round 1 Match ${i + 1}`, 101, i, null, null, cfg.defaultFormat);
+                await this.attachLoser(d1.doc, m, 'teamA');
+                await this.attachLoser(d2.doc, m, 'teamB');
+                lbNodes.push({ type: 'match', doc: m });
+            } else if (d1 || d2) {
+                lbNodes.push({ type: 'loser_ref', doc: (d1 || d2).doc }); // single loser passes through
+            } else {
+                lbNodes.push(null);
+            }
+        }
+
+        let lbRound = 2;
+        for (let r = 2; r <= totalRounds; r++) {
+            // Step 1: LB survivors vs UB drops (reverse seeding)
+            const drops = (ubDrops[r] || []).slice().reverse();
+            const next = [];
+            for (let i = 0; i < lbNodes.length; i++) {
+                const lb = lbNodes[i];
+                const ub = drops[i];
+                if (lb && ub) {
+                    const m = await mk(`${stage.name} LB Round ${lbRound} Match ${i + 1}`, 100 + lbRound, i, null, null, cfg.defaultFormat);
+                    await this.connect(lb, m, 'teamA');
+                    await this.attachLoser(ub.doc, m, 'teamB');
+                    next.push({ type: 'match', doc: m });
+                } else if (lb) {
+                    next.push(lb);
+                } else if (ub) {
+                    next.push({ type: 'loser_ref', doc: ub.doc });
+                } else {
+                    next.push(null);
+                }
+            }
+            lbNodes = next;
+            lbRound++;
+
+            // Step 2: consolidate LB pairs (skipped after last UB round)
+            if (r < totalRounds) {
+                const cons = [];
+                for (let i = 0; i < lbNodes.length / 2; i++) {
+                    const top = lbNodes[i * 2];
+                    const bottom = lbNodes[i * 2 + 1];
+                    if (top && bottom) {
+                        const m = await mk(`${stage.name} LB Round ${lbRound} Match ${i + 1}`, 100 + lbRound, i, null, null, cfg.defaultFormat);
+                        await this.connect(top, m, 'teamA');
+                        await this.connect(bottom, m, 'teamB');
+                        cons.push({ type: 'match', doc: m });
+                    } else {
+                        cons.push(top || bottom || null);
+                    }
+                }
+                lbNodes = cons;
+                lbRound++;
+            }
+        }
+
+        // --- GRAND FINAL ---
+        const ubFinal = currentNodes[0];
+        const lbFinal = lbNodes[0];
+        if (qualified === 1 && ubFinal && lbFinal) {
+            const gf = await mk(`${stage.name} Grand Final`, 999, 0, teamOf(ubFinal), teamOf(lbFinal), cfg.finalFormat || 'BO5');
+            await this.connect(ubFinal, gf, 'teamA');
+            await this.connect(lbFinal, gf, 'teamB');
+        }
+
+        return created;
+    }
+
+    // ---- DISPATCH ----
+
+    async generateStage(tournamentId, stage, teams) {
+        const cfg = stage.settings || {};
+        if (cfg.usePlaceholders) {
+            // Lazy require: stageManager.js requires this module at load time, so a top-level require here would be circular.
+            const stageManager = require('./stageManager');
+            return stageManager.generatePlaceholderMatches(tournamentId, stage);
+        }
+
+        const list = (teams || []).filter(Boolean);
+        if (cfg.randomize && stage.type !== 'cross_group') this.shuffle(list);
+
+        switch (stage.type) {
+            case 'round_robin': return this.generateRoundRobin(tournamentId, stage, list);
+            case 'swiss': return this.generateSwissRound1(tournamentId, stage, list);
+            case 'single_elim':
+            case 'double_elim': return this.generateElimination(tournamentId, stage, list);
+            case 'gsl':
+            case 'cross_group':
+            case 'triple_elim':
+                throw new Error(`${stage.type} is a Phase 3 follow-up`);
+            default:
+                throw new Error(`Unknown stage type: ${stage.type}`);
         }
     }
 
-    async updateMatchSlot(matchId, slot, team) {
-        if (!matchId || !team) return;
-        const update = {};
-        update[slot] = team._id;
-        update[`${slot}Roster`] = team.members;
-        
-        // Update and return new doc
-        const match = await Match.findByIdAndUpdate(matchId, update, { new: true });
+    // ---- MATCH RESULT & PROPAGATION ----
 
-        // [NEW] Trigger Channel Creation if both teams are present
+    // Record a finished match and push the winner/loser into their downstream slots
+    async updateMatch(matchId, { winnerId, scores = [] }) {
+        const match = await Match.findById(matchId);
+        if (!match) throw new Error('Match not found');
+        if (match.status === 'finished' || match.status === 'bye') throw new Error('Match already finished');
+
+        const aId = match.teamA ? match.teamA.toString() : null;
+        const bId = match.teamB ? match.teamB.toString() : null;
+        const winner = winnerId ? winnerId.toString() : null;
+        if (!winner || (winner !== aId && winner !== bId)) {
+            throw new Error('Winner must be one of the teams in this match');
+        }
+        const loser = winner === aId ? bId : aId;
+
+        match.scores = scores;
+        match.winner = winner;
+        match.status = 'finished';
+        await match.save();
+
+        await this.propagateMatchResult(match, winner, loser);
+
+        if (this.io) {
+            this.io.emit('match_update', match);
+            this.io.emit('bracket_update');
+        }
+        return match;
+    }
+
+    // Structural note: bracket generation never creates a match with an empty
+    // feeder slot (BYE sources emit no loser, and LB pairs are only built from
+    // real feeders), so no BYE-drop flag is needed like the legacy note-based logic.
+    async propagateMatchResult(match, winnerId, loserId) {
+        if (!winnerId) return;
+        if (match.nextMatchId) {
+            await this.updateMatchSlot(match.nextMatchId, match.nextMatchSlot, winnerId);
+        }
+        if (match.loserMatchId && loserId) {
+            await this.updateMatchSlot(match.loserMatchId, match.loserMatchSlot, loserId);
+        }
+    }
+
+    async updateMatchSlot(matchId, slot, teamId) {
+        if (!matchId || !teamId || !slot) return null;
+        const team = await Team.findById(teamId);
+        if (!team) return null;
+
+        const match = await Match.findByIdAndUpdate(
+            matchId,
+            { [slot]: team._id, [`${slot}Roster`]: team.members },
+            { new: true }
+        );
+
         if (match && match.teamA && match.teamB && this.onMatchReady) {
             this.onMatchReady(match);
         }
-        
-        // [FIX] Check for BYE_DROP condition to auto-advance
-        const otherSlot = slot === 'teamA' ? 'teamB' : 'teamA';
-        const byeFlag = otherSlot === 'teamA' ? 'BYE_DROP_A' : 'BYE_DROP_B';
-        
-        if (match && match.note && match.note.includes(byeFlag) && !match.winner) {
-             match.winner = team._id;
-             match.status = 'finished';
-             match.note += " (Auto-Advance)";
-             await match.save();
-             await this.propagateMatchResult(match, team, null);
-             
-             await Team.findByIdAndUpdate(team._id, { $inc: { wins: 1 } });
-             if (this.io) {
-                 this.io.emit('match_update', match);
-                 this.io.emit('bracket_update');
-             }
-        }
+        if (this.io && match) this.io.emit('match_update', match);
+        return match;
     }
 
-    // [FIX] New method to handle BYE drops in Lower Bracket
-    async handleByeDrop(matchId, slot) {
-        const match = await Match.findById(matchId);
-        if (!match) return;
-
-        const flag = slot === 'teamA' ? 'BYE_DROP_A' : 'BYE_DROP_B';
-        if (!match.note) match.note = flag;
-        else if (!match.note.includes(flag)) match.note += ` ${flag}`;
-
-        // [FIX] Check for Double Bye (Both slots are BYE drops)
-        // ถ้าทั้ง 2 ฝั่งเป็น BYE DROP ให้จบแมตช์นี้แล้วส่ง BYE ต่อไปรอบหน้าเลย
-        const otherByeFlag = slot === 'teamA' ? 'BYE_DROP_B' : 'BYE_DROP_A';
-        if (match.note.includes(otherByeFlag)) {
-            match.status = 'finished';
-            match.note += " (Double Bye)";
-            await match.save();
-            
-            // Propagate Bye to next match (if any)
-            if (match.nextMatchId) {
-                await this.handleByeDrop(match.nextMatchId, match.nextMatchSlot);
-            }
-            return;
-        }
-
-        // Check if we can resolve the match now (if other team is already present)
-        const otherSlot = slot === 'teamA' ? 'teamB' : 'teamA';
-        const otherTeamId = match[otherSlot];
-
-        if (otherTeamId) {
-            const wTeam = await Team.findById(otherTeamId);
-            if (wTeam) {
-                match.winner = wTeam._id;
-                match.status = 'finished';
-                match.note += " (Auto-Advance)";
-                await match.save();
-                await this.propagateMatchResult(match, wTeam, null);
-                
-                await Team.findByIdAndUpdate(wTeam._id, { $inc: { wins: 1 } });
-                if (this.io) {
-                    this.io.emit('match_update', match);
-                    this.io.emit('bracket_update');
-                }
-            }
-        } else {
-            await match.save();
-        }
+    // Manual match creation used by team management (relational version)
+    async createMatchForManager(tournamentId, stage, group, data) {
+        return this.createMatchDoc(tournamentId, stage, group, {
+            name: data.name,
+            matchNumber: data.matchNumber,
+            round: data.round || 99,
+            matchOrder: data.matchOrder || 0,
+            teamA: data.teamA,
+            teamB: data.teamB,
+            format: data.format
+        });
     }
 
-    // [NEW] Resolve Placeholders
-    async resolveStagePlaceholders(tournamentId, stageIndex) {
-        const tournament = await Tournament.findById(tournamentId);
-        const targetStage = tournament.stages[stageIndex];
-        if (!targetStage) return;
+    // ---- STANDINGS (by Stage _id, null-safe for BYE) ----
 
-        // 1. Get Standings from Source Stage(s)
-        // We need to cache standings to avoid re-calculating for every match
-        const standingsCache = {}; // { stageIndex: [standings array] }
+    async getStageStandings(stageId) {
+        const stage = await Stage.findById(stageId);
+        if (!stage) return [];
 
-        const getCachedStandings = async (sIdx) => {
-            if (!standingsCache[sIdx]) {
-                standingsCache[sIdx] = await this.getStageStandings(tournamentId, sIdx);
-            }
-            return standingsCache[sIdx];
-        };
+        const [entries, groups, matches] = await Promise.all([
+            StageEntry.find({ stage: stageId }).populate('team', 'name shortName logo'),
+            Group.find({ stage: stageId }),
+            Match.find({ stage: stageId })
+        ]);
 
-        // 2. Iterate Target Matches
-        const matches = await Match.find({ _id: { $in: targetStage.matches } });
-        
-        for (const m of matches) {
-            let changed = false;
+        const groupById = {};
+        groups.forEach(g => { groupById[g._id.toString()] = g; });
 
-            const resolveSide = async (side) => {
-                const ph = m[`team${side}Placeholder`];
-                if (ph && ph.sourceStageIndex !== undefined && !m[`team${side}`]) {
-                    const standings = await getCachedStandings(ph.sourceStageIndex);
-                    // Filter standings by group if needed
-                    // Note: getStageStandings returns flat list with .group property
-                    const groupLetter = String.fromCharCode(65 + ph.sourceGroupIndex); // 0->A, 1->B
-                    const groupStandings = standings.filter(s => s.group === groupLetter);
-                    
-                    const teamData = groupStandings[ph.sourceRank - 1]; // Rank 1 is index 0
-                    if (teamData) {
-                        m[`team${side}`] = teamData.id;
-                        // Also update roster snapshot
-                        const teamDoc = await Team.findById(teamData.id);
-                        if (teamDoc) m[`team${side}Roster`] = teamDoc.members;
-                        changed = true;
-                    }
-                }
-            };
-
-            await resolveSide('A');
-            await resolveSide('B');
-
-            if (changed) {
-                await m.save();
-                if (this.io) this.io.emit('match_update', m);
-            }
-        }
-    }
-
-    // --- STANDINGS CALCULATION ---
-    async getStageStandings(tournamentId, stageIndex) {
-        const tournament = await Tournament.findById(tournamentId);
-        if (!tournament || !tournament.stages[stageIndex]) return [];
-
-        const stage = tournament.stages[stageIndex];
-        const matches = await Match.find({ _id: { $in: stage.matches } });
-        const teams = await Team.find({ _id: { $in: stage.stageParticipants } });
-
-        let stats = {};
-        stage.stageParticipants.forEach(pid => {
-            const team = teams.find(t => t._id.toString() === pid.toString());
-            if (team) stats[pid] = { 
-                id: pid, name: team.name, shortName: team.shortName, logo: team.logo, 
-                wins: 0, losses: 0, played: 0, 
+        const stats = {};
+        entries.forEach(e => {
+            if (!e.team) return;
+            const id = e.team._id.toString();
+            const g = e.group ? groupById[e.group.toString()] : null;
+            stats[id] = {
+                id: id,
+                name: e.team.name,
+                shortName: e.team.shortName,
+                logo: e.team.logo,
+                group: g ? g.order : 0,
+                groupName: g ? g.name : '',
+                wins: 0, losses: 0, played: 0,
                 roundDiff: 0, mapWon: 0, mapLost: 0, mapDiff: 0,
-                h2h: {}, group: 'A'
+                h2h: {}
             };
         });
 
         matches.forEach(m => {
-            const gMatch = m.name.match(/Group\s+([A-Z])/);
-            const group = gMatch ? gMatch[1] : 'A';
-            if (m.teamA && stats[m.teamA.toString()]) stats[m.teamA.toString()].group = group;
-            if (m.teamB && stats[m.teamB.toString()]) stats[m.teamB.toString()].group = group;
+            const done = m.status === 'finished' || m.status === 'bye';
+            if (!done || !m.winner) return;
+            const winnerId = m.winner.toString();
+            if (!stats[winnerId]) return;
 
-            if (m.status === 'finished' && m.winner) {
-                const winnerId = m.winner.toString();
-                const loserId = (m.teamA.toString() === winnerId) ? m.teamB.toString() : m.teamA.toString();
+            // BYE: one side only, counts as a win without a game
+            if (!m.teamA || !m.teamB) {
+                stats[winnerId].wins++;
+                return;
+            }
 
-                if (stats[winnerId]) { stats[winnerId].wins++; stats[winnerId].played++; stats[winnerId].h2h[loserId] = 'win'; }
-                if (stats[loserId]) { stats[loserId].losses++; stats[loserId].played++; stats[loserId].h2h[winnerId] = 'loss'; }
+            const aId = m.teamA.toString();
+            const bId = m.teamB.toString();
+            const loserId = (winnerId === aId) ? bId : aId;
 
-                let sA = 0, sB = 0, mapsA = 0, mapsB = 0;
-                if (m.scores && m.scores.length > 0) {
-                    m.scores.forEach(s => {
-                        const scA = parseInt(s.teamAScore) || 0; const scB = parseInt(s.teamBScore) || 0;
-                        sA += scA; sB += scB;
-                        if (scA > scB) mapsA++; else if (scB > scA) mapsB++;
-                    });
-                    
-                    const tA = m.teamA.toString(); const tB = m.teamB.toString();
-                    if (stats[tA]) { stats[tA].roundDiff += (sA - sB); stats[tA].mapWon += mapsA; stats[tA].mapLost += mapsB; stats[tA].mapDiff += (mapsA - mapsB); }
-                    if (stats[tB]) { stats[tB].roundDiff += (sB - sA); stats[tB].mapWon += mapsB; stats[tB].mapLost += mapsA; stats[tB].mapDiff += (mapsB - mapsA); }
-                }
+            stats[winnerId].wins++;
+            stats[winnerId].played++;
+            stats[winnerId].h2h[loserId] = 'win';
+
+            if (stats[loserId]) {
+                stats[loserId].losses++;
+                stats[loserId].played++;
+                stats[loserId].h2h[winnerId] = 'loss';
+            }
+
+            let sA = 0, sB = 0, mapsA = 0, mapsB = 0;
+            if (m.scores && m.scores.length > 0) {
+                m.scores.forEach(s => {
+                    const scA = parseInt(s.teamAScore) || 0;
+                    const scB = parseInt(s.teamBScore) || 0;
+                    sA += scA; sB += scB;
+                    if (scA > scB) mapsA++; else if (scB > scA) mapsB++;
+                });
+                if (stats[aId]) { stats[aId].roundDiff += (sA - sB); stats[aId].mapWon += mapsA; stats[aId].mapLost += mapsB; stats[aId].mapDiff += (mapsA - mapsB); }
+                if (stats[bId]) { stats[bId].roundDiff += (sB - sA); stats[bId].mapWon += mapsB; stats[bId].mapLost += mapsA; stats[bId].mapDiff += (mapsB - mapsA); }
             }
         });
 
-        const tiebreakers = stage.settings?.tiebreakers || ['h2h', 'map_diff', 'round_diff'];
+        const tiebreakers = (stage.settings && stage.settings.tiebreakers) || ['h2h', 'map_diff', 'round_diff'];
 
         return Object.values(stats).sort((a, b) => {
             if (b.wins !== a.wins) return b.wins - a.wins;
-
             for (const rule of tiebreakers) {
                 if (rule === 'h2h') {
                     if (a.h2h[b.id]) return a.h2h[b.id] === 'win' ? -1 : 1;
@@ -828,113 +628,6 @@ class BracketManager {
             }
             return 0;
         });
-    }
-
-    // --- DYNAMIC STAGE MANAGEMENT ---
-
-    async addTeamToStage(tournamentId, stageIndex, teamId, groupIndex = 0) {
-        const tournament = await Tournament.findById(tournamentId);
-        const stage = tournament.stages[stageIndex];
-        const team = await Team.findById(teamId);
-        if (!stage || !team) throw new Error("Stage or Team not found");
-
-        // 1. Update Participants List
-        if (stage.type === 'cross_group') {
-            // Insert based on Alpha/Omega split
-            const currentLen = stage.stageParticipants.length;
-            const mid = Math.ceil(currentLen / 2);
-            if (groupIndex === 0) { // Alpha: Insert at mid (end of Alpha)
-                stage.stageParticipants.splice(mid, 0, team._id);
-            } else { // Omega: Push to end
-                stage.stageParticipants.push(team._id);
-            }
-        } else {
-            stage.stageParticipants.push(team._id);
-        }
-
-        // 2. Generate Extra Matches
-        const newMatches = [];
-        let nextNum = await this.getNextMatchNumber(tournamentId);
-
-        if (stage.type === 'round_robin') {
-            // Identify existing teams in the target group
-            const groupTeams = new Set();
-            const stageMatches = await Match.find({ _id: { $in: stage.matches } });
-            
-            const groupLetter = String.fromCharCode(65 + groupIndex);
-            const groupName = (stage.settings.groupNames && stage.settings.groupNames[groupIndex]) 
-                ? stage.settings.groupNames[groupIndex] 
-                : (stage.settings.groupCount > 1 ? `Group ${groupLetter}` : '');
-
-            stageMatches.forEach(m => {
-                let belongs = !groupName || m.name.includes(groupName); // Simple heuristic
-                if (belongs) {
-                    if (m.teamA) groupTeams.add(m.teamA.toString());
-                    if (m.teamB) groupTeams.add(m.teamB.toString());
-                }
-            });
-
-            for (const opponentId of groupTeams) {
-                if (opponentId === teamId.toString()) continue;
-                const m = await this.createMatchForManager(tournamentId, `${stage.name} ${groupName}: Extra`, nextNum++, team, await Team.findById(opponentId), stage.settings.defaultFormat, 99);
-                newMatches.push(m._id);
-            }
-        } else if (stage.type === 'cross_group') {
-            const participants = stage.stageParticipants;
-            const mid = Math.ceil(participants.length / 2);
-            const alpha = participants.slice(0, mid);
-            const omega = participants.slice(mid);
-            const opponents = (groupIndex === 0) ? omega : alpha;
-
-            for (const oppId of opponents) {
-                if (!oppId) continue;
-                const m = await this.createMatchForManager(tournamentId, `${stage.name}: Extra`, nextNum++, team, await Team.findById(oppId), stage.settings.defaultFormat, 99);
-                newMatches.push(m._id);
-            }
-        }
-
-        stage.matches.push(...newMatches);
-        await tournament.save();
-    }
-
-    async swapTeamsInStage(tournamentId, stageIndex, team1Id, team2Id) {
-        const tournament = await Tournament.findById(tournamentId);
-        const stage = tournament.stages[stageIndex];
-        if (!stage) throw new Error("Stage not found");
-
-        // 1. Swap in Participants Array
-        const idx1 = stage.stageParticipants.findIndex(id => id.toString() === team1Id);
-        const idx2 = stage.stageParticipants.findIndex(id => id.toString() === team2Id);
-        if (idx1 !== -1 && idx2 !== -1) {
-            stage.stageParticipants.set(idx1, team2Id);
-            stage.stageParticipants.set(idx2, team1Id);
-            await tournament.save();
-        }
-
-        // 2. Swap in Matches
-        const matches = await Match.find({ _id: { $in: stage.matches } });
-        const t1 = await Team.findById(team1Id);
-        const t2 = await Team.findById(team2Id);
-
-        for (const m of matches) {
-            let changed = false;
-            if (m.teamA && m.teamA.toString() === team1Id) { m.teamA = team2Id; m.teamARoster = t2.members; changed = true; }
-            else if (m.teamA && m.teamA.toString() === team2Id) { m.teamA = team1Id; m.teamARoster = t1.members; changed = true; }
-            if (m.teamB && m.teamB.toString() === team1Id) { m.teamB = team2Id; m.teamBRoster = t2.members; changed = true; }
-            else if (m.teamB && m.teamB.toString() === team2Id) { m.teamB = team1Id; m.teamBRoster = t1.members; changed = true; }
-            if (changed) { await m.save(); if (this.io) this.io.emit('match_update', m); }
-        }
-    }
-
-    async createMatchForManager(tId, name, num, tA, tB, fmt, round) {
-        const m = new Match({
-            tournament: tId, name, matchNumber: num,
-            teamA: tA._id, teamB: tB._id, format: fmt || 'BO1',
-            status: 'scheduled', round,
-            teamARoster: tA.members, teamBRoster: tB.members
-        });
-        await m.save();
-        return m;
     }
 }
 
