@@ -18,9 +18,6 @@ const MatchSchema = new mongoose.Schema({
     loserMatchSlot: { type: String, enum: ['teamA', 'teamB'] },
 
     roomName: { type: String, default: '' },
-    // Excluded from all queries and JSON/socket payloads by default.
-    // Only GET /matches/:id/room selects it explicitly (participating teams and admins).
-    roomPassword: { type: String, default: '', select: false },
     chat: [{ sender: String, senderId: String, message: String, timestamp: { type: Date, default: Date.now } }],
     
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
