@@ -5,7 +5,9 @@ const MemberSchema = new mongoose.Schema({
     name: String,
     tag: String,
     role: { type: String, enum: ['Main', 'Sub', 'Coach'], default: 'Main' },
-    discordName: { type: String, default: "" }, 
+    // กัปตันทีม: ต้องเป็น role Main เท่านั้น (ตรวจใน routes/teamRoutes.js)
+    isCaptain: { type: Boolean, default: false },
+    discordName: { type: String, default: "" },
     discordId: { type: String, default: "" },
     status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'pending' },
     // [NEW] API Validated Info
@@ -20,21 +22,21 @@ const MemberSchema = new mongoose.Schema({
 
 const TeamSchema = new mongoose.Schema({
     // [NEW] username สำหรับ Login (ห้ามซ้ำ, แก้ไขยาก)
-    username: { 
-        type: String, 
-        required: true, 
-        unique: true, 
+    username: {
+        type: String,
+        required: true,
+        unique: true,
         lowercase: true, // บังคับตัวเล็กหมดเพื่อลดปัญหา Case sensitive
-        trim: true 
+        trim: true
     },
     // [MODIFIED] name คือ Display Name (แสดงผลในตารางแข่ง)
-    name: { type: String, required: true }, 
+    name: { type: String, required: true },
     shortName: { type: String, required: true, maxlength: 4, uppercase: true },
     password: { type: String, required: true },
     logo: { type: String, default: '' },
     status: { type: String, enum: ['pending', 'approved'], default: 'pending' },
     discordRoleId: { type: String, default: '' },
-    
+
     members: [MemberSchema],
     rosterLocked: { type: Boolean, default: false },
     wins: { type: Number, default: 0 },
