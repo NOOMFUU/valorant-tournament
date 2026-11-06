@@ -106,7 +106,7 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
             for (let j = 0; j < 2; j++) { const idx = 19 + (j * 3); addMember(cols[idx], cols[idx + 1], cols[idx + 2], 'Sub'); }
             addMember(cols[25], cols[26], cols[27], 'Coach');
 
-            // CSV import: ตั้งกัปตันเป็นผู้เล่น Main คนแรกโดยอัตโนมัติ (แก้ให้ถูกต้องภายหลังได้ที่หน้า roster)
+            // CSV import: ตั้งกัปตันเป็นผู้เล่น Main คนแรกโดยอัตโนมัติ
             const firstMain = members.find(m => m.role === 'Main');
             if (firstMain) firstMain.isCaptain = true;
 
@@ -131,8 +131,9 @@ router.post('/teams/import', auth(['admin']), csvUpload.single('file'), async (r
 });
 
 // Roster & Team Updates
-// - ต้องมีกัปตันพอดี 1 คน และกัปตันต้องเป็นผู้เล่น Main
-// - เปลี่ยน Riot ID แล้ว Riot API ยืนยันผ่าน -> อนุมัติอัตโนมัติ (status approved)
+// - กัปตันต้องเป็นผู้เล่น Main และมีได้คนเดียว
+//   ถ้าไม่ได้ส่ง isCaptain มา: ใช้กัปตันเดิม (ถ้ายังอยู่ใน roster) มิฉะนั้นใช้ผู้เล่น Main คนแรก
+// - เปลี่ยน Riot ID แล้ว Riot API ยืนยันผ่าน -> อนุมัติอัตโนมัติ
 router.put('/teams/roster', auth(['team']), async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
@@ -142,14 +143,33 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
             return res.status(400).json({ msg: 'A minimum of 5 players is required to complete roster registration.' });
         }
 
-        const captains = newMembers.filter(m => m.isCaptain && m.role === 'Main');
-        if (captains.length !== 1) {
-            return res.status(400).json({ msg: 'Roster must have exactly one captain, chosen from Main players.' });
+        const flagged = newMembers.filter(m => m.isCaptain === true && m.role === 'Main');
+        if (flagged.length > 1) {
+            return res.status(400).json({ msg: 'Only one captain is allowed.' });
+        }
+
+        const findOld = (newM) => team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
+
+        // ตัดสินกัปตัน
+        let captainIndex = newMembers.findIndex(m => m.isCaptain === true && m.role === 'Main');
+        if (captainIndex === -1) {
+            const oldCaptain = team.members.find(m => m.isCaptain);
+            if (oldCaptain) {
+                captainIndex = newMembers.findIndex(m => {
+                    const old = findOld(m);
+                    return old && old._id.toString() === oldCaptain._id.toString() && m.role === 'Main';
+                });
+            }
+            if (captainIndex === -1) captainIndex = newMembers.findIndex(m => m.role === 'Main');
+        }
+        if (captainIndex === -1) {
+            return res.status(400).json({ msg: 'Roster must include at least one Main player to be captain.' });
         }
         
         const processedMembers = [];
-        for (const newM of newMembers) {
-            const oldM = team.members.find(m => (newM._id && m._id.toString() === newM._id) || (m.name === newM.name && m.tag === newM.tag));
+        for (let i = 0; i < newMembers.length; i++) {
+            const newM = newMembers[i];
+            const oldM = findOld(newM);
             
             let status = 'pending';
             let puuid = oldM ? oldM.puuid : '';
@@ -179,8 +199,12 @@ router.put('/teams/roster', auth(['team']), async (req, res) => {
             if (!team.rosterLocked) status = 'approved';
 
             processedMembers.push({
-                ...newM,
-                isCaptain: newM.role === 'Main' && !!newM.isCaptain,
+                name: newM.name,
+                tag: newM.tag,
+                role: newM.role,
+                discordName: newM.discordName || '',
+                discordId: newM.discordId || '',
+                isCaptain: i === captainIndex,
                 status, puuid, accountLevel, playerCard, pendingUpdate: null
             });
         }
