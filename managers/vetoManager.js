@@ -4,6 +4,9 @@ const discordService = require('../services/discordService');
 // Fallback Map Pool (กรณี Tournament ไม่ได้ตั้งค่าไว้)
 const FALLBACK_MAP_POOL = ['Abyss', 'Ascent', 'Bind', 'Haven', 'Lotus', 'Sunset', 'Pearl'];
 
+// เปรียบเทียบ ObjectId / string ได้ทั้งคู่ (เดิมเรียกฟังก์ชันนี้โดยไม่ได้ประกาศ -> ReferenceError)
+const areIdsEqual = (a, b) => !!a && !!b && a.toString() === b.toString();
+
 class VetoManager {
     constructor(io) {
         this.io = io;
@@ -21,23 +24,19 @@ class VetoManager {
                 .populate('tournament'); 
             
             if(match) {
-                // [UPDATED] Force Sync Map Pool ถ้ายังไม่เริ่ม Veto
-                // เพื่อให้มั่นใจว่าถ้า Admin เปลี่ยน Map Pool ใน Tournament แมตช์จะอัปเดตตาม
+                // Force Sync Map Pool ถ้ายังไม่เริ่ม Veto
                 if (match.vetoData.status === 'pending') {
                     const tournamentPool = (match.tournament && match.tournament.mapPool && match.tournament.mapPool.length > 0) 
                         ? match.tournament.mapPool 
                         : null;
 
-                    // ถ้ามี Pool ใน Tournament และยังไม่ตรงกับใน Match ให้ทับเลย
                     if (tournamentPool) {
-                        // เช็คว่าต้องอัปเดตไหม (ป้องกันการเขียน DB ซ้ำๆ โดยไม่จำเป็น)
                         const isDifferent = JSON.stringify(match.vetoData.mapPool) !== JSON.stringify(tournamentPool);
                         if (isDifferent || match.vetoData.mapPool.length === 0) {
                             match.vetoData.mapPool = tournamentPool;
                             await match.save();
                         }
                     } else if (!match.vetoData.mapPool || match.vetoData.mapPool.length === 0) {
-                        // ถ้าไม่มีให้ใช้ Fallback
                         match.vetoData.mapPool = FALLBACK_MAP_POOL;
                         await match.save();
                     }
@@ -48,7 +47,6 @@ class VetoManager {
                 this.io.to(matchId).emit('veto_update', matchData);
                 this.io.to('admins').emit('veto_update', matchData);
 
-                // [NEW] Notify teams in dashboard about presence/veto updates
                 if (match.teamA) this.io.to(match.teamA._id.toString()).emit('lobby_presence_update', { matchId });
                 if (match.teamB) this.io.to(match.teamB._id.toString()).emit('lobby_presence_update', { matchId });
             }
@@ -89,16 +87,15 @@ class VetoManager {
             await this.startCoinToss(match);
         }
     }
+
     // --- CORE VETO FLOW ---
     async startCoinToss(match) {
-        // [UPDATED] Initialize Pool before starting (Final Sync)
         if (match.tournament && match.tournament.mapPool && match.tournament.mapPool.length > 0) {
              match.vetoData.mapPool = match.tournament.mapPool;
         } else if (!match.vetoData.mapPool || match.vetoData.mapPool.length === 0) {
              match.vetoData.mapPool = FALLBACK_MAP_POOL;
         }
 
-        // If 1v1 mode is active and results aren't reported yet, wait
         if (match.vetoData.priorityMode === '1v1' && !match.vetoData.priorityWinnerId) {
             match.vetoData.status = 'awaiting_1v1';
             await this.logAction(match, "PROTOCOL: Awaiting 1v1 Duel Results");
@@ -142,16 +139,14 @@ class VetoManager {
         const match = await Match.findById(matchId).populate('teamA teamB');
         if (!match || match.vetoData.status !== 'awaiting_1v1') return;
 
-        // Only captains can report
         if (!areIdsEqual(teamId, match.teamA._id) && !areIdsEqual(teamId, match.teamB._id)) return;
 
         match.vetoData.priorityReportedBy = teamId;
         match.vetoData.priorityWinnerId = winnerId;
         
         await match.save();
-        await this.logAction(match, `REPORT: ${teamId === match.teamA._id.toString() ? match.teamA.name : match.teamB.name} reported winner`);
+        await this.logAction(match, `REPORT: ${areIdsEqual(teamId, match.teamA._id) ? match.teamA.name : match.teamB.name} reported winner`);
         
-        // Auto-start coin toss phase (which will now skip to decision)
         await this.startCoinToss(match);
     }
 
@@ -165,7 +160,6 @@ class VetoManager {
         const t1 = (choice === 'first') ? winnerId : loserId;
         const t2 = (choice === 'first') ? loserId : winnerId;
 
-        // Define Sequence
         let seq = [];
         if (match.format === 'BO3') {
             seq = [
@@ -209,7 +203,7 @@ class VetoManager {
         if (v.status !== 'in_progress') return;
         
         const step = v.sequence[v.sequenceIndex];
-        if (step.team !== teamId) return; 
+        if (!step || step.team !== teamId) return; 
 
         const teamName = match.teamA._id.toString() === teamId ? match.teamA.name : match.teamB.name;
 
@@ -243,17 +237,15 @@ class VetoManager {
             match.vetoData.status = 'completed';
             match.status = 'live'; 
             this.clearTimer(match._id);
-            this.io.emit('match_update', match); // [NEW] Notify dashboard to update status to LIVE
+            this.io.emit('match_update', match);
             await this.logAction(match, `VETO COMPLETED - GLHF!`);
             
-            // [NEW] Announce Veto Results to Discord
             await discordService.sendVetoResultToDiscord(match);
         } else {
             const nextStep = match.vetoData.sequence[match.vetoData.sequenceIndex];
             
             if (nextStep.act === 'decider') {
                 const used = [...match.vetoData.bannedMaps, ...match.vetoData.pickedMaps.map(m=>m.map)];
-                // [UPDATED] Use current mapPool
                 const pool = match.vetoData.mapPool && match.vetoData.mapPool.length > 0 ? match.vetoData.mapPool : FALLBACK_MAP_POOL;
                 const available = pool.filter(m => !used.includes(m));
                 
@@ -340,9 +332,8 @@ class VetoManager {
 
         if (currentPauses >= MAX_PAUSES) return { success: false, msg: `Pause limit reached (${MAX_PAUSES}/${MAX_PAUSES})` };
 
-        // Cooldown Check
         const lastPause = isTeamA ? match.vetoData.teamALastPauseTime : match.vetoData.teamBLastPauseTime;
-        const COOLDOWN = 20000; // 30 seconds
+        const COOLDOWN = 20000;
         if (lastPause) {
             const diff = Date.now() - new Date(lastPause).getTime();
             if (diff < COOLDOWN) {
@@ -373,14 +364,13 @@ class VetoManager {
     async adminPause(match) {
         await this.pauseTimer(match);
         match.vetoData.status = 'paused';
-        match.vetoData.pausedBy = null; // Admin
+        match.vetoData.pausedBy = null;
         match.vetoData.pauseStartTime = new Date();
         await this.logAction(match, `PAUSE: Admin paused veto`);
         await match.save();
         await this.broadcastState(match._id.toString());
     }
 
-    // [NEW] Reset Veto State
     async resetVeto(match) {
         this.clearTimer(match._id.toString());
         
@@ -423,7 +413,7 @@ class VetoManager {
         const match = await Match.findById(matchId);
         if (!match || match.vetoData.status !== 'paused') return { success: false, msg: 'Not paused' };
 
-        const PAUSE_LIMIT_MS = 120 * 1000; // 2 minutes
+        const PAUSE_LIMIT_MS = 120 * 1000;
         const elapsed = Date.now() - new Date(match.vetoData.pauseStartTime).getTime();
         const isPauser = match.vetoData.pausedBy && match.vetoData.pausedBy.toString() === teamId;
         
@@ -441,6 +431,7 @@ class VetoManager {
         return { success: true };
     }
 
+    // หมดเวลา: สุ่มอัตโนมัติทุกขั้น (ban/pick/side/decision) ไม่ให้ veto ค้าง
     async handleTimeout(matchId) {
         const match = await Match.findById(matchId);
         if(!match || (match.vetoData.status !== 'in_progress' && match.vetoData.status !== 'decision')) return;
@@ -454,22 +445,28 @@ class VetoManager {
 
         const v = match.vetoData;
         const step = v.sequence[v.sequenceIndex];
-        
-        // Use stored mapPool or fallback
+        if (!step) return;
+
         const pool = match.vetoData.mapPool && match.vetoData.mapPool.length > 0 ? match.vetoData.mapPool : FALLBACK_MAP_POOL;
         const used = [...v.bannedMaps, ...v.pickedMaps.map(m=>m.map)];
         const available = pool.filter(m => !used.includes(m));
-        
+
         if (step.act === 'ban' || step.act === 'pick') {
-             if(available.length > 0) {
-                 const randMap = available[Math.floor(Math.random() * available.length)];
-                 await this.logAction(match, `TIMEOUT: Auto-${step.act} ${randMap}`);
-                 await this.handleAction(matchId, step.team, step.act, randMap);
-             }
+            if (available.length > 0) {
+                const randMap = available[Math.floor(Math.random() * available.length)];
+                await this.logAction(match, `TIMEOUT: Auto-${step.act} ${randMap}`);
+                await this.handleAction(matchId, step.team, step.act, randMap);
+            } else {
+                await this.logAction(match, `TIMEOUT: No map available, skipping ${step.act}`);
+                await this.nextTurn(match);
+            }
         } else if (step.act === 'side') {
-             const randSide = Math.random() < 0.5 ? 'atk' : 'def';
-             await this.logAction(match, `TIMEOUT: Auto-side ${randSide}`);
-             await this.handleAction(matchId, step.team, 'side', null, randSide);
+            const randSide = Math.random() < 0.5 ? 'atk' : 'def';
+            await this.logAction(match, `TIMEOUT: Auto-side ${randSide}`);
+            await this.handleAction(matchId, step.team, 'side', null, randSide);
+        } else if (step.act === 'decider') {
+            await this.logAction(match, `TIMEOUT: Decider step skipped`);
+            await this.nextTurn(match);
         }
     }
 
@@ -497,7 +494,6 @@ class VetoManager {
 
     async restoreTimers() {
         try {
-            // หาแมตช์ที่สถานะกำลังแข่ง (in_progress) หรือ decision
             const activeMatches = await Match.find({ 
                 'vetoData.status': { $in: ['in_progress', 'decision'] } 
             });
@@ -511,14 +507,12 @@ class VetoManager {
                     const remainingTime = deadline - now;
 
                     if (remainingTime > 0) {
-                        // ถ้าเวลายังเหลือ ให้ตั้ง Timer ต่อ
                         console.log(`  -> Match ${match._id}: Resuming timer (${Math.ceil(remainingTime/1000)}s)`);
                         this.clearTimer(match._id.toString());
                         this.timers[match._id.toString()] = setTimeout(async () => {
                             await this.handleTimeout(match._id.toString());
                         }, remainingTime);
                     } else {
-                        // ถ้าเวลาหมดไปตอน Server ดับ -> สั่งให้ Timeout ทันที
                         console.log(`  -> Match ${match._id}: Expired while offline. Triggering timeout.`);
                         await this.handleTimeout(match._id.toString());
                     }
